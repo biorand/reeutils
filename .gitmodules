@@ -1,0 +1,4 @@
+[submodule "lib/REE.PAK.Tool"]
+	path = lib/REE.PAK.Tool
+	url = https://github.com/Intelorca/REE.PAK.Tool.git
+	branch = library-refactor
