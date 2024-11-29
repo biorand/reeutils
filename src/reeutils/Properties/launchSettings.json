@@ -1,8 +1,12 @@
 {
   "profiles": {
-    "reeutils": {
+    "export": {
       "commandName": "Project",
-      "commandLineArgs": "unpack G:\\re4r\\vanilla\\dlc\\re_dlc_stm_2109311.pak -o dog -g re4r"
+      "commandLineArgs": "export natives/stm/_chainsaw/message/mes_main_item/ch_mes_main_item_caption.msg.22\r\n-o ch_mes_main_item_caption.msg.22.json\r\n-I G:\\re4r\\vanilla\\re_chunk_000.pak\r\n-I G:\\re4r\\vanilla\\re_chunk_000.pak.patch_001.pak\r\n-I G:\\re4r\\vanilla\\re_chunk_000.pak.patch_002.pak\r\n-I G:\\re4r\\vanilla\\re_chunk_000.pak.patch_003.pak\r\n-I M:\\git\\reeutils\\out\\.funnystrings_tmp"
+    },
+    "import": {
+      "commandName": "Project",
+      "commandLineArgs": "import ch_mes_main_item_caption.msg.22.json -o new.msg.22"
     }
   }
 }

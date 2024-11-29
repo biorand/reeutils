@@ -21,6 +21,12 @@ namespace IntelOrca.Biohazard.REEUtils
                     .WithDescription("Extracts a .pak file to a directory")
                     .WithExample("unpack", "-g", "re4r", "-o", "output", "input.pak")
                     .WithExample("unpack", "-l", "mylist.txt", "-o", "output", "input.pak");
+                config.AddCommand<ExportCommand>("export")
+                    .WithDescription("Export an REE file to JSON.")
+                    .WithExample("export", "-o", "ch_mes_main_item_caption.msg.22.json", "ch_mes_main_item_caption.msg.22");
+                config.AddCommand<ImportCommand>("import")
+                    .WithDescription("Import a JSON file and convert to an REE file.")
+                    .WithExample("export", "-o", "ch_mes_main_item_caption.msg.22", "ch_mes_main_item_caption.msg.22.json");
                 // config.AddCommand<DumpCommand>("dump")
                 //     .WithDescription("Dumps an SCN file to JSON")
                 //     .WithExample("dump", "input.scn");
