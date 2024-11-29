@@ -59,7 +59,23 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 ? EmbeddedData.GetPakList(settings.Game!) ?? throw new Exception($"{settings.Game} not recognized.")
                 : new PakList(File.ReadAllText(settings.PakListPath));
 
-            await pakFile.ExtractAllAsync(pakList, outputPath);
+            for (var i = 0; i < pakFile.NumEntries; i++)
+            {
+                var entryHash = pakFile.GetEntryHash(i);
+                var entryPath = pakList.GetPath(entryHash);
+                if (entryPath == null)
+                {
+                    AnsiConsole.WriteLine($"No file name found for hash: {entryHash}");
+                }
+                else
+                {
+                    var fullPath = Path.Combine(outputPath, entryPath);
+                    var data = pakFile.GetEntryData(i);
+                    Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+                    await File.WriteAllBytesAsync(fullPath, data);
+                    AnsiConsole.WriteLine(entryPath);
+                }
+            }
             return 0;
         }
     }

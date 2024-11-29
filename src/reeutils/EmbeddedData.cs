@@ -10,7 +10,7 @@ namespace IntelOrca.Biohazard.REEUtils
         public static PakList? GetPakList(string name)
         {
             var assembly = Assembly.GetExecutingAssembly()!;
-            var resourceName = $"reeutils.data.paklist.{name}.txt.gz";
+            var resourceName = $"IntelOrca.Biohazard.REEUtils.data.paklist.{name}.txt.gz";
             using var stream = assembly.GetManifestResourceStream(resourceName);
             if (stream == null)
                 return null;

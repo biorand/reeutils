@@ -1,5 +1,9 @@
 {
   "profiles": {
+    "unpack": {
+      "commandName": "Project",
+      "commandLineArgs": "unpack \"F:\\games\\steamapps\\common\\RESIDENT EVIL 4  BIOHAZARD RE4\\re_chunk_000.pak.patch_004.pak\" -o dog -g re4r"
+    },
     "export": {
       "commandName": "Project",
       "commandLineArgs": "export natives/stm/_chainsaw/message/mes_main_item/ch_mes_main_item_caption.msg.22\r\n-o ch_mes_main_item_caption.msg.22.json\r\n-I G:\\re4r\\vanilla\\re_chunk_000.pak\r\n-I G:\\re4r\\vanilla\\re_chunk_000.pak.patch_001.pak\r\n-I G:\\re4r\\vanilla\\re_chunk_000.pak.patch_002.pak\r\n-I G:\\re4r\\vanilla\\re_chunk_000.pak.patch_003.pak\r\n-I M:\\git\\reeutils\\out\\.funnystrings_tmp"

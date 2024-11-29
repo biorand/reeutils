@@ -73,7 +73,7 @@ class ReeMod:
         Saves the mod as a pak file that can be placed in the installation directory
         of an REE game.
         """
-        print(f"Saving pak {self.name} to {path}")
+        self._exec_tool(["pack", "-C", self.work_dir, "-o", path, self._get_work_path("natives")])
 
     def save_fluffy(self, path=None):
         """
@@ -170,6 +170,6 @@ class ReeMod:
     def _exec_tool(self, args):
         command = ["reeutils"] + args
         # print(command)
-        result = subprocess.run(command)
+        result = subprocess.run(command, capture_output=True)
         if result.returncode != 0:
             raise Exception(f"reeutils failed with exit code {result.returncode}")

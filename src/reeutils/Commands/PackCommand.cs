@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
 using System.IO;
 using REE;
 using Spectre.Console;
@@ -16,6 +17,9 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
             [CommandOption("-o|--output")]
             public string? OutputPath { get; init; }
+
+            [CommandOption("-C")]
+            public string? BasePath { get; init; }
         }
 
         public override ValidationResult Validate(CommandContext context, Settings settings)
@@ -40,20 +44,20 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             foreach (var inputPath in settings.InputPaths)
             {
                 var fullInputPath = Path.GetFullPath(inputPath);
-                var basePath = Path.GetDirectoryName(fullInputPath)!;
+                var basePath = settings.BasePath ?? Environment.CurrentDirectory;
                 if (Directory.Exists(fullInputPath))
                 {
                     var files = Directory.GetFiles(fullInputPath, "*", SearchOption.AllDirectories);
                     foreach (var file in files)
                     {
-                        var relativePath = Path.GetRelativePath(basePath, file);
+                        var relativePath = Path.GetRelativePath(basePath, file).Replace("\\", "/");
                         builder.AddEntry(relativePath, File.ReadAllBytes(file));
                         AnsiConsole.WriteLine(relativePath);
                     }
                 }
                 else
                 {
-                    var relativePath = Path.GetFileName(fullInputPath);
+                    var relativePath = Path.GetFileName(fullInputPath).Replace("\\", "/");
                     builder.AddEntry(relativePath, File.ReadAllBytes(fullInputPath));
                     AnsiConsole.WriteLine(relativePath);
                 }

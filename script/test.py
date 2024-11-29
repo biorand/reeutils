@@ -37,6 +37,7 @@ if __name__ == "__main__":
 
     def chg(msg):
         set_msg_en(msg, "6766b978-b6cb-42fe-91ca-ce55edabcea9", "A very green herb that\r\nrestores plenty of health.")
-    mod.modify("natives\stm\_chainsaw\message\mes_main_item\ch_mes_main_item_caption.msg.22", chg)
+    mod.modify("natives/stm/_chainsaw/message/mes_main_item/ch_mes_main_item_caption.msg.22", chg)
 
     mod.save_fluffy()
+    mod.save_pak("re_chunk_000.pak.patch_004.pak")
