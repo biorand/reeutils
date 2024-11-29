@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "reeutils": {
+      "commandName": "Project",
+      "commandLineArgs": "unpack G:\\re4r\\vanilla\\dlc\\re_dlc_stm_2109311.pak -o dog -g re4r"
+    }
+  }
+}
