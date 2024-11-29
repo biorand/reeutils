@@ -7,16 +7,21 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: true
     - name: Restore
       run: dotnet restore
     - name: Build
-      run: dotnet build -c Release
+      run: |
+        dotnet publish src/reeutils -c Release -o out/reeutils --os linux
+        dotnet publish src/reeutils -c Release -o out/reeutils --os win
     - name: Pack
       run: |
-        dotnet publish -c Release --no-build -o out
-        rm -rf out/*.deps.json out/*.pdb out/de out/fr out/sv
-        cp script/* out
-        tar czf reeutils.tar.gz -C out
+        cd out/reeutils
+        rm -rf *.deps.json *.pdb de fr sv
+        cp ../../script/* .
+        cd ..
+        tar czf ../reeutils.tar.gz .
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
