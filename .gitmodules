@@ -2,3 +2,7 @@
 	path = lib/REE.PAK.Tool
 	url = https://github.com/Intelorca/REE.PAK.Tool.git
 	branch = library-refactor
+[submodule "lib/rsztool"]
+	path = lib/rsztool
+	url = https://github.com/IntelOrca/RszTool.git
+	branch = biorand/v0.2.2

@@ -11,8 +11,12 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../lib/REE.PAK.Tool/src/REE.PAK/REE.PAK.csproj" />
+    <ProjectReference Include="../../lib/rsztool\RszTool\RszTool.csproj" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="data/**/*" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="data\rszre4.json.gz" />
   </ItemGroup>
 </Project>

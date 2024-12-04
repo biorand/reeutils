@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Namsku.REE.Messages;
 using REE;
+using RszTool;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -20,6 +21,9 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
             [CommandOption("-o|--output")]
             public string? OutputPath { get; init; }
+
+            [CommandOption("-g|--game")]
+            public string? Game { get; init; }
 
             [CommandOption("-I")]
             public string[] BaselinePaths { get; init; } = [];
@@ -59,6 +63,21 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                     }).ToArray()
                 };
                 await File.WriteAllTextAsync(settings.OutputPath!, data.ToJson(camelCase: true));
+            }
+            else if (settings.InputPath.EndsWith(".user.2"))
+            {
+                var fileData = GetFileData(settings);
+                if (fileData == null)
+                    throw new Exception("File not found");
+
+                if (settings.Game == null)
+                    throw new Exception("Game not specified");
+
+                var rszFileOption = EmbeddedData.CreateRszFileOption(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
+                var userFile = new UserFile(rszFileOption, new FileHandler(new MemoryStream(fileData)));
+                userFile.Read();
+                var root = userFile.RSZ!.ObjectList[0];
+                await File.WriteAllTextAsync(settings.OutputPath!, root.ToSimpleJson());
             }
             else
             {
