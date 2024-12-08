@@ -73,7 +73,7 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 if (settings.Game == null)
                     throw new Exception("Game not specified");
 
-                var rszFileOption = EmbeddedData.CreateRszFileOption(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
+                var rszFileOption = EmbeddedData.CreateRszFileOptionBinary(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
                 var userFile = new UserFile(rszFileOption, new FileHandler(new MemoryStream(fileData)));
                 userFile.Read();
                 var root = userFile.RSZ!.ObjectList[0];

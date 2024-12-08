@@ -1,4 +1,5 @@
-﻿using IntelOrca.Biohazard.REEUtils.Commands;
+﻿using System.IO;
+using IntelOrca.Biohazard.REEUtils.Commands;
 using Spectre.Console.Cli;
 
 namespace IntelOrca.Biohazard.REEUtils
@@ -7,7 +8,6 @@ namespace IntelOrca.Biohazard.REEUtils
     {
         public static int Main(string[] args)
         {
-            // return DebugCode();
             var app = new CommandApp();
             app.Configure(config =>
             {
@@ -35,6 +35,15 @@ namespace IntelOrca.Biohazard.REEUtils
                     .WithExample("msg", "input.msg.22");
             });
             return app.Run(args);
+        }
+
+        private static void CreateBinaryRszData()
+        {
+            var data = RszBinarySerializer.Serialize(
+                EmbeddedData.GetCompressedFile("rszre4.json")!,
+                EmbeddedData.GetCompressedFile("rszre4_patch.json")!,
+                EmbeddedData.GetCompressedFile("re4_enum.json")!);
+            File.WriteAllBytes(@"M:\git\reeutils\src\reeutils\data\reszre4.dat", data);
         }
     }
 }

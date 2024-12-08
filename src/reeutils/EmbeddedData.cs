@@ -20,6 +20,17 @@ namespace IntelOrca.Biohazard.REEUtils
             return new PakList(content);
         }
 
+        public static RszFileOption? CreateRszFileOptionBinary(string name)
+        {
+            if (!Enum.TryParse<GameName>(name, out var gameName))
+                return null;
+
+            var data = GetCompressedFile($"resz{name}.dat")!;
+            var enumData = Encoding.UTF8.GetString(GetCompressedFile("re4_enum.json")!);
+            var rszParser = RszBinarySerializer.Deserialize(data);
+            return new RszFileOption(gameName, GameVersion.re4, rszParser, EnumParser.FromJson(enumData));
+        }
+
         public static RszFileOption? CreateRszFileOption(string name)
         {
             if (!Enum.TryParse<GameName>(name, out var gameName))
@@ -55,7 +66,7 @@ namespace IntelOrca.Biohazard.REEUtils
             File.WriteAllBytes(path, data);
         }
 
-        private static byte[]? GetCompressedFile(string name)
+        public static byte[]? GetCompressedFile(string name)
         {
             var assembly = Assembly.GetExecutingAssembly()!;
             var resourceName = $"IntelOrca.Biohazard.REEUtils.data.{name}.gz";

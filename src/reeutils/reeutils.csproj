@@ -16,7 +16,4 @@
   <ItemGroup>
     <EmbeddedResource Include="data/**/*" />
   </ItemGroup>
-  <ItemGroup>
-    <None Remove="data\rszre4.json.gz" />
-  </ItemGroup>
 </Project>
