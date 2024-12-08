@@ -77,7 +77,10 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 var userFile = new UserFile(rszFileOption, new FileHandler(new MemoryStream(fileData)));
                 userFile.Read();
                 var root = userFile.RSZ!.ObjectList[0];
-                await File.WriteAllTextAsync(settings.OutputPath!, root.ToSimpleJson());
+
+                var serializer = new RszInstanceSerializer(userFile.RSZ);
+                var rootJson = serializer.Serialize(root);
+                await File.WriteAllTextAsync(settings.OutputPath!, rootJson);
             }
             else
             {

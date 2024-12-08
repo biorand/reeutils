@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Numerics;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Namsku.REE.Messages;
@@ -79,7 +77,10 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 var userFile = new UserFile(rszFileOption, new FileHandler(ms));
                 userFile.Read();
                 userFile.RSZ!.ObjectList.Clear();
-                userFile.RSZ!.ObjectList.Add(DeserializeRootElement(userFile.RSZ, data.RootElement));
+
+                var serializer = new RszInstanceSerializer(userFile.RSZ);
+                userFile.RSZ!.ObjectList.Add(serializer.Deserialize(data.RootElement));
+
                 userFile.RSZ!.RebuildInstanceInfo();
                 userFile.RebuildInfoTable();
                 await File.WriteAllBytesAsync(settings.OutputPath!, userFile.ToByteArray());
@@ -89,70 +90,6 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 throw new NotSupportedException("File format not supported.");
             }
             return 0;
-        }
-
-        private static RszInstance DeserializeRootElement(RSZFile rsz, JsonElement el)
-        {
-            if (el.ValueKind != JsonValueKind.Object)
-                throw new Exception("Root must be an object");
-
-            return DeserializeObject(rsz, el);
-        }
-
-        private static RszInstance DeserializeObject(RSZFile rsz, JsonElement el)
-        {
-            if (el.ValueKind != JsonValueKind.Object)
-                throw new Exception("Expected object");
-
-            var type = el.GetStringProperty("$type")!;
-            var result = rsz.CreateInstance(type);
-            foreach (var f in result.Fields)
-            {
-                if (el.TryGetProperty(f.name, out var propEl))
-                {
-                    result.SetFieldValue(f.name, DeserializeField(rsz, f, propEl));
-                }
-            }
-            return result;
-        }
-
-        private static object DeserializeField(RSZFile rsz, RszField field, JsonElement el)
-        {
-            return field.array
-                ? DeserializeArray(rsz, field.type, el)
-                : DeserializeElement(rsz, field.type, el);
-        }
-
-        private static object DeserializeArray(RSZFile rsz, RszFieldType type, JsonElement el)
-        {
-            if (el.ValueKind != JsonValueKind.Array)
-                throw new Exception("Expected array");
-
-            var list = new List<object>();
-            foreach (var jArrayItem in el.EnumerateArray())
-            {
-                list.Add(DeserializeElement(rsz, type, jArrayItem));
-            }
-            return list;
-        }
-
-
-        private static object DeserializeElement(RSZFile rsz, RszFieldType fieldType, JsonElement el)
-        {
-            return fieldType switch
-            {
-                RszFieldType.Bool => el.GetBoolean(),
-                RszFieldType.S32 => el.GetInt32(),
-                RszFieldType.F32 => el.GetSingle(),
-                RszFieldType.Object => DeserializeObject(rsz, el),
-                RszFieldType.Vec4 => new Vector4(
-                    el.GetProperty("X").GetSingle(),
-                    el.GetProperty("Y").GetSingle(),
-                    el.GetProperty("Z").GetSingle(),
-                    el.GetProperty("W").GetSingle()),
-                RszFieldType.Data => BitConverter.GetBytes(el.GetSingle()),
-                _ => throw new NotImplementedException(),
-            };
         }
     }
 }
