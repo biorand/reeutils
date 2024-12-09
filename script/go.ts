@@ -2,6 +2,7 @@ import { ModsContext } from "./mods.ts";
 import { MsgFile, ReeMod } from "./ree_mod.ts";
 import * as path from "jsr:@std/path";
 import { createLaserSightMod } from "./weapons.ts";
+import { createIncreasedJetSkiTimer } from "./misc.ts";
 
 function setMessageEn(msg: MsgFile, guid: string, value: string) {
     for (const entry of msg.entries) {
@@ -12,10 +13,17 @@ function setMessageEn(msg: MsgFile, guid: string, value: string) {
     }
 }
 
+async function applyMods(ctx: ModsContext) {
+    await createLaserSightMod(ctx);
+    await createIncreasedJetSkiTimer(ctx);
+}
+
 async function main() {
     const ctx = new ModsContext();
     ctx.baseLine = getVanillaPaths();
-    await createLaserSightMod(ctx);
+    await ctx.createSingleMod("biorand", async () => {
+        await applyMods(ctx);
+    });
 
     // const mod = await ReeMod.create("funnystrings", "IntelOrca");
     // try {

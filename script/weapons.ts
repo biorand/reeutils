@@ -18,8 +18,8 @@ const WeaponIds = {
     WP_SW_RED9: 6113
 };
 
-export function createLaserSightMod(ctx: ModsContext) {
-    ctx.createOrApplyMod("lasersight", async mod => {
+export async function createLaserSightMod(ctx: ModsContext) {
+    await ctx.createOrApplyMod("lasersight", async mod => {
         // Weapon part combine
         await mod.modify("natives/stm/_chainsaw/appsystem/ui/userdata/weaponpartscombinedefinitionuserdata.user.2", f => {
             const laserSight = f._Datas.find(x => x._ItemId == ItemIds.AT_LASER_SIGHT);

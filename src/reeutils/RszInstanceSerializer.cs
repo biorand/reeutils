@@ -112,11 +112,6 @@ namespace IntelOrca.Biohazard.REEUtils
                     RszFieldType.U32 => el.GetUInt32(),
                     RszFieldType.F32 => el.GetSingle(),
                     RszFieldType.Object => DeserializeObject(el),
-                    RszFieldType.Range => new RszTool.via.Range()
-                    {
-                        r = el.GetProperty("r").GetSingle(),
-                        s = el.GetProperty("s").GetSingle()
-                    },
                     RszFieldType.Vec3 => new Vector3(
                         el.GetProperty("X").GetSingle(),
                         el.GetProperty("Y").GetSingle(),
@@ -131,6 +126,17 @@ namespace IntelOrca.Biohazard.REEUtils
                         el.GetProperty("Y").GetSingle(),
                         el.GetProperty("Z").GetSingle(),
                         el.GetProperty("W").GetSingle()),
+                    RszFieldType.Guid => Guid.Parse(el.GetString()!),
+                    RszFieldType.Range => new RszTool.via.Range()
+                    {
+                        r = el.GetProperty("r").GetSingle(),
+                        s = el.GetProperty("s").GetSingle()
+                    },
+                    RszFieldType.Size => new RszTool.via.Size()
+                    {
+                        w = el.GetProperty("w").GetSingle(),
+                        h = el.GetProperty("h").GetSingle()
+                    },
                     RszFieldType.Data => throw new NotImplementedException(),
                     _ => throw new NotImplementedException($"Deserialization of {field.type} is not implemented")
                 };
