@@ -98,20 +98,47 @@ namespace IntelOrca.Biohazard.REEUtils
 
         private object DeserializeElement(RszField field, JsonElement el)
         {
-            return field.type switch
+            try
             {
-                RszFieldType.Bool => el.GetBoolean(),
-                RszFieldType.S32 => el.GetInt32(),
-                RszFieldType.F32 => el.GetSingle(),
-                RszFieldType.Object => DeserializeObject(el),
-                RszFieldType.Vec4 => new Vector4(
-                    el.GetProperty("X").GetSingle(),
-                    el.GetProperty("Y").GetSingle(),
-                    el.GetProperty("Z").GetSingle(),
-                    el.GetProperty("W").GetSingle()),
-                RszFieldType.Data => throw new NotImplementedException(),
-                _ => throw new NotImplementedException()
-            };
+                return field.type switch
+                {
+                    RszFieldType.Bool => el.GetBoolean(),
+                    RszFieldType.String => el.GetString()!,
+                    RszFieldType.S8 => el.GetSByte(),
+                    RszFieldType.U8 => el.GetByte(),
+                    RszFieldType.S16 => el.GetInt16(),
+                    RszFieldType.U16 => el.GetUInt16(),
+                    RszFieldType.S32 => el.GetInt32(),
+                    RszFieldType.U32 => el.GetUInt32(),
+                    RszFieldType.F32 => el.GetSingle(),
+                    RszFieldType.Object => DeserializeObject(el),
+                    RszFieldType.Range => new RszTool.via.Range()
+                    {
+                        r = el.GetProperty("r").GetSingle(),
+                        s = el.GetProperty("s").GetSingle()
+                    },
+                    RszFieldType.Vec3 => new Vector3(
+                        el.GetProperty("X").GetSingle(),
+                        el.GetProperty("Y").GetSingle(),
+                        el.GetProperty("Z").GetSingle()),
+                    RszFieldType.Vec4 => new Vector4(
+                        el.GetProperty("X").GetSingle(),
+                        el.GetProperty("Y").GetSingle(),
+                        el.GetProperty("Z").GetSingle(),
+                        el.GetProperty("W").GetSingle()),
+                    RszFieldType.Quaternion => new Quaternion(
+                        el.GetProperty("X").GetSingle(),
+                        el.GetProperty("Y").GetSingle(),
+                        el.GetProperty("Z").GetSingle(),
+                        el.GetProperty("W").GetSingle()),
+                    RszFieldType.Data => throw new NotImplementedException(),
+                    _ => throw new NotImplementedException($"Deserialization of {field.type} is not implemented")
+                };
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Issue with setting field {field.name} to {el}. {ex.Message}", ex);
+            }
         }
     }
 }

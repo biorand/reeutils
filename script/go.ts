@@ -1,5 +1,7 @@
+import { ModsContext } from "./mods.ts";
 import { MsgFile, ReeMod } from "./ree_mod.ts";
 import * as path from "jsr:@std/path";
+import { createLaserSightMod } from "./weapons.ts";
 
 function setMessageEn(msg: MsgFile, guid: string, value: string) {
     for (const entry of msg.entries) {
@@ -11,17 +13,21 @@ function setMessageEn(msg: MsgFile, guid: string, value: string) {
 }
 
 async function main() {
-    const mod = await ReeMod.create("funnystrings", "IntelOrca");
-    try {
-        mod.setBaseline(getVanillaPaths());
-        await mod.modify("natives/stm/_chainsaw/message/mes_main_item/ch_mes_main_item_caption.msg.22", msg => {
-            setMessageEn(msg, "6766b978-b6cb-42fe-91ca-ce55edabcea9", "A very green herb that\r\nrestores plenty of health.");
-        });
-        await mod.saveFluffy("funnystrings.zip");
-        await mod.savePak("re_chunk_000.pak.patch_004.pak");
-    } finally {
-        await mod.dispose();
-    }
+    const ctx = new ModsContext();
+    ctx.baseLine = getVanillaPaths();
+    await createLaserSightMod(ctx);
+
+    // const mod = await ReeMod.create("funnystrings", "IntelOrca");
+    // try {
+    //     mod.setBaseline(getVanillaPaths());
+    //     await mod.modify("natives/stm/_chainsaw/message/mes_main_item/ch_mes_main_item_caption.msg.22", msg => {
+    //         setMessageEn(msg, "6766b978-b6cb-42fe-91ca-ce55edabcea9", "A very green herb that\r\nrestores plenty of health.");
+    //     });
+    //     await mod.saveFluffy("funnystrings.zip");
+    //     await mod.savePak("re_chunk_000.pak.patch_004.pak");
+    // } finally {
+    //     await mod.dispose();
+    // }
 }
 
 function getVanillaPaths() {

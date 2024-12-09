@@ -36,6 +36,7 @@ async function cpr(src: string, dest: string) {
 
 async function zip(outputPath: string, dir: string) {
     await rmrf(outputPath);
+    await ensuredir(outputPath);
     const path7zip = "C:\\Program Files\\7-Zip\\7z.exe";
     const cmd = new Deno.Command(path7zip, {
         args: ["a", "-r", path.resolve(outputPath), "."],
@@ -70,7 +71,7 @@ export class ReeMod {
     private workDir: string;
     private baseline: string[];
 
-    constructor(name: string, author: string) {
+    private constructor(name: string, author: string) {
         this.debug = false;
         this.name = name;
         this.author = author;
@@ -184,7 +185,7 @@ export class ReeMod {
      */
     async importJson(path: string, input: string) {
         const modpath = this.getAndEnsureModPath(path);
-        await this.execTool(["import", "-o", modpath, input]);
+        await this.execTool(["import", "-g", "re4", "-o", modpath, input]);
     }
 
     /**
@@ -194,7 +195,7 @@ export class ReeMod {
      * @param path 
      * @param cb 
      */
-    async modify(path: string, cb: (f: MsgFile) => void) {
+    async modify(path: string, cb: (f: MsgFile | any) => void) {
         const hasExtension = (ext: string) => path.toLowerCase().endsWith(ext)
         if (hasExtension('.scn.2')) {
             throw new Error("Scenes not yet supported");
@@ -224,6 +225,7 @@ export class ReeMod {
 
     private async execToolDefault(args: string[]) {
         let finalArgs = args;
+        finalArgs = [...finalArgs, "-g", "re4"];
         for (const bl of this.baseline) {
             finalArgs = [...finalArgs, "-I", bl];
         }
@@ -237,8 +239,18 @@ export class ReeMod {
         });
         // console.log(`reeutils ${args.join(" ")}`);
         const result = await command.output();
-        if (result.code != 0) {
-            throw new Error(`reeutils failed with exit code ${result.code}`);
+        switch (result.code) {
+            case 0:
+                break;
+            case 2:
+                throw new Error(new TextDecoder().decode(result.stderr));
+            default:
+                console.error("Command was:")
+                console.error(`    reeutils ${args.join(" ")}`);
+                console.error("stdout/stderr:")
+                console.error(new TextDecoder().decode(result.stdout));
+                console.error(new TextDecoder().decode(result.stderr));
+                throw new Error(`reeutils failed with exit code ${result.code}`);
         }
     }
 }

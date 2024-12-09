@@ -44,12 +44,15 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
         public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
         {
+            var fileData = GetFileData(settings);
+            if (fileData == null)
+            {
+                Console.Error.WriteLine($"{settings.InputPath} not found");
+                return ExitCodes.FileNotFound;
+            }
+
             if (settings.InputPath.EndsWith(".msg.22"))
             {
-                var fileData = GetFileData(settings);
-                if (fileData == null)
-                    throw new Exception("File not found");
-
                 var msg = new Msg(fileData);
                 var data = new SerializableMsg
                 {
@@ -66,10 +69,6 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             }
             else if (settings.InputPath.EndsWith(".user.2"))
             {
-                var fileData = GetFileData(settings);
-                if (fileData == null)
-                    throw new Exception("File not found");
-
                 if (settings.Game == null)
                     throw new Exception("Game not specified");
 

@@ -17,6 +17,8 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
 
         [Theory]
         [InlineData("natives/stm/_chainsaw/appsystem/ui/userdata/itemcraftsettinguserdata.user.2")]
+        [InlineData("natives/stm/_chainsaw/appsystem/weapon/lasersight/playerlasersightcontrolleruserdata.user.2")]
+        [InlineData("natives/stm/_chainsaw/appsystem/weaponcustom/weapondetailcustomuserdata.user.2")]
         public async Task ImportExportImport(string path)
         {
             using var tempFolder = new TempFolder();
