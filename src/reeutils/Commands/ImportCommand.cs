@@ -79,11 +79,35 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 userFile.RSZ!.ObjectList.Clear();
 
                 var serializer = new RszInstanceSerializer(userFile.RSZ);
-                userFile.RSZ!.ObjectList.Add(serializer.Deserialize(data.RootElement));
+                userFile.RSZ!.ObjectList.Add(serializer.DeserializeUserFile(data.RootElement));
 
                 userFile.RSZ!.RebuildInstanceInfo();
                 userFile.RebuildInfoTable();
                 await File.WriteAllBytesAsync(settings.OutputPath!, userFile.ToByteArray());
+            }
+            else if (settings.OutputPath!.EndsWith(".scn.20"))
+            {
+                if (settings.Game == null)
+                    throw new Exception("Game not specified");
+
+                var rszFileOption = EmbeddedData.CreateRszFileOptionBinary(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
+
+                JsonDocument data;
+                using (var fs = new FileStream(settings.InputPath!, FileMode.Open, FileAccess.Read))
+                {
+                    data = JsonDocument.Parse(fs);
+                }
+                using var ms = new MemoryStream(EmbeddedData.GetFile("empty.scn.20")!);
+                var scnFile = new ScnFile(rszFileOption, new FileHandler(ms));
+                scnFile.Read();
+                scnFile.SetupGameObjects();
+
+                var serializer = new RszInstanceSerializer(scnFile.RSZ!);
+                serializer.DeserializeScnFile(scnFile, data.RootElement);
+
+                scnFile.RebuildInfoTable();
+                await File.WriteAllBytesAsync(settings.OutputPath!, scnFile.ToByteArray());
+
             }
             else
             {

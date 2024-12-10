@@ -15,6 +15,33 @@ export interface MsgFileEntry {
     values: string[];
 }
 
+export interface Folder {
+    "$type": "via.Folder",
+    v0: string;
+    v1: string;
+    v2: number;
+    v3: number;
+    v4: number;
+    v5: string;
+    v6: string;
+    children?: (Folder | GameObject)[];
+}
+
+export interface GameObject {
+    "$type": "via.GameObject",
+    v0: string;
+    v1: string;
+    v2: number;
+    v3: number;
+    v4: number;
+    guid: string;
+    prefab?: string;
+    components?: any[];
+    children?: GameObject[];
+}
+
+export type Scene = (Folder | GameObject)[];
+
 async function mkdir(path: string) {
     await fs.ensureDir(path);
 }
@@ -195,21 +222,21 @@ export class ReeMod {
      * @param path 
      * @param cb 
      */
-    async modify(path: string, cb: (f: MsgFile | any) => void) {
+    async modify(path: string, cb: (f: MsgFile | any) => false | undefined) {
         const hasExtension = (ext: string) => path.toLowerCase().endsWith(ext)
-        if (hasExtension('.scn.2')) {
-            throw new Error("Scenes not yet supported");
-         } else if (hasExtension('.user.2') || hasExtension('.msg.22')) {
+        if (hasExtension('.scn.20') || hasExtension('.user.2') || hasExtension('.msg.22')) {
             const data = await this.getJson(path);
-            cb(data)
-            await this.setJson(path, data);
+            if (cb(data) !== false) {
+                await this.setJson(path, data);
+                console.log(`  modify ${path}`);
+            }
         } else {
             throw new Error("Unsupported file type");
         }
     }
 
     private async getJson(path: string) {
-        const tmpPath = this.getWorkPath("tmp.json")
+        const tmpPath = this.getTempJsonFileName();
         await this.export(path, tmpPath)
         const data = await readJsonFile(tmpPath)
         await rmrf(tmpPath)
@@ -217,10 +244,20 @@ export class ReeMod {
     }
 
     private async setJson(path: string, data: any) {
-        const tmpPath = this.getWorkPath("tmp.json")
+        const tmpPath = this.getTempJsonFileName();
         await writeJsonFile(tmpPath, data)
         await this.importJson(path, tmpPath)
         await rmrf(tmpPath)
+    }
+
+    private getTempJsonFileName() {
+        const letters = "0123456789abcdefghijklmnopqrstuvwxyz";
+        let fileName = "tmp_";
+        for (let i = 0; i < 5; i++) {
+            fileName += letters[~~(Math.random() * letters.length)];
+        }
+        fileName += ".json";
+        return this.getWorkPath(fileName);
     }
 
     private async execToolDefault(args: string[]) {

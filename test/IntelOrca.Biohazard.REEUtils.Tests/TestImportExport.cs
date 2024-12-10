@@ -20,7 +20,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
         [InlineData("natives/stm/_chainsaw/appsystem/weapon/lasersight/playerlasersightcontrolleruserdata.user.2")]
         [InlineData("natives/stm/_chainsaw/appsystem/weaponcustom/weapondetailcustomuserdata.user.2")]
         [InlineData("natives/stm/_chainsaw/appsystem/ui/userdata/guiparamholdersettinguserdata.user.2")]
-        public async Task ImportExportImport(string path)
+        public async Task UserFile(string path)
         {
             using var tempFolder = new TempFolder();
             var userData = _pak.GetFileData(path) ?? throw new Exception();
@@ -48,6 +48,46 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             await exportCommand.ExecuteAsync(null!, new ExportCommand.Settings()
             {
                 InputPath = userPath,
+                Game = "re4",
+                OutputPath = jsonPath
+            });
+
+            var jsonB = File.ReadAllText(jsonPath);
+
+            Assert.Equal(jsonA, jsonB);
+        }
+
+        [Theory]
+        [InlineData("natives/stm/_anotherorder/leveldesign/chapter/cp11_chp1_1/level_cp11_chp1_1.scn.20")]
+        [InlineData("natives/stm/_chainsaw/appsystem/navigation/loc40/navigation_loc4000.scn.20")]
+        public async Task ScnFile(string path)
+        {
+            using var tempFolder = new TempFolder();
+            var userData = _pak.GetFileData(path) ?? throw new Exception();
+            var scnPath = tempFolder.GetSubPath("test.scn.20");
+            var jsonPath = tempFolder.GetSubPath("test.json");
+            File.WriteAllBytes(scnPath, userData);
+
+            var exportCommand = new ExportCommand();
+            await exportCommand.ExecuteAsync(null!, new ExportCommand.Settings()
+            {
+                InputPath = scnPath,
+                Game = "re4",
+                OutputPath = jsonPath
+            });
+
+            var jsonA = File.ReadAllText(jsonPath);
+
+            var importCommand = new ImportCommand();
+            await importCommand.ExecuteAsync(null!, new ImportCommand.Settings()
+            {
+                InputPath = jsonPath,
+                Game = "re4",
+                OutputPath = scnPath
+            });
+            await exportCommand.ExecuteAsync(null!, new ExportCommand.Settings()
+            {
+                InputPath = scnPath,
                 Game = "re4",
                 OutputPath = jsonPath
             });

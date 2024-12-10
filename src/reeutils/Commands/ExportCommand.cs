@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Namsku.REE.Messages;
 using REE;
@@ -44,6 +45,13 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
         public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
         {
+            var jsonOptions = new JsonSerializerOptions()
+            {
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                IncludeFields = true,
+                WriteIndented = true
+            };
+
             var fileData = GetFileData(settings);
             if (fileData == null)
             {
@@ -75,10 +83,23 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 var rszFileOption = EmbeddedData.CreateRszFileOptionBinary(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
                 var userFile = new UserFile(rszFileOption, new FileHandler(new MemoryStream(fileData)));
                 userFile.Read();
-                var root = userFile.RSZ!.ObjectList[0];
 
-                var serializer = new RszInstanceSerializer(userFile.RSZ);
-                var rootJson = serializer.Serialize(root);
+                var serializer = new RszInstanceSerializer(userFile.RSZ!);
+                var rootJson = serializer.Serialize(userFile, jsonOptions);
+                await File.WriteAllTextAsync(settings.OutputPath!, rootJson);
+            }
+            else if (settings.InputPath.EndsWith(".scn.20"))
+            {
+                if (settings.Game == null)
+                    throw new Exception("Game not specified");
+
+                var rszFileOption = EmbeddedData.CreateRszFileOptionBinary(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
+                var scnFile = new ScnFile(rszFileOption, new FileHandler(new MemoryStream(fileData)));
+                scnFile.Read();
+                scnFile.SetupGameObjects();
+
+                var serializer = new RszInstanceSerializer(scnFile.RSZ!);
+                var rootJson = serializer.Serialize(scnFile, jsonOptions);
                 await File.WriteAllTextAsync(settings.OutputPath!, rootJson);
             }
             else

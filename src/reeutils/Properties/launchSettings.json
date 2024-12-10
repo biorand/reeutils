@@ -6,7 +6,7 @@
     },
     "export": {
       "commandName": "Project",
-      "commandLineArgs": "export -g re4 -o test.json M:\\apps\\re4rr\\extract\\natives\\stm\\_chainsaw\\appsystem\\ui\\userdata\\itemcraftsettinguserdata.user.2"
+      "commandLineArgs": "export -g re4 -o test.json M:\\apps\\re4rr\\extract\\natives\\stm\\_anotherorder\\leveldesign\\chapter\\cp11_chp1_1\\level_cp11_chp1_1.scn.20"
     },
     "import": {
       "commandName": "Project",

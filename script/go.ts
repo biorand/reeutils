@@ -1,8 +1,9 @@
 import { ModsContext } from "./mods.ts";
-import { MsgFile, ReeMod } from "./ree_mod.ts";
+import { MsgFile } from "./ree_mod.ts";
 import * as path from "jsr:@std/path";
 import { createLaserSightMod } from "./weapons.ts";
-import { createIncreasedJetSkiTimer } from "./misc.ts";
+import { createIncreasedJetSkiTimer, createQuickBuy } from "./misc.ts";
+import { createNovisNavigation } from "./navigation.ts";
 
 function setMessageEn(msg: MsgFile, guid: string, value: string) {
     for (const entry of msg.entries) {
@@ -14,16 +15,24 @@ function setMessageEn(msg: MsgFile, guid: string, value: string) {
 }
 
 async function applyMods(ctx: ModsContext) {
-    await createLaserSightMod(ctx);
+    await createNovisNavigation(ctx);
+    await createQuickBuy(ctx);
     await createIncreasedJetSkiTimer(ctx);
+    await createLaserSightMod(ctx);
 }
 
 async function main() {
     const ctx = new ModsContext();
     ctx.baseLine = getVanillaPaths();
-    await ctx.createSingleMod("biorand", async () => {
+    if (Deno.args[0] == "single") {
+        console.log("Creating single mod...");
+        await ctx.createSingleMod("biorand", async () => {
+            await applyMods(ctx);
+        });
+    } else {
+        console.log("Creating small mods...");
         await applyMods(ctx);
-    });
+    }
 
     // const mod = await ReeMod.create("funnystrings", "IntelOrca");
     // try {
