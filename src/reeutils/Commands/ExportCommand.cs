@@ -102,6 +102,20 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 var rootJson = serializer.Serialize(scnFile, jsonOptions);
                 await File.WriteAllTextAsync(settings.OutputPath!, rootJson);
             }
+            else if (settings.InputPath.EndsWith(".pfb.17"))
+            {
+                if (settings.Game == null)
+                    throw new Exception("Game not specified");
+
+                var rszFileOption = EmbeddedData.CreateRszFileOptionBinary(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
+                var pfbFile = new PfbFile(rszFileOption, new FileHandler(new MemoryStream(fileData)));
+                pfbFile.Read();
+                pfbFile.SetupGameObjects();
+
+                var serializer = new RszInstanceSerializer(pfbFile.RSZ!);
+                var rootJson = serializer.Serialize(pfbFile, jsonOptions);
+                await File.WriteAllTextAsync(settings.OutputPath!, rootJson);
+            }
             else
             {
                 throw new NotSupportedException("File format not supported.");

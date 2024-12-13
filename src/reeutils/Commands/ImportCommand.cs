@@ -107,7 +107,29 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
                 scnFile.RebuildInfoTable();
                 await File.WriteAllBytesAsync(settings.OutputPath!, scnFile.ToByteArray());
+            }
+            else if (settings.OutputPath!.EndsWith(".pfb.17"))
+            {
+                if (settings.Game == null)
+                    throw new Exception("Game not specified");
 
+                var rszFileOption = EmbeddedData.CreateRszFileOptionBinary(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
+
+                JsonDocument data;
+                using (var fs = new FileStream(settings.InputPath!, FileMode.Open, FileAccess.Read))
+                {
+                    data = JsonDocument.Parse(fs);
+                }
+                using var ms = new MemoryStream(EmbeddedData.GetFile("empty.pfb.17")!);
+                var pfbFile = new PfbFile(rszFileOption, new FileHandler(ms));
+                pfbFile.Read();
+                pfbFile.SetupGameObjects();
+
+                var serializer = new RszInstanceSerializer(pfbFile.RSZ!);
+                serializer.DeserializePfbFile(pfbFile, data.RootElement);
+
+                pfbFile.RebuildInfoTable();
+                await File.WriteAllBytesAsync(settings.OutputPath!, pfbFile.ToByteArray());
             }
             else
             {

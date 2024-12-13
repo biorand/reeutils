@@ -32,35 +32,43 @@ namespace IntelOrca.Biohazard.REEUtils
                     continue;
 
                 var value = instance.Values[i];
-                if (value is RszInstance child)
-                {
-                    if (child.RSZUserData is RSZUserDataInfo userDataInfo)
-                    {
-                        var d = new Dictionary<string, object>();
-                        d["$type"] = child.RszClass.name;
-                        d["$path"] = userDataInfo.Path!;
-                        value = d;
-                    }
-                    else
-                    {
-                        value = ToDictionary(child);
-                    }
-                }
-                else if (value is List<object> list)
+                if (value is List<object> list)
                 {
                     var copy = list.ToList();
                     for (var j = 0; j < copy.Count; j++)
                     {
-                        if (copy[j] is RszInstance el)
-                        {
-                            copy[j] = ToDictionary(el);
-                        }
+                        copy[j] = SerializeValue(copy[j]);
                     }
                     value = copy;
                 }
-                dict[field.name] = value;
+                dict[field.name] = SerializeValue(value);
             }
             return dict;
+        }
+
+        private static object SerializeValue(object value)
+        {
+            if (value is RszInstance child)
+            {
+                if (child.RSZUserData is RSZUserDataInfo userDataInfo)
+                {
+                    var d = new Dictionary<string, object>
+                    {
+                        ["$type"] = child.RszClass.name,
+                        ["$path"] = userDataInfo.Path!
+                    };
+                    return d;
+                }
+                else
+                {
+                    return ToDictionary(child);
+                }
+            }
+            else if (value is RszTool.via.Color c)
+            {
+                return c.rgba;
+            }
+            return value;
         }
 
         public string Serialize(ScnFile scn, JsonSerializerOptions? options = null)
@@ -90,6 +98,20 @@ namespace IntelOrca.Biohazard.REEUtils
             return dict;
         }
 
+        public string Serialize(PfbFile pfb, JsonSerializerOptions? options = null)
+        {
+            var unfoldered = pfb.GameObjectDatas?.Select(SerializeGameObject).ToArray() ?? [];
+            return JsonSerializer.Serialize(unfoldered, options);
+        }
+
+        private object SerializeGameObject(PfbFile.GameObjectData gameObject)
+        {
+            var dict = ToDictionary(gameObject.Instance!);
+            dict["components"] = gameObject.Components.Select(ToDictionary).ToArray();
+            dict["children"] = gameObject.Children.Select(SerializeGameObject).ToArray();
+            return dict;
+        }
+
         public RszInstance DeserializeUserFile(JsonElement el)
         {
             if (el.ValueKind != JsonValueKind.Object)
@@ -103,12 +125,12 @@ namespace IntelOrca.Biohazard.REEUtils
             if (el.ValueKind != JsonValueKind.Array)
                 throw new Exception("Root must be an array");
 
-            var children = DeserializeChildren(el);
+            var children = DeserializeScnChildren(el);
             scn.FolderDatas = [.. children.OfType<ScnFile.FolderData>()];
             scn.GameObjectDatas = [.. children.OfType<ScnFile.GameObjectData>()];
         }
 
-        private object[] DeserializeChildren(JsonElement el)
+        private object[] DeserializeScnChildren(JsonElement el)
         {
             if (el.ValueKind != JsonValueKind.Array)
                 throw new Exception("Children must be an array");
@@ -124,7 +146,7 @@ namespace IntelOrca.Biohazard.REEUtils
                     folder.Instance = DeserializeObject(element);
                     if (element.TryGetProperty("children", out var jChildren))
                     {
-                        var grandchildren = DeserializeChildren(jChildren);
+                        var grandchildren = DeserializeScnChildren(jChildren);
                         foreach (var gc in grandchildren)
                         {
                             if (gc is ScnFile.FolderData folderChild)
@@ -169,7 +191,7 @@ namespace IntelOrca.Biohazard.REEUtils
                     }
                     if (element.TryGetProperty("children", out var jChildren))
                     {
-                        var grandchildren = DeserializeChildren(jChildren);
+                        var grandchildren = DeserializeScnChildren(jChildren);
                         foreach (var gc in grandchildren)
                         {
                             if (gc is ScnFile.GameObjectData gameDataChild)
@@ -191,6 +213,56 @@ namespace IntelOrca.Biohazard.REEUtils
                 }
             }
             return result.ToArray();
+        }
+
+        public void DeserializePfbFile(PfbFile pfb, JsonElement el)
+        {
+            if (el.ValueKind != JsonValueKind.Array)
+                throw new Exception("Root must be an array");
+
+            pfb.GameObjectDatas = [.. DeserializePfbChildren(el)];
+        }
+
+        private PfbFile.GameObjectData[] DeserializePfbChildren(JsonElement el)
+        {
+            if (el.ValueKind != JsonValueKind.Array)
+                throw new Exception("Children must be an array");
+
+            var result = new List<PfbFile.GameObjectData>();
+            foreach (var element in el.EnumerateArray())
+            {
+                var type = element.GetStringProperty("$type");
+                if (type == "via.GameObject")
+                {
+                    var gameObject = new PfbFile.GameObjectData
+                    {
+                        Info = new StructModel<PfbFile.GameObjectInfo>(),
+                        Instance = DeserializeObject(element)
+                    };
+                    if (element.TryGetProperty("components", out var jComponents))
+                    {
+                        foreach (var jComponent in jComponents.EnumerateArray())
+                        {
+                            gameObject.Components.Add(DeserializeObject(jComponent));
+                        }
+                    }
+                    if (element.TryGetProperty("children", out var jChildren))
+                    {
+                        var grandchildren = DeserializePfbChildren(jChildren);
+                        foreach (var gc in grandchildren)
+                        {
+                            gc.Parent = gameObject;
+                            gameObject.Children.Add(gc);
+                        }
+                    }
+                    result.Add(gameObject);
+                }
+                else
+                {
+                    throw new NotSupportedException($"{type} not supported. Only via.Folder and via.GameObject.");
+                }
+            }
+            return [.. result];
         }
 
         private RszInstance DeserializeObject(JsonElement el)
@@ -278,6 +350,7 @@ namespace IntelOrca.Biohazard.REEUtils
                         el.GetProperty("Z").GetSingle(),
                         el.GetProperty("W").GetSingle()),
                     RszFieldType.Guid => Guid.Parse(el.GetString()!),
+                    RszFieldType.Color => new RszTool.via.Color() { rgba = el.GetUInt32() },
                     RszFieldType.OBB => new RszTool.via.OBB()
                     {
                         Coord = ParseMatrix4(el.GetProperty("Coord")),

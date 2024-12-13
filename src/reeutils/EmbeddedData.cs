@@ -67,6 +67,7 @@ namespace IntelOrca.Biohazard.REEUtils
             mesh.GetField("v36")!.type = RszFieldType.S32;
             mesh.GetField("v37")!.type = RszFieldType.S32;
             mesh.GetField("v38")!.type = RszFieldType.S32;
+            mesh.GetField("v40")!.type = RszFieldType.Object;
             mesh.GetField("v43")!.type = RszFieldType.S32;
             mesh.GetField("v45")!.type = RszFieldType.S32;
             mesh.GetField("v47")!.type = RszFieldType.S32;
@@ -81,6 +82,53 @@ namespace IntelOrca.Biohazard.REEUtils
             aiMap.GetField("v2")!.type = RszFieldType.S32;
             var mapHandle = parser.GetRSZClass("via.navigation.MapHandle")!;
             mapHandle.GetField("v9")!.type = RszFieldType.S32;
+            var dynamicMotionBank = parser.GetRSZClass("via.motion.DynamicMotionBank")!;
+            dynamicMotionBank.GetField("v0")!.type = RszFieldType.S32;
+            dynamicMotionBank.GetField("v2")!.type = RszFieldType.S32;
+            dynamicMotionBank.GetField("v4")!.type = RszFieldType.S32;
+            dynamicMotionBank.GetField("v6")!.type = RszFieldType.S32;
+            var motion = parser.GetRSZClass("via.motion.Motion")!;
+            motion.GetField("v1")!.type = RszFieldType.S32;
+            motion.GetField("v2")!.type = RszFieldType.F32;
+            motion.GetField("v6")!.type = RszFieldType.S32;
+            motion.GetField("v8")!.type = RszFieldType.S32;
+            motion.GetField("v15")!.type = RszFieldType.S32;
+            motion.GetField("v21")!.type = RszFieldType.S32;
+            motion.GetField("v22")!.type = RszFieldType.S32;
+            motion.GetField("v25")!.type = RszFieldType.S32;
+            motion.GetField("v26")!.type = RszFieldType.S32;
+            motion.GetField("v27")!.type = RszFieldType.S32;
+            motion.GetField("v28")!.type = RszFieldType.S32;
+            var treeLayer = parser.GetRSZClass("via.motion.TreeLayer")!;
+            treeLayer.GetField("v1")!.type = RszFieldType.S32;
+            treeLayer.GetField("v2")!.type = RszFieldType.S32;
+            treeLayer.GetField("v3")!.type = RszFieldType.F32;
+            treeLayer.GetField("v6")!.type = RszFieldType.S32;
+            treeLayer.GetField("v7")!.type = RszFieldType.S32;
+            treeLayer.GetField("v8")!.type = RszFieldType.S32;
+            treeLayer.GetField("v10")!.type = RszFieldType.S32;
+            treeLayer.GetField("v11")!.type = RszFieldType.S32;
+            treeLayer.GetField("v15")!.type = RszFieldType.S32;
+            treeLayer.GetField("v16")!.type = RszFieldType.F32;
+            treeLayer.GetField("v21")!.type = RszFieldType.S32;
+            treeLayer.GetField("v22")!.type = RszFieldType.S32;
+            treeLayer.GetField("v23")!.type = RszFieldType.S32;
+            treeLayer.GetField("v24")!.type = RszFieldType.S32;
+            var motionFsm2 = parser.GetRSZClass("via.motion.MotionFsm2")!;
+            motionFsm2.GetField("v3")!.type = RszFieldType.S32;
+            motionFsm2.GetField("v4")!.type = RszFieldType.S32;
+            motionFsm2.GetField("v8")!.type = RszFieldType.S32;
+            var motionFsm2Layer = parser.GetRSZClass("via.motion.MotionFsm2Layer")!;
+            motionFsm2Layer.GetField("v3")!.type = RszFieldType.S32;
+            motionFsm2Layer.GetField("v6")!.type = RszFieldType.S32;
+            motionFsm2Layer.GetField("v8")!.type = RszFieldType.S32;
+            motionFsm2Layer.GetField("v9")!.type = RszFieldType.S32;
+            motionFsm2Layer.GetField("v11")!.type = RszFieldType.S32;
+            motionFsm2Layer.GetField("v13")!.type = RszFieldType.S32;
+            motionFsm2Layer.GetField("v15")!.type = RszFieldType.F32;
+
+            var materialParam = parser.GetRSZClass("via.render.MaterialParam")!;
+            materialParam.GetField("v4")!.type = RszFieldType.S32;
         }
 
         public static RszFileOption? CreateRszFileOption(string name)
