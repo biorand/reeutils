@@ -11,11 +11,13 @@ jobs:
         submodules: true
     - name: Restore
       run: dotnet restore
-    - name: Build
+    - name: Build nupkg
+      run: dotnet pack src/IntelOrca.Biohazard.REE -c Release -o .
+    - name: Build reeutils
       run: |
         dotnet publish src/reeutils -c Release -o out/reeutils --os linux
         dotnet publish src/reeutils -c Release -o out/reeutils --os win
-    - name: Pack
+    - name: Pack reeutils
       run: |
         cd out/reeutils
         rm -rf *.deps.json *.pdb de fr sv
@@ -26,10 +28,17 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: reeutils
-        path: out/**/*
+        path: |
+          *.nupkg
+          out/**/*
     - name: Create release
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/v')
       with:
         fail_on_unmatched_files: true
-        files: reeutils.tar.gz
+        files: |
+          *.nupkg
+          reeutils.tar.gz
+    - name: Publish to nuget.org
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: dotnet nuget push out/*.nupkg --api-key "${{ secrets.NUGET_APIKEY }}" --source https://api.nuget.org/v3/index.json
