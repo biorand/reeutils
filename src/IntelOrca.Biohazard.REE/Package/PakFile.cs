@@ -96,6 +96,19 @@ namespace IntelOrca.Biohazard.REE.Package
             }
         }
 
+        public int EntryCount => _entries.Length;
+
+        public ulong GetEntryHash(int index)
+        {
+            return _entries[index].HashName;
+        }
+
+        public string? GetEntryName(int index, PakList pakList)
+        {
+            var hash = _entries[index].HashName;
+            return pakList.GetPath(hash);
+        }
+
         private int FindEntry(string path)
         {
             var hash = GetNormalizedPathHash(path);

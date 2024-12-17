@@ -164,5 +164,10 @@ namespace IntelOrca.Biohazard.REE.Package
             Save(ms, CompressionKind.Zstd);
             return ms.ToArray();
         }
+
+        public PakFile ToPakFile()
+        {
+            return new PakFile(ToByteArray());
+        }
     }
 }

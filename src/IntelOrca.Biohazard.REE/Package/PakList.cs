@@ -20,7 +20,7 @@ namespace IntelOrca.Biohazard.REE.Package
         {
         }
 
-        public PakList(string[] files)
+        public PakList(IEnumerable<string> files)
         {
             foreach (var line in files)
             {
@@ -45,5 +45,28 @@ namespace IntelOrca.Biohazard.REE.Package
             var dwHashUpper = (ulong)MurMur3.HashData(path.ToUpper());
             return dwHashLower | (dwHashUpper << 32);
         }
+
+        /// <summary>
+        /// Returns a new <see cref="PakList"/> containing only the entries found in the
+        /// given pak file.
+        /// </summary>
+        /// <param name="file"></param>
+        /// <returns></returns>
+        public PakList Strip(PakFile file)
+        {
+            var fileNames = new List<string>();
+            for (var i = 0; i < file.EntryCount; i++)
+            {
+                var fileName = file.GetEntryName(i, this);
+                if (fileName != null)
+                {
+                    fileNames.Add(fileName);
+                }
+            }
+            return new PakList(fileNames);
+        }
+
+        public string ToFileContents() => string.Join("\n", Entries) + "\n";
+        public void WriteToFile(string path) => File.WriteAllText(path, ToFileContents());
     }
 }
