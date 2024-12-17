@@ -115,12 +115,17 @@ namespace IntelOrca.Biohazard.REE.Package
             return !_hashToEntry.TryGetValue(hash, out var index) ? -1 : index;
         }
 
-        public byte[]? GetFileData(string path)
+        public byte[]? GetEntryData(string path)
         {
             var index = FindEntry(path);
             if (index == -1)
                 return null;
 
+            return GetEntryData(index);
+        }
+
+        public byte[] GetEntryData(int index)
+        {
             return GetEntryData(_entries[index]);
         }
 

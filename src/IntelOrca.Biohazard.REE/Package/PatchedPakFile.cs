@@ -59,7 +59,7 @@ namespace IntelOrca.Biohazard.REE.Package
         {
             for (var i = _files.Length - 1; i >= 0; i--)
             {
-                var data = _files[i].GetFileData(path);
+                var data = _files[i].GetEntryData(path);
                 if (data != null)
                 {
                     return data;

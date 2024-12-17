@@ -2,7 +2,7 @@
 using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
-using REE;
+using IntelOrca.Biohazard.REE.Package;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -59,7 +59,7 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 ? EmbeddedData.GetPakList(settings.Game!) ?? throw new Exception($"{settings.Game} not recognized.")
                 : new PakList(File.ReadAllText(settings.PakListPath));
 
-            for (var i = 0; i < pakFile.NumEntries; i++)
+            for (var i = 0; i < pakFile.EntryCount; i++)
             {
                 var entryHash = pakFile.GetEntryHash(i);
                 var entryPath = pakList.GetPath(entryHash);

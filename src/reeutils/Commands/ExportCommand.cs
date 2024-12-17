@@ -4,8 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using IntelOrca.Biohazard.REE.Package;
 using Namsku.REE.Messages;
-using REE;
 using RszTool;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -132,7 +132,7 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                     if (p.EndsWith(".pak", StringComparison.OrdinalIgnoreCase))
                     {
                         var pak = new PakFile(p);
-                        var data = pak.GetFileData(settings.InputPath);
+                        var data = pak.GetEntryData(settings.InputPath);
                         if (data != null)
                         {
                             return data;

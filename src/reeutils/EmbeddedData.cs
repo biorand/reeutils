@@ -3,7 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 using System.Text;
-using REE;
+using IntelOrca.Biohazard.REE.Package;
 using RszTool;
 
 namespace IntelOrca.Biohazard.REEUtils

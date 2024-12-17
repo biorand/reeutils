@@ -25,8 +25,8 @@ namespace IntelOrca.Biohazard.REE.Tests
             builder.AddEntry("natives/stm/_biorand/authoring/test2.dat", Encoding.UTF8.GetBytes("test_test2"));
             var pak = builder.ToPakFile();
             Assert.Equal(2, pak.EntryCount);
-            var test1 = pak.GetFileData("natives/stm/_biorand/appsystem/test1.dat")!;
-            var test2 = pak.GetFileData("natives/stm/_biorand/authoring/test2.dat")!;
+            var test1 = pak.GetEntryData("natives/stm/_biorand/appsystem/test1.dat")!;
+            var test2 = pak.GetEntryData("natives/stm/_biorand/authoring/test2.dat")!;
             Assert.Equal("test_test1", Encoding.UTF8.GetString(test1));
             Assert.Equal("test_test2", Encoding.UTF8.GetString(test2));
         }
@@ -48,9 +48,9 @@ namespace IntelOrca.Biohazard.REE.Tests
 
             var pak = new PakFile(pakPath);
             Assert.Equal(3, pak.EntryCount);
-            var test1 = pak.GetFileData("natives/stm/_biorand/appsystem/test1.dat")!;
-            var test2 = pak.GetFileData("natives/stm/_biorand/appsystem/test2.dat")!;
-            var test3 = pak.GetFileData("natives/stm/_biorand/appsystem/test3.dat")!;
+            var test1 = pak.GetEntryData("natives/stm/_biorand/appsystem/test1.dat")!;
+            var test2 = pak.GetEntryData("natives/stm/_biorand/appsystem/test2.dat")!;
+            var test3 = pak.GetEntryData("natives/stm/_biorand/appsystem/test3.dat")!;
             Assert.Equal("test1", Encoding.UTF8.GetString(test1));
             Assert.Equal("test2", Encoding.UTF8.GetString(test2));
             Assert.Equal("test3", Encoding.UTF8.GetString(test3));

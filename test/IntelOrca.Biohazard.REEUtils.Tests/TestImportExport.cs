@@ -2,13 +2,13 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using IntelOrca.Biohazard.REE.Package;
 using IntelOrca.Biohazard.REEUtils.Commands;
 using Namsku.REE.Messages;
-using REE;
 
 namespace IntelOrca.Biohazard.REEUtils.Tests
 {
-    public class TestImportExport
+    public class TestImportExport : IDisposable
     {
         private PatchedPakFile _pak;
 
@@ -16,6 +16,11 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
         {
             var h = PakHash.GetHash("natives/stm/_chainsaw/appsystem/ui/userdata/itemcraftsettinguserdata.user.2");
             _pak = GetVanillaPak();
+        }
+
+        public void Dispose()
+        {
+            _pak.Dispose();
         }
 
         [Theory]

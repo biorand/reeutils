@@ -1,7 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 using System.IO;
-using REE;
+using IntelOrca.Biohazard.REE.Package;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -62,7 +62,7 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                     AnsiConsole.WriteLine(relativePath);
                 }
             }
-            builder.Save(settings.OutputPath!, CompressionType.ZSTD);
+            builder.Save(settings.OutputPath!, CompressionKind.Zstd);
             return 0;
         }
     }
