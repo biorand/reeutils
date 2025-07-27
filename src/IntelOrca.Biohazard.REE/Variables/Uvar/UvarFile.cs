@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using IntelOrca.Biohazard.REE.Cryptography;
 using IntelOrca.Biohazard.REE.Extensions;
+using IntelOrca.Biohazard.REE.Variables.Uvar;
 
 namespace IntelOrca.Biohazard.REE.Variables
 {

@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace IntelOrca.Biohazard.REE.Variables
+namespace IntelOrca.Biohazard.REE.Variables.Uvar
 {
     [StructLayout(LayoutKind.Sequential)]
     internal struct UvarHeader

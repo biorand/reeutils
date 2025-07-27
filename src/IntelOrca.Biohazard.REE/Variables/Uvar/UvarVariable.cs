@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 
-namespace IntelOrca.Biohazard.REE.Variables
+namespace IntelOrca.Biohazard.REE.Variables.Uvar
 {
     [StructLayout(LayoutKind.Sequential)]
     internal struct UvarVariable
@@ -16,13 +16,13 @@ namespace IntelOrca.Biohazard.REE.Variables
         public int TypeVal
         {
             readonly get => (int)(TypeValNumBits & 0xFFFFFF);
-            set => TypeValNumBits = (TypeValNumBits & 0xFF000000) | ((uint)value & 0xFFFFFF);
+            set => TypeValNumBits = TypeValNumBits & 0xFF000000 | (uint)value & 0xFFFFFF;
         }
 
         public int NumBits
         {
-            readonly get => (int)((TypeValNumBits >> 24) & 0xFF);
-            set => TypeValNumBits = (TypeValNumBits & 0x00FFFFFF) | ((uint)(value & 0xFF) << 24);
+            readonly get => (int)(TypeValNumBits >> 24 & 0xFF);
+            set => TypeValNumBits = TypeValNumBits & 0x00FFFFFF | (uint)(value & 0xFF) << 24;
         }
     }
 }
