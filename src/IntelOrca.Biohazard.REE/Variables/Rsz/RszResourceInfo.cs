@@ -7,7 +7,7 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
     [StructLayout(LayoutKind.Sequential)]
     internal class RszResourceInfo
     {
-        public uint StringOffset { get; set; }
-        public uint Reserved { get; set; }
+        public uint StringOffset;
+        public uint Reserved;
     }
 }

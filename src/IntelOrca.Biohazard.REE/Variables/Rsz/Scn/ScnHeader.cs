@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Buffers.Binary;
 
-internal abstract class ScnHeaderBase
+internal class ScnHeaderBase
 {
     public byte[] Signature = new byte[4];
     public uint InfoCount;
@@ -14,7 +14,7 @@ internal abstract class ScnHeaderBase
     public ulong PrefabInfoTbl;
     public ulong DataOffset;
 
-    public abstract int Size { get; }
+    public int Size { get; }
     public virtual void Parse(byte[] data)
     {
         if (data == null || data.Length < Size)
@@ -35,7 +35,7 @@ internal abstract class ScnHeaderBase
 
 internal class Scn18Header : ScnHeaderBase
 {
-    public override int Size => 56;
+    public int Size => 56;
 
     public override void Parse(byte[] data)
     {
@@ -47,7 +47,7 @@ internal class Scn18Header : ScnHeaderBase
 internal class Scn19Header : ScnHeaderBase
 {
     public ulong UserdataInfoTbl;
-    public override int Size => 64;
+    public int Size => 64;
 
     public override void Parse(byte[] data)
     {

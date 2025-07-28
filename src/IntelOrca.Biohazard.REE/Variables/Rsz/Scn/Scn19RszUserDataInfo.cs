@@ -26,7 +26,7 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz.Scn
         public EmbeddedIdManager? IdManager; // Optional, used for embedded RSZs
 
         // Embedded RSZ fields
-        public EmbeddedRSZHeader? EmbeddedRszHeader;
+        public EmbeddedRszHeader? EmbeddedRszHeader;
         public List<int> EmbeddedObjectTable = new List<int>();
         public List<EmbeddedInstanceInfo> EmbeddedInstanceInfos = new List<EmbeddedInstanceInfo>();
         public List<Scn19RSZUserDataInfo> EmbeddedUserdataInfos = new List<Scn19RSZUserDataInfo>();

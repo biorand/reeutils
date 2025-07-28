@@ -3,21 +3,21 @@ using System.Buffers.Binary;
 
 namespace IntelOrca.Biohazard.REE.Variables.Rsz
 {
-    internal class RszRSZHeader
+    internal class RszHeader
     {
         public uint Magic;
-        public uint Version { get; set; }
-        public uint ObjectCount { get; set; }
-        public uint InstanceCount { get; set; }
-        public uint UserdataCount { get; set; }
-        public uint Reserved { get; set; }
-        public ulong InstanceOffset { get; set; }
-        public ulong DataOffset { get; set; }
+        public uint Version;
+        public uint ObjectCount;
+        public uint InstanceCount;
+        public uint UserdataCount;
+        public uint Reserved;
+        public ulong InstanceOffset;
+        public ulong DataOffset;
         public ulong UserdataOffset;
 
         public int Size => Version < 4 ? 32 : 48;
 
-        public RszRSZHeader(ReadOnlySpan<byte> data)
+        public RszHeader(ReadOnlySpan<byte> data)
         {
             if (data.Length < 8)
                 throw new ArgumentException("Insufficient data for RszRSZHeader.");

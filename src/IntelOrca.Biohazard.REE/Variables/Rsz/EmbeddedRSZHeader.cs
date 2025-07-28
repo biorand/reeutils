@@ -6,7 +6,7 @@ using System.Text;
 namespace IntelOrca.Biohazard.REE.Variables.Rsz
 {
     [StructLayout(LayoutKind.Sequential)]
-    internal struct EmbeddedRSZHeader
+    internal struct EmbeddedRszHeader
     {
         public uint Magic;
         public uint Version;
