@@ -3,12 +3,12 @@ using System.Buffers.Binary;
 
 namespace IntelOrca.Biohazard.REE.Variables.Rsz
 {
-    internal readonly struct RszFolderInfo
+    internal class RszFolderInfo
     {
         public const int Size = 8;
 
-        public readonly int Id;
-        public readonly int ParentId;
+        public int Id { get; set; }
+        public int ParentId { get; set; }
 
         public RszFolderInfo(ReadOnlySpan<byte> data)
         {

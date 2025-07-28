@@ -1,40 +1,58 @@
-using System;
+﻿using System;
 using System.Buffers.Binary;
 
-namespace IntelOrca.Biohazard.REE.Variables.Scn
+internal abstract class ScnHeaderBase
 {
-    internal readonly struct ScnHeader
+    public byte[] Signature = new byte[4];
+    public uint InfoCount;
+    public uint ResourceCount;
+    public uint FolderCount;
+    public uint UserdataCount;
+    public uint PrefabCount;
+    public ulong FolderTbl;
+    public ulong ResourceInfoTbl;
+    public ulong PrefabInfoTbl;
+    public ulong DataOffset;
+
+    public abstract int Size { get; }
+    public virtual void Parse(byte[] data)
     {
-        public const int Size = 64;
+        if (data == null || data.Length < Size)
+            throw new ArgumentException($"Invalid SCN file data: expected at least {Size} bytes, got {data?.Length ?? 0}");
 
-        public readonly uint Signature;
-        public readonly uint InfoCount;
-        public readonly uint ResourceCount;
-        public readonly uint FolderCount;
-        public readonly uint PrefabCount;
-        public readonly uint UserdataCount;
-        public readonly ulong FolderTbl;
-        public readonly ulong ResourceInfoTbl;
-        public readonly ulong PrefabInfoTbl;
-        public readonly ulong UserdataInfoTbl;
-        public readonly ulong DataOffset;
+        Array.Copy(data, 0, Signature, 0, 4);
+        InfoCount = BitConverter.ToUInt32(data, 4);
+        ResourceCount = BitConverter.ToUInt32(data, 8);
+        FolderCount = BitConverter.ToUInt32(data, 12);
+        UserdataCount = BitConverter.ToUInt32(data, 16);
+        PrefabCount = BitConverter.ToUInt32(data, 20);
+        FolderTbl = BitConverter.ToUInt64(data, 24);
+        ResourceInfoTbl = BitConverter.ToUInt64(data, 32);
+        PrefabInfoTbl = BitConverter.ToUInt64(data, 40);
+        // DataOffset handled in derived
+    }
+}
 
-        public ScnHeader(ReadOnlySpan<byte> data)
-        {
-            if (data.Length < Size)
-                throw new ArgumentException("Insufficient data for ScnHeader.");
+internal class Scn18Header : ScnHeaderBase
+{
+    public override int Size => 56;
 
-            Signature = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(0, 4));
-            InfoCount = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(4, 4));
-            ResourceCount = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(8, 4));
-            FolderCount = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(12, 4));
-            PrefabCount = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(16, 4));
-            UserdataCount = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(20, 4));
-            FolderTbl = BinaryPrimitives.ReadUInt64LittleEndian(data.Slice(24, 8));
-            ResourceInfoTbl = BinaryPrimitives.ReadUInt64LittleEndian(data.Slice(32, 8));
-            PrefabInfoTbl = BinaryPrimitives.ReadUInt64LittleEndian(data.Slice(40, 8));
-            UserdataInfoTbl = BinaryPrimitives.ReadUInt64LittleEndian(data.Slice(48, 8));
-            DataOffset = BinaryPrimitives.ReadUInt64LittleEndian(data.Slice(56, 8));
-        }
+    public override void Parse(byte[] data)
+    {
+        base.Parse(data);
+        DataOffset = BitConverter.ToUInt64(data, 48);
+    }
+}
+
+internal class Scn19Header : ScnHeaderBase
+{
+    public ulong UserdataInfoTbl;
+    public override int Size => 64;
+
+    public override void Parse(byte[] data)
+    {
+        base.Parse(data);
+        UserdataInfoTbl = BitConverter.ToUInt64(data, 48);
+        DataOffset = BitConverter.ToUInt64(data, 56);
     }
 }

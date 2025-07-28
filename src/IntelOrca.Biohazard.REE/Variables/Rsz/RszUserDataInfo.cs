@@ -3,21 +3,21 @@ using System.Buffers.Binary;
 
 namespace IntelOrca.Biohazard.REE.Variables.Rsz
 {
-    internal readonly struct RszUserDataInfo
+    internal class RszRSZUserDataInfo
     {
         public const int Size = 16;
 
-        public readonly uint Hash;
-        public readonly uint Crc;
-        public readonly ulong StringOffset;
+        public uint InstanceId;
+        public uint Hash;
+        public ulong StringOffset;
 
-        public RszUserDataInfo(ReadOnlySpan<byte> data)
+        public RszRSZUserDataInfo(ReadOnlySpan<byte> data)
         {
             if (data.Length < Size)
-                throw new ArgumentException("Insufficient data for RszUserDataInfo.");
+                throw new ArgumentException("Insufficient data for RszRSZUserDataInfo.");
 
-            Hash = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(0, 4));
-            Crc = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(4, 4));
+            InstanceId = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(0, 4));
+            Hash = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(4, 4));
             StringOffset = BinaryPrimitives.ReadUInt64LittleEndian(data.Slice(8, 8));
         }
     }

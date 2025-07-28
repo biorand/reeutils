@@ -3,17 +3,17 @@ using System.Buffers.Binary;
 
 namespace IntelOrca.Biohazard.REE.Variables.Rsz
 {
-    internal readonly struct RszRSZHeader
+    internal class RszRSZHeader
     {
-        public readonly uint Magic;
-        public readonly uint Version;
-        public readonly uint ObjectCount;
-        public readonly uint InstanceCount;
-        public readonly uint UserdataCount;
-        public readonly uint Reserved;
-        public readonly ulong InstanceOffset;
-        public readonly ulong DataOffset;
-        public readonly ulong UserdataOffset;
+        public uint Magic;
+        public uint Version { get; set; }
+        public uint ObjectCount { get; set; }
+        public uint InstanceCount { get; set; }
+        public uint UserdataCount { get; set; }
+        public uint Reserved { get; set; }
+        public ulong InstanceOffset { get; set; }
+        public ulong DataOffset { get; set; }
+        public ulong UserdataOffset;
 
         public int Size => Version < 4 ? 32 : 48;
 

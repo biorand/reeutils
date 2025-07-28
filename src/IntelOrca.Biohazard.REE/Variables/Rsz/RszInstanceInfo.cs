@@ -1,22 +1,13 @@
 using System;
 using System.Buffers.Binary;
+using System.Runtime.InteropServices;
 
 namespace IntelOrca.Biohazard.REE.Variables.Rsz
 {
-    internal readonly struct RszInstanceInfo
+    [StructLayout(LayoutKind.Sequential)]
+    internal class RszInstanceInfo
     {
-        public const int Size = 8;
-
-        public readonly uint TypeId;
-        public readonly uint Crc;
-
-        public RszInstanceInfo(ReadOnlySpan<byte> data)
-        {
-            if (data.Length < Size)
-                throw new ArgumentException("Insufficient data for RszInstanceInfo.");
-
-            TypeId = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(0, 4));
-            Crc = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(4, 4));
-        }
+        public uint TypeId { get; set; }
+        public uint Crc { get; set; }
     }
 }
