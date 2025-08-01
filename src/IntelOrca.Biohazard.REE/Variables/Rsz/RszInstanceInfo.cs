@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 namespace IntelOrca.Biohazard.REE.Variables.Rsz
 {
     [StructLayout(LayoutKind.Sequential)]
-    internal class RszInstanceInfo
+    internal struct RszInstanceInfo
     {
         public uint TypeId;
         public uint Crc;

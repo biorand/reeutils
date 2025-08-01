@@ -1,8 +1,10 @@
 ﻿using IntelOrca.Biohazard.REE.Utils;
 using IntelOrca.Biohazard.REE.Variables.Pfb;
 using IntelOrca.Biohazard.REE.Variables.Rsz.Pfb;
+using IntelOrca.Biohazard.REE.Variables.Rsz.Scn;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -21,6 +23,7 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
     internal class RszFile
     {
         private int _currentOffset = 0;
+        private int _instance_base_mod = 0;
         public byte[] FullData { get; set; } = Array.Empty<byte>();
         public object Header { get; set; }
         public List<RszGameObject> GameObjects { get; } = new List<RszGameObject>();
@@ -64,18 +67,24 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
             public object Parent { get; set; }
         }
 
-        public HeaderType GetHeaderType()
+        private HeaderType GetHeaderType()
         {
             if (Header is UsrHeader)
                 return HeaderType.Usr;
-            if (Header is PfbHeader)
-                return HeaderType.Pfb;
-            if (Header is Pfb16Header)
-                return HeaderType.Pfb16;
-            if (Header is Scn18Header)
-                return HeaderType.Scn18;
-            if (Header is Scn19Header)
-                return HeaderType.Scn19;
+            if (Header is PfbHeader pfbHeader)
+            {
+                return pfbHeader.Version == 16 ? HeaderType.Pfb16 : HeaderType.Pfb;
+            }
+            if (Header is ScnHeader scnHeader)
+            {
+                return scnHeader.Version switch
+                {
+                    19 => HeaderType.Scn19,
+                    18 => HeaderType.Scn18,
+                    _ => HeaderType.ScnBase
+                };
+            }
+
             return HeaderType.ScnBase;
         }
 
@@ -99,12 +108,16 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
                         if ((FilePath?.ToLowerInvariant() ?? string.Empty).EndsWith(".16"))
                         {
                             headerType = HeaderType.Pfb16;
-                            Header = new Pfb16Header(); // Placeholder
+                            var pfbHeader = new PfbHeader();
+                            pfbHeader.Parse(data, 16);
+                            Header = pfbHeader;
                         }
                         else
                         {
                             headerType = HeaderType.Pfb;
-                            Header = new PfbHeader(); // Placeholder
+                            var pfbHeader = new PfbHeader();
+                            pfbHeader.Parse(data, 0);
+                            Header = pfbHeader;
                         }
                         break;
                     default:
@@ -112,24 +125,30 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
                         if (fileExt.EndsWith(".19"))
                         {
                             headerType = HeaderType.Scn19;
-                            Header = new Scn19Header();
+                            var scnHeader = new ScnHeader();
+                            scnHeader.Parse(data, 19);
+                            Header = scnHeader;
                         }
                         else if (fileExt.EndsWith(".18"))
                         {
                             headerType = HeaderType.Scn18;
-                            Header = new Scn18Header();
+                            var scnHeader = new ScnHeader();
+                            scnHeader.Parse(data, 18);
+                            Header = scnHeader;
                         }
                         else
                         {
                             headerType = HeaderType.ScnBase;
-                            Header = new ScnHeaderBase();
+                            var scnHeader = new ScnHeader();
+                            scnHeader.Parse(data, 0);
+                            Header = scnHeader;
                         }
                         break;
                 }
             }
             else
             {
-                Header = new ScnHeaderBase();
+                Header = new ScnHeader();
             }
 
             // Parse based on detected header type
@@ -139,7 +158,6 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
                     ParseUsrFile(data);
                     break;
                 case HeaderType.Pfb:
-                case HeaderType.Pfb16:
                     ParsePfbFile(data);
                     break;
                 default:
@@ -180,48 +198,20 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
             }
         }
 
-        /// <summary>
-        /// Check if the current file is a SCN file.
-        /// </summary>
-
         private bool isScnFile()
         {
-            return Header is ScnHeaderBase || Header is Scn18Header || Header is Scn19Header;
+            return Header is ScnHeader;
         }
 
-        /// <summary>
-        /// Check if the current file is a PFB file.
-        /// </summary>
-        /// 
         private bool isPfbFile()
         {
             return Header is PfbHeader;
         }
 
-        /// <summary>
-        /// Check if the current file is a PFB 16 file.
-        /// </summary>
-        /// 
-        private bool isPfb16File()
-        {
-            return Header is Pfb16Header;
-        }
-
-        /// <summary>
-        /// Check if the current file is a USR file.
-        /// </summary>
-        /// 
         private bool isUsrFile()
         {
             return Header is UsrHeader;
         }
-
-        /// <summary>
-        /// Parses the USR file format from the provided byte array.
-        /// </summary>
-        /// <param name="data"></param>
-        /// <param name="skipData"></param>
-
         private void ParseUsrFile(byte[] data, bool skipData = false) 
         {
             
@@ -229,10 +219,6 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
         private void ParsePfbFile(byte[] data) { /* Implement parsing logic */ }
         private void ParseScnFile(byte[] data) { /* Implement parsing logic */ }
 
-        /// <summary>
-        /// Parses the resource information from the provided byte array.
-        /// </summary>
-        /// <param name="data"></param>
         private void ParseResourceInfos(byte[] data)
         {
             ResourceInfos.Clear();
@@ -274,7 +260,7 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
         private void ParsePrefabInfo(byte[] data)
         {
             PrefabInfos.Clear();
-            var scnHeader = Header as ScnHeaderBase;
+            var scnHeader = Header as ScnHeader;
             if (scnHeader == null || scnHeader.PrefabCount == 0)
                 return;
 
@@ -335,85 +321,76 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
                 return usrHeader.DataOffset;
             if (Header is PfbHeader pfbHeader)
                 return pfbHeader.DataOffset;
-            if (Header is Pfb16Header pfb16Header)
-                return pfb16Header.DataOffset;
-            if (Header is Scn18Header scn18Header)
-                return scn18Header.DataOffset;
-            if (Header is Scn19Header scn19Header)
-                return scn19Header.DataOffset;
-            if (Header is ScnHeaderBase scnBaseHeader)
-                return scnBaseHeader.DataOffset;
+            if (Header is ScnHeader scnHeader)
+                return scnHeader.DataOffset;
             return 0; // Default case
         }
 
         private void ParseRszSection(byte[] data, bool skipData = false)
         {
-            _currentOffset = (int) GetHeaderDataOffset(); 
-            RszHeader = new RszHeader(data);
-            if (RszHeader == null)
-            {
-                Console.WriteLine("Failed to parse RSZ header.");
-                return;
-            }
+            _currentOffset = (int)(GetHeaderDataOffset() + RszHeader.InstanceOffset);
 
-            _currentOffset += RszHeader.Size;
-
-            // Parse Object Table First
-            int objectCount = (int)RszHeader.ObjectCount;
-            ObjectTable.Clear();
-            if (objectCount > 0)
-            {
-                // Each object table entry is a 4-byte int
-                int entrySize = sizeof(int);
-                for (int i = 0; i < objectCount; i++)
-                {
-                    int objId = BitConverter.ToInt32(data, _currentOffset + i * entrySize);
-                    ObjectTable.Add(objId);
-                }
-                _currentOffset += objectCount * entrySize;
-            }
-
-            // Now we can create the gameobject and folder ID Sets
-            _gameObjectInstanceIds.Clear();
-            _folderInstanceIds.Clear();
-
-            // Populate _gameObjectInstanceIds and _folderInstanceIds based on ObjectTable, GameObjects, and FolderInfos
-            _gameObjectInstanceIds.Clear();
-            foreach (var go in GameObjects)
-            {
-                if (go.Id < ObjectTable.Count)
-                {
-                    _gameObjectInstanceIds.Add(ObjectTable[go.Id]);
-                }
-            }
-            _folderInstanceIds.Clear();
-            foreach (var fi in FolderInfos)
-            {
-                if (fi.Id < ObjectTable.Count)
-                {
-                    _folderInstanceIds.Add(ObjectTable[fi.Id]);
-                }
-            }
-
-            // Continue with rest of Rsz Section parsing
-            _currentOffset = (int) GetHeaderDataOffset() + (int) RszHeader.InstanceOffset;
-            int structSize = Marshal.SizeOf<RszInstanceInfo>();
-
+            // Parse Instance Infos – that has instance_count entries (8 bytes each)
             for (int i = 0; i < RszHeader.InstanceCount; i++)
             {
-                var span = new ReadOnlySpan<byte>(data, _currentOffset, structSize);
-                var instanceInfo = MemoryMarshal.Read<RszInstanceInfo>(span); 
-                if (RszHeader.Version < 4) _currentOffset += 8;
+                var instanceInfo = new RszInstanceInfo();
+                _currentOffset = instanceInfo.Parse(data, _currentOffset);
+                if (RszHeader.Version < 4)
+                {
+                    _currentOffset += 8;
+                }
                 InstanceInfos.Add(instanceInfo);
-                _currentOffset += structSize;
             }
 
+            // Only parse userdata if version > 3
             if (RszHeader.Version > 3)
             {
-                var filepath = FilePath?.ToLowerInvariant() ?? string.Empty;
-                _currentOffset = (int) GetHeaderDataOffset() + (int) RszHeader.UserdataOffset;
+                _currentOffset = (int)(GetHeaderDataOffset() + RszHeader.UserdataOffset);
+
+                if (FilePath.ToLowerInvariant().EndsWith(".19") || 
+                    (FilePath.ToLowerInvariant().EndsWith(".18") && isScnFile()))
+                {
+                    ParseScn19RszUserData(data, skipData);
+                }
+                else if (FilePath.ToLowerInvariant().EndsWith(".16"))
+                {
+                    _currentOffset = ParsePfbRszUserData(data, skipData);
+                }
+                else
+                {
+                    ParseStandardRszUserData(data);
+                }
+            }
+
+            Data = data.Skip(_currentOffset).ToArray();
+
+            _rszUserDataDict = RszUserDataInfos.ToDictionary(rui => rui.InstanceId, rui => (object)rui);
+            _rszUserDataSet = new HashSet<object>(_rszUserDataDict.Keys);
+
+            int fileOffsetOfData = _currentOffset;
+            _instance_base_mod = fileOffsetOfData % 16;
+        }
+
+        private void ParseScn19RszUserData(byte[] data, bool skipData)
+        {
+            while (_currentOffset < data.Length)
+            {
+                var userDataInfo = new RszUserDataInfo();
+                _currentOffset = userDataInfo.Parse(data, _currentOffset, isScn19: true);
+                RszUserDataInfos.Add(userDataInfo);
             }
         }
+
+        private void ParseStandardRszUserData(byte[] data)
+        {
+            while (_currentOffset < data.Length)
+            {
+                var userDataInfo = new RszUserDataInfo();
+                _currentOffset = userDataInfo.Parse(data, _currentOffset, isScn19: false);
+                RszUserDataInfos.Add(userDataInfo);
+            }
+        }
+
         private void SetResourceString(object resourceInfo, string value)
         {
             if (string.IsNullOrEmpty(value))
@@ -421,7 +398,7 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
 
             try
             {
-                if (isPfb16File() && resourceInfo is Pfb16ResourceInfo pfb16ResourceInfo)
+                if (isPfbFile() && resourceInfo is Pfb16ResourceInfo pfb16ResourceInfo)
                 {
                     pfb16ResourceInfo.StringValue = value;
                 }
@@ -434,38 +411,22 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
             }
         }
 
-        /// <summary>
-        /// Aligns a position relative to a base modifier.
-        /// </summary>
-        /// <param name="pos">The position to align.</param>
-        /// <param name="align">The alignment boundary.</param>
-        /// <param name="baseMod">The base modifier for alignment.</param>
-        /// <returns>The aligned position.</returns>
         private static int AlignRel(int pos, int align, int baseMod)
         {
             int rem = (pos + baseMod) % align;
             return rem == 0 ? pos : pos + (align - rem);
         }
 
-        /// <summary>
-        /// Aligns a position using the instance base modifier.
-        /// </summary>
-        /// <param name="pos">The position to align.</param>
-        /// <param name="align">The alignment boundary.</param>
-        /// <returns>The aligned position.</returns>
         private int Align(int pos, int align)
         {
             int baseMod = GetInstanceBaseMod();
             return AlignRel(pos, align, baseMod);
         }
 
-        /// <summary>
-        /// Computes the instance base modifier for alignment.
-        /// </summary>
-        /// <returns>The base modifier value.</returns>
         private int GetInstanceBaseMod()
         {
-            return (int)(GetType().GetProperty("_instance_base_mod")?.GetValue(this) ?? 0);
+            return _instance_base_mod;
         }
     }
 }
+

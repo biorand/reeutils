@@ -4,10 +4,17 @@ using System.Runtime.InteropServices;
 
 namespace IntelOrca.Biohazard.REE.Variables.Rsz
 {
-    [StructLayout(LayoutKind.Sequential)]
-    internal class RszResourceInfo
+    [StructLayout(LayoutKind.Explicit)]
+    internal struct RszResourceInfo
     {
-        public uint StringOffset;
+        [FieldOffset(0)]
         public uint Reserved;
+
+        // Only one of these will be used at a time
+        [FieldOffset(0)]
+        public string StringValue;
+
+        [FieldOffset(4)]
+        public uint StringOffset;
     }
 }

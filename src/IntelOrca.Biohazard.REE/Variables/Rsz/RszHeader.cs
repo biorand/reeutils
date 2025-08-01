@@ -3,6 +3,15 @@ using System.Buffers.Binary;
 
 namespace IntelOrca.Biohazard.REE.Variables.Rsz
 {
+    /// <summary>
+    /// Represents the header of a RSZ file.
+    /// </summary>
+    
+    internal class RszHeaderBase
+    {
+
+    }
+
     internal class RszHeader
     {
         public uint Magic;
