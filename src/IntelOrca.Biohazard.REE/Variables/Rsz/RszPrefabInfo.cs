@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 namespace IntelOrca.Biohazard.REE.Variables.Rsz
 {
     [StructLayout(LayoutKind.Sequential)]
-    internal class RszPrefabInfo
+    internal struct RszPrefabInfo
     {
         public uint StringOffset;
         public uint ParentId;

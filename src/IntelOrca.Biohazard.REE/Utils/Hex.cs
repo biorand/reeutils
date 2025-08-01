@@ -33,15 +33,15 @@ namespace IntelOrca.Biohazard.REE.Utils
             return Tuple.Create(chars.ToString(), pos, count);
         }
 
-        public static Tuple<string, int> ReadWString(byte[] data, int offset, int maxWChars)
+        public static Tuple<string, uint> ReadWString(byte[] data, uint offset, int maxWChars)
         {
-            int pos = offset;
+            uint pos = offset;
 
             // Skip BOM if present
             if (pos + 1 < data.Length && data[pos] == 0xFF && data[pos + 1] == 0xFE)
                 pos += 2;
 
-            int end = pos;
+            uint end = pos;
             while (end + 1 < data.Length && !(data[end] == 0 && data[end + 1] == 0))
             {
                 end += 2;
@@ -49,8 +49,8 @@ namespace IntelOrca.Biohazard.REE.Utils
                     break;
             }
 
-            string str = Encoding.Unicode.GetString(data, pos, end - pos);
-            return Tuple.Create(str, end + 2);
+            string str = Encoding.Unicode.GetString(data, (int)pos, (int)(end - pos));
+            return Tuple.Create(str, (uint)(end + 2));
         }
 
         public static string GuidLeToStr(byte[] guidBytes)
