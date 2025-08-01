@@ -20,6 +20,13 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
         ScnBase
     }
 
+    // Helper class for instance hierarchy
+    public class InstanceHierarchy
+    {
+        public List<object> Children { get; set; } = new List<object>();
+        public object Parent { get; set; }
+    }
+
     internal class RszFile
     {
         private int _currentOffset = 0;
@@ -59,13 +66,6 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
         // public Dictionary<object, InstanceHierarchy> InstanceHierarchy { get; } = new Dictionary<object, InstanceHierarchy>();
         private HashSet<object> _gameObjectInstanceIds = new HashSet<object>();
         private HashSet<object> _folderInstanceIds = new HashSet<object>();
-
-        // Helper class for instance hierarchy
-        public class InstanceHierarchy
-        {
-            public List<object> Children { get; set; } = new List<object>();
-            public object Parent { get; set; }
-        }
 
         private HeaderType GetHeaderType()
         {
@@ -174,9 +174,7 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
                     return usrHeader.ResourceCount;
                 case PfbHeader pfbHeader:
                     return pfbHeader.ResourceCount;
-                case Pfb16Header pfb16Header:
-                    return pfb16Header.ResourceCount;
-                case ScnHeaderBase scnHeader:
+                case ScnHeader scnHeader:
                     return scnHeader.ResourceCount;
                 default:
                     return 0;
@@ -190,8 +188,8 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
                 case UsrHeader usrHeader:
                     return usrHeader.UserdataCount;
                 case PfbHeader pfbHeader:
-                    return pfbHeader.UserdataCount;
-                case ScnHeaderBase scnHeader:
+                    return pfbHeader.UserDataCount ?? 0;
+                case ScnHeader scnHeader:
                     return scnHeader.UserdataCount;
                 default:
                     return 0;
@@ -202,16 +200,17 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
         {
             return Header is ScnHeader;
         }
-
+        
         private bool isPfbFile()
         {
             return Header is PfbHeader;
         }
-
+        
         private bool isUsrFile()
         {
             return Header is UsrHeader;
         }
+        
         private void ParseUsrFile(byte[] data, bool skipData = false) 
         {
             
@@ -233,13 +232,10 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
                 ResourceInfos.Add(resourceInfo);
                 offset += structSize;
             }
+
             _currentOffset = Align(offset, 16); 
         }
 
-        /// <summary>
-        /// Parses the user data information from the provided byte array.
-        /// </summary>
-        /// <param name="data"></param>
         private void ParseUserDataInfos(byte[] data)
         {
             UserDataInfos.Clear();
@@ -274,6 +270,7 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
                 PrefabInfos.Add(prefabInfo);
                 offset += structSize;
             }
+
             _currentOffset = Align(offset, 16);
         }
 
@@ -328,17 +325,21 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
 
         private void ParseRszSection(byte[] data, bool skipData = false)
         {
-            _currentOffset = (int)(GetHeaderDataOffset() + RszHeader.InstanceOffset);
+            var offset = (int)(GetHeaderDataOffset() + RszHeader.InstanceOffset);
+            var structSize = Marshal.SizeOf<RszInstanceInfo>();
 
-            // Parse Instance Infos – that has instance_count entries (8 bytes each)
             for (int i = 0; i < RszHeader.InstanceCount; i++)
             {
-                var instanceInfo = new RszInstanceInfo();
-                _currentOffset = instanceInfo.Parse(data, _currentOffset);
+                var span = new ReadOnlySpan<byte>(data, offset, structSize);
+                var prefabInfo = MemoryMarshal.Read<RszPrefabInfo>(span);
+                PrefabInfos.Add(prefabInfo);
+                offset += structSize;
+
                 if (RszHeader.Version < 4)
                 {
                     _currentOffset += 8;
                 }
+                
                 InstanceInfos.Add(instanceInfo);
             }
 
@@ -354,7 +355,7 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
                 }
                 else if (FilePath.ToLowerInvariant().EndsWith(".16"))
                 {
-                    _currentOffset = ParsePfbRszUserData(data, skipData);
+                    _currentOffset = ParseRszUserData(data, skipData);
                 }
                 else
                 {
@@ -371,24 +372,118 @@ namespace IntelOrca.Biohazard.REE.Variables.Rsz
             _instance_base_mod = fileOffsetOfData % 16;
         }
 
-        private void ParseScn19RszUserData(byte[] data, bool skipData)
+        private int ParseRszUserData(byte[] data)
         {
-            while (_currentOffset < data.Length)
+            this.RszUserDataInfos.Clear();
+            var rszBaseOffset = GetHeaderDataOffset();
+            var currentOffset = this._currentOffset;
+
+            for (int i = 0; i < RszHeader.UserdataCount; i++)
             {
-                var userDataInfo = new RszUserDataInfo();
-                _currentOffset = userDataInfo.Parse(data, _currentOffset, isScn19: true);
-                RszUserDataInfos.Add(userDataInfo);
+                var rszUserDataInfo = new RszUserDataInfo();
+                currentOffset = rszUserDataInfo.Parse(data, currentOffset, true);
+                this.RszUserDataInfos.Add(rszUserDataInfo);
             }
+
+            return 0;
         }
 
-        private void ParseStandardRszUserData(byte[] data)
+        private int ParseScn19RszUserData(byte[] data, bool skipData)
         {
-            while (_currentOffset < data.Length)
+            this.RszUserDataInfos.Clear();
+            var rszBaseOffset = GetHeaderDataOffset();
+            var currentOffset = this._currentOffset;
+
+            for (int i = 0; i < RszHeader.UserdataCount; i++)
             {
-                var userDataInfo = new RszUserDataInfo();
-                _currentOffset = userDataInfo.Parse(data, _currentOffset, isScn19: false);
-                RszUserDataInfos.Add(userDataInfo);
+                var rszUserDataInfo = new RszUserDataInfo();
+                currentOffset = rszUserDataInfo.Parse(data, currentOffset, true);
+                this.RszUserDataInfos.Add(rszUserDataInfo);
             }
+
+            foreach (var rszUserDataInfo in this.RszUserDataInfos)
+            {
+                if (rszUserDataInfo.StringOffset <= 0 || rszUserDataInfo.DataSize <= 0)
+                {
+                    rszUserDataInfo.Data = Array.Empty<byte>();
+                    _rszUserDataStrMap[rszUserDataInfo] = "Emtpy UserData";
+                }
+
+                var magic = 0;
+                var version = 0;
+                var absoluteDataOffset = rszBaseOffset + rszUserDataInfo.RszOffset;
+
+                if ((absoluteDataOffset < rszBaseOffset) || (absoluteDataOffset >= (ulong)Data.Length))
+                {
+                    rszUserDataInfo.Data = Array.Empty<byte>();
+                    _rszUserDataStrMap[rszUserDataInfo] = "Invalid UserDat offset";
+                }
+
+                if ((absoluteDataOffset + (ulong) rszUserDataInfo.DataSize) <= (ulong) Data.Length)
+                {
+                    // read data from absoluteDataOffset to (absoluteDataOffset + rszUserDataInfo.DataSize)
+                    rszUserDataInfo.Data = data.Skip((int)absoluteDataOffset).Take(rszUserDataInfo.DataSize).ToArray();
+
+                    if (rszUserDataInfo.Data.Length >= 8)
+                    {
+                        magic = BitConverter.ToInt32(rszUserDataInfo.Data, 0);
+                        version = BitConverter.ToInt32(rszUserDataInfo.Data, 4);
+                    }
+
+                    if (rszUserDataInfo.Data.Length >= 48)
+                    {
+                        ParseEmbeddedRsz(rszUserDataInfo, TypeRegistry, skipData);
+                        if (rszUserDataInfo.EmbeddedObjectTable.Count > 0)
+                        {
+                            var description = $"Embedded RSZ: {rszUserDataInfo.EmbeddedObjectTable.Count}, "
+                                + $"{rszUserDataInfo.EmbeddedInstanceInfos.Count} instances, "
+                                + $"{rszUserDataInfo.EmbeddedInstances.Count} parsed";
+                            _rszUserDataStrMap[rszUserDataInfo] = description;
+                        }
+                        else
+                        {
+                            _rszUserDataStrMap[rszUserDataInfo] = $"Rsz Parse Error (magic: 0x{magic:08X}, ver: {version})";
+                        }
+                    } 
+                    else
+                    {
+                        _rszUserDataStrMap[rszUserDataInfo] = $"Not RSZ Data - Too Small {rszUserDataInfo.DataSize} bytes";
+                    }
+                }
+                else
+                {
+                    rszUserDataInfo.Data = Array.Empty<byte>();
+                    _rszUserDataStrMap[rszUserDataInfo] = "Invalid UserData (out of bounds)";
+                }
+            }
+
+            if (RszUserDataInfos.Count > 0)
+            {
+                // C# equivalent of the provided Python logic
+                int maxEndOffset = 0;
+                try
+                {
+                    var validUserDataInfos = RszUserDataInfos
+                        .Where(rui => rui.RszOffset > 0 && rui.DataSize > 0)
+                        .Select(rui => (int)((int)rszBaseOffset + (int)rui.RszOffset + rui.DataSize));
+
+                    if (validUserDataInfos.Any())
+                    {
+                        maxEndOffset = validUserDataInfos.Max();
+                        currentOffset = Align(maxEndOffset, 16);
+                    }
+                    else
+                    {
+                        currentOffset = Align(currentOffset, 16);
+                    }
+                }
+                catch (Exception)
+                {
+                    currentOffset = Align(currentOffset, 16);
+                }
+            }
+
+            return currentOffset;
         }
 
         private void SetResourceString(object resourceInfo, string value)
