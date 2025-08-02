@@ -3,13 +3,13 @@ using System.IO.Compression;
 
 namespace IntelOrca.Biohazard.REE.Compression
 {
-    public static class Deflate
+    public static class Gzip
     {
         public static byte[] CompressData(byte[] buffer)
         {
             using var outputStream = new MemoryStream();
             using var inputStream = new MemoryStream(buffer);
-            using var deflateStream = new DeflateStream(inputStream, CompressionMode.Compress, false);
+            using var deflateStream = new GZipStream(inputStream, CompressionMode.Compress, false);
             deflateStream.CopyTo(outputStream);
             return outputStream.ToArray();
 
@@ -19,7 +19,7 @@ namespace IntelOrca.Biohazard.REE.Compression
         {
             using var outputStream = new MemoryStream();
             using var inputStream = new MemoryStream(buffer);
-            using var deflateStream = new DeflateStream(inputStream, CompressionMode.Decompress, false);
+            using var deflateStream = new GZipStream(inputStream, CompressionMode.Decompress, false);
             deflateStream.CopyTo(outputStream);
             return outputStream.ToArray();
         }

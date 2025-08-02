@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Text;
+using IntelOrca.Biohazard.REE.Compression;
 using IntelOrca.Biohazard.REE.Cryptography;
 
 namespace IntelOrca.Biohazard.REE.Package
@@ -13,7 +15,17 @@ namespace IntelOrca.Biohazard.REE.Package
 
         public ImmutableArray<string> Entries { get; }
 
-        public static PakList FromFile(string path) => new PakList(File.ReadAllText(path));
+        public static PakList FromFile(string path)
+        {
+            var data = File.ReadAllBytes(path);
+            if (path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase))
+            {
+                data = Gzip.DecompressData(data);
+            }
+            var sr = new StreamReader(new MemoryStream(data), Encoding.UTF8);
+            var s = sr.ReadToEnd();
+            return new PakList(s);
+        }
 
         public PakList(string contents)
             : this(contents.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))

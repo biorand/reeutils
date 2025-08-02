@@ -3,7 +3,7 @@ using ZstdSharp;
 
 namespace IntelOrca.Biohazard.REE.Compression
 {
-    internal static class Zstd
+    public static class Zstd
     {
         public static byte[] CompressData(byte[] buffer)
         {
