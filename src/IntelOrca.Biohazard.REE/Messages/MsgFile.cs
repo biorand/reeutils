@@ -28,8 +28,8 @@ namespace IntelOrca.Biohazard.REE.Messages
         private ReadOnlySpan<ulong> EntryOffsets => GetSpan<ulong>(HeaderCOffset + (ulong)sizeof(MsgHeaderC), (int)HeaderB.EntryCount);
         private ulong UnkData => MemoryMarshal.Read<ulong>(data.Span.Slice((int)HeaderC.UnkDataOffset));
         private ReadOnlySpan<LanguageId> Languages => GetSpan<LanguageId>(HeaderC.LangDataOffset, (int)HeaderB.LanguageCount);
-        private ReadOnlySpan<int> AttributeTypes => GetSpan<int>(HeaderC.AttributeOffset, (int)HeaderB.AttributeCount);
-        private ReadOnlySpan<ulong> AttributeNames => GetSpan<ulong>(HeaderC.AttributeNameOffset, (int)HeaderB.AttributeCount);
+        private ReadOnlySpan<MsgAttributeType> AttributeTypes => GetSpan<MsgAttributeType>(HeaderC.AttributeTypesOffset, (int)HeaderB.AttributeCount);
+        private ReadOnlySpan<ulong> AttributeNames => GetSpan<ulong>(HeaderC.AttributeNamesOffset, (int)HeaderB.AttributeCount);
 
         private static bool IsVersionEncrypt(int version)
         {
@@ -49,6 +49,24 @@ namespace IntelOrca.Biohazard.REE.Messages
                 if (!IsVersionEncrypt((int)HeaderA.Version))
                     offset -= 8;
                 return offset;
+            }
+        }
+
+        private ReadOnlySpan<MsgAttributeDefinition> Attributes
+        {
+            get
+            {
+                var stringData = GetStringData();
+                var types = AttributeTypes;
+                var names = AttributeNames;
+                var result = new MsgAttributeDefinition[(int)HeaderB.AttributeCount];
+                for (var i = 0; i < result.Length; i++)
+                {
+                    result[i] = new MsgAttributeDefinition(
+                        types[i],
+                        stringData.GetString(names[i]));
+                }
+                return result;
             }
         }
 
@@ -97,12 +115,18 @@ namespace IntelOrca.Biohazard.REE.Messages
 
         public int Count => (int)HeaderB.EntryCount;
 
+        public int AttributeCount => (int)HeaderB.AttributeCount;
+
         public Msg GetMessage(int index)
         {
             var stringData = GetStringData();
             var languageIds = Languages;
+            var attributesDefinitions = Attributes;
             var msgHeader = Messages[index];
-            var values = ImmutableArray.CreateBuilder<MsgValue>(Languages.Length);
+            var attributeValues = MemoryMarshal.Cast<byte, ulong>(
+                Data.Slice((int)msgHeader.AttributeOffset, attributesDefinitions.Length * sizeof(ulong)).Span);
+
+            var values = ImmutableArray.CreateBuilder<MsgValue>(languageIds.Length);
             for (var i = 0; i < languageIds.Length; i++)
             {
                 values.Add(
@@ -111,12 +135,29 @@ namespace IntelOrca.Biohazard.REE.Messages
                         stringData.GetString(msgHeader.ContentOffsets[i])));
             }
 
+            var attributes = ImmutableArray.CreateBuilder<MsgAttributeValue>(attributesDefinitions.Length);
+            for (var i = 0; i < attributesDefinitions.Length; i++)
+            {
+                var def = Attributes[i];
+                var valueRaw = attributeValues[i];
+                var value = (object)valueRaw;
+                if (def.Type == MsgAttributeType.Wstring)
+                    value = stringData.GetString(valueRaw);
+                else if (def.Type == MsgAttributeType.Int64)
+                    value = (long)valueRaw;
+                else if (def.Type == MsgAttributeType.Double)
+                    value = BitConverter.Int64BitsToDouble((long)valueRaw);
+
+                attributes.Add(new MsgAttributeValue(def, value));
+            }
+
             return new Msg
             {
                 Guid = msgHeader.Guid,
                 Crc = (int)msgHeader.Crc,
                 Name = GetString(msgHeader.EntryName),
-                Values = values.ToImmutable()
+                Values = values.ToImmutable(),
+                Attributes = attributes.ToImmutable()
             };
         }
 
@@ -125,13 +166,15 @@ namespace IntelOrca.Biohazard.REE.Messages
         public class Builder
         {
             public int Version { get; set; }
-            public ImmutableArray<LanguageId> Languages { get; set; }
+            public List<LanguageId> Languages { get; } = [];
+            public List<MsgAttributeDefinition> Attributes { get; } = [];
             public List<Msg> Messages { get; } = [];
 
             public Builder(MsgFile msgFile)
             {
                 Version = (int)msgFile.HeaderA.Version;
-                Languages = msgFile.Languages.ToImmutableArray();
+                Languages = [.. msgFile.Languages];
+                Attributes = [.. msgFile.Attributes];
 
                 var stringData = msgFile.GetStringData();
                 var messages = msgFile.Messages;
@@ -146,11 +189,31 @@ namespace IntelOrca.Biohazard.REE.Messages
                                 languageIds[i],
                                 stringData.GetString(msgHeader.ContentOffsets[i])));
                     }
+
+                    var attributeValues = MemoryMarshal.Cast<byte, ulong>(
+                        msgFile.Data.Slice((int)msgHeader.AttributeOffset, Attributes.Count * sizeof(ulong)).Span);
+                    var attributes = ImmutableArray.CreateBuilder<MsgAttributeValue>();
+                    for (var i = 0; i < Attributes.Count; i++)
+                    {
+                        var def = Attributes[i];
+                        var valueRaw = attributeValues[i];
+                        var value = (object)valueRaw;
+                        if (def.Type == MsgAttributeType.Wstring)
+                            value = stringData.GetString(valueRaw);
+                        else if (def.Type == MsgAttributeType.Int64)
+                            value = (long)valueRaw;
+                        else if (def.Type == MsgAttributeType.Double)
+                            value = BitConverter.Int64BitsToDouble((long)valueRaw);
+
+                        attributes.Add(new MsgAttributeValue(def, value));
+                    }
+
                     Messages.Add(new Msg
                     {
                         Guid = msgHeader.Guid,
                         Name = msgFile.GetString(msgHeader.EntryName),
-                        Values = values.ToImmutable()
+                        Values = values.ToImmutable(),
+                        Attributes = attributes.ToImmutable()
                     });
                 }
             }
@@ -165,7 +228,8 @@ namespace IntelOrca.Biohazard.REE.Messages
                 var headerB = new MsgHeaderB()
                 {
                     EntryCount = (uint)Messages.Count,
-                    LanguageCount = (uint)Languages.Length
+                    AttributeCount = (uint)Attributes.Count,
+                    LanguageCount = (uint)Languages.Count
                 };
                 var headerC = new MsgHeaderC();
                 var messageHeaderOffsets = new ulong[Messages.Count];
@@ -187,15 +251,21 @@ namespace IntelOrca.Biohazard.REE.Messages
                 headerC.UnkDataOffset = (ulong)ms.Position;
                 ms.Position += 8;
                 headerC.LangDataOffset = (ulong)ms.Position;
-                for (var i = 0; i < Languages.Length; i++)
+                for (var i = 0; i < Languages.Count; i++)
                 {
                     bw.Write((int)Languages[i]);
                 }
                 bw.Align(8);
-                headerC.AttributeOffset = (ulong)ms.Position;
-                headerC.AttributeNameOffset = (ulong)ms.Position;
+                headerC.AttributeTypesOffset = (ulong)ms.Position;
+                foreach (var attributeDefinition in Attributes)
+                {
+                    bw.Write((int)attributeDefinition.Type);
+                }
+                bw.Align(8);
+                headerC.AttributeNamesOffset = (ulong)ms.Position;
+                ms.Position += Attributes.Count * sizeof(ulong);
 
-                var entrySize = MsgEntryHeader.GetSize(Languages.Length);
+                var entrySize = MsgEntryHeader.GetSize(Languages.Count);
                 for (var i = 0; i < Messages.Count; i++)
                 {
                     messageHeaderOffsets[i] = (ulong)ms.Position;
@@ -203,6 +273,7 @@ namespace IntelOrca.Biohazard.REE.Messages
                 }
 
                 var attributeStartOffset = (ulong)ms.Position;
+                ms.Position += Attributes.Count * Messages.Count * sizeof(ulong);
 
                 headerB.DataOffset = (ulong)ms.Position;
                 var stringDataBuilder = new StringData.Builder(headerB.DataOffset);
@@ -218,6 +289,11 @@ namespace IntelOrca.Biohazard.REE.Messages
                 {
                     bw.Write(messageHeaderOffsets[i]);
                 }
+                ms.Position = (int)headerC.AttributeNamesOffset;
+                foreach (var def in Attributes)
+                {
+                    bw.Write(stringDataBuilder.AddString(def.Name));
+                }
                 for (var i = 0; i < Messages.Count; i++)
                 {
                     ms.Position = (int)messageHeaderOffsets[i];
@@ -231,10 +307,22 @@ namespace IntelOrca.Biohazard.REE.Messages
                         bw.Write(i);
                     bw.Write(stringDataBuilder.AddString(m.Name));
                     bw.Write(attributeStartOffset);
-                    for (var j = 0; j < Languages.Length; j++)
+                    for (var j = 0; j < Languages.Count; j++)
                     {
                         var languageId = Languages[j];
                         bw.Write(stringDataBuilder.AddString(m[languageId]));
+                    }
+                }
+                ms.Position = (int)attributeStartOffset;
+                foreach (var message in Messages)
+                {
+                    for (var i = 0; i < Attributes.Count; i++)
+                    {
+                        var attribute = message.Attributes[i];
+                        if (attribute.Type == MsgAttributeType.Wstring)
+                            bw.Write(stringDataBuilder.AddString((string)attribute.Value));
+                        else
+                            bw.Write((ulong)attribute.Value);
                     }
                 }
                 ms.Position = (int)headerB.DataOffset;

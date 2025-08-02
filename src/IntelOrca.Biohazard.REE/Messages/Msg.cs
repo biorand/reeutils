@@ -11,6 +11,7 @@ namespace IntelOrca.Biohazard.REE.Messages
         public int Crc { get; set; }
         public string Name { get; set; } = "";
         public ImmutableArray<MsgValue> Values { get; set; }
+        public ImmutableArray<MsgAttributeValue> Attributes { get; set; }
 
         public string this[LanguageId languageId]
         {

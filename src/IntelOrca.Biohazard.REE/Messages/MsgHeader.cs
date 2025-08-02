@@ -25,7 +25,7 @@ namespace IntelOrca.Biohazard.REE.Messages
     {
         public ulong UnkDataOffset;
         public ulong LangDataOffset;
-        public ulong AttributeOffset;
-        public ulong AttributeNameOffset;
+        public ulong AttributeTypesOffset;
+        public ulong AttributeNamesOffset;
     }
 }
