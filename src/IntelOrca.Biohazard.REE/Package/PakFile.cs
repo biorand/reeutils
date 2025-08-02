@@ -20,7 +20,7 @@ namespace IntelOrca.Biohazard.REE.Package
         private ImmutableArray<Entry> _entries;
         private ImmutableDictionary<ulong, int> _hashToEntry;
 
-        public PakFile(string path) : this(File.Open(path, FileMode.Open))
+        public PakFile(string path) : this(File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
         }
 
