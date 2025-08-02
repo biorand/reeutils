@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using IntelOrca.Biohazard.REE.Cryptography;
@@ -117,8 +117,24 @@ namespace IntelOrca.Biohazard.REE.Messages
 
         public int AttributeCount => (int)HeaderB.AttributeCount;
 
+        public Msg? FindMessage(Guid guid)
+        {
+            var messages = Messages;
+            for (var i = 0; i < messages.Length; i++)
+            {
+                if (messages[i].Guid == guid)
+                {
+                    return GetMessage(i);
+                }
+            }
+            return null;
+        }
+
         public Msg GetMessage(int index)
         {
+            if (index < 0 || index >= Count)
+                throw new ArgumentOutOfRangeException(nameof(index), "Message index is out of range.");
+
             var stringData = GetStringData();
             var languageIds = Languages;
             var attributesDefinitions = Attributes;
@@ -126,16 +142,23 @@ namespace IntelOrca.Biohazard.REE.Messages
             var attributeValues = MemoryMarshal.Cast<byte, ulong>(
                 Data.Slice((int)msgHeader.AttributeOffset, attributesDefinitions.Length * sizeof(ulong)).Span);
 
-            var values = ImmutableArray.CreateBuilder<MsgValue>(languageIds.Length);
+            var msg = new Msg
+            {
+                Guid = msgHeader.Guid,
+                Crc = (int)msgHeader.Crc,
+                Name = GetString(msgHeader.EntryName)
+            };
+
+            var values = new List<MsgValue>(languageIds.Length);
             for (var i = 0; i < languageIds.Length; i++)
             {
-                values.Add(
+                msg.Values.Add(
                     new MsgValue(
                         languageIds[i],
                         stringData.GetString(msgHeader.ContentOffsets[i])));
             }
 
-            var attributes = ImmutableArray.CreateBuilder<MsgAttributeValue>(attributesDefinitions.Length);
+            var attributes = new List<MsgAttributeValue>(attributesDefinitions.Length);
             for (var i = 0; i < attributesDefinitions.Length; i++)
             {
                 var def = Attributes[i];
@@ -148,17 +171,10 @@ namespace IntelOrca.Biohazard.REE.Messages
                 else if (def.Type == MsgAttributeType.Double)
                     value = BitConverter.Int64BitsToDouble((long)valueRaw);
 
-                attributes.Add(new MsgAttributeValue(def, value));
+                msg.Attributes.Add(new MsgAttributeValue(def, value));
             }
 
-            return new Msg
-            {
-                Guid = msgHeader.Guid,
-                Crc = (int)msgHeader.Crc,
-                Name = GetString(msgHeader.EntryName),
-                Values = values.ToImmutable(),
-                Attributes = attributes.ToImmutable()
-            };
+            return msg;
         }
 
         public Builder ToBuilder() => new Builder(this);
@@ -181,10 +197,16 @@ namespace IntelOrca.Biohazard.REE.Messages
                 var languageIds = msgFile.Languages;
                 foreach (var msgHeader in messages)
                 {
-                    var values = ImmutableArray.CreateBuilder<MsgValue>();
+                    var msg = new Msg
+                    {
+                        Guid = msgHeader.Guid,
+                        Crc = (int)msgHeader.Crc,
+                        Name = msgFile.GetString(msgHeader.EntryName)
+                    };
+
                     for (var i = 0; i < languageIds.Length; i++)
                     {
-                        values.Add(
+                        msg.Values.Add(
                             new MsgValue(
                                 languageIds[i],
                                 stringData.GetString(msgHeader.ContentOffsets[i])));
@@ -192,7 +214,6 @@ namespace IntelOrca.Biohazard.REE.Messages
 
                     var attributeValues = MemoryMarshal.Cast<byte, ulong>(
                         msgFile.Data.Slice((int)msgHeader.AttributeOffset, Attributes.Count * sizeof(ulong)).Span);
-                    var attributes = ImmutableArray.CreateBuilder<MsgAttributeValue>();
                     for (var i = 0; i < Attributes.Count; i++)
                     {
                         var def = Attributes[i];
@@ -205,17 +226,30 @@ namespace IntelOrca.Biohazard.REE.Messages
                         else if (def.Type == MsgAttributeType.Double)
                             value = BitConverter.Int64BitsToDouble((long)valueRaw);
 
-                        attributes.Add(new MsgAttributeValue(def, value));
+                        msg.Attributes.Add(new MsgAttributeValue(def, value));
                     }
 
-                    Messages.Add(new Msg
-                    {
-                        Guid = msgHeader.Guid,
-                        Name = msgFile.GetString(msgHeader.EntryName),
-                        Values = values.ToImmutable(),
-                        Attributes = attributes.ToImmutable()
-                    });
+                    Messages.Add(msg);
                 }
+            }
+
+            public Msg? FindMessage(string name)
+            {
+                return Messages.FirstOrDefault(x => x.Name == name);
+            }
+
+            public Msg? FindMessage(Guid guid)
+            {
+                return Messages.FirstOrDefault(x => x.Guid == guid);
+            }
+
+            public Builder SetMessage(Guid guid, LanguageId languageId, string text)
+            {
+                if (FindMessage(guid) is Msg msg)
+                {
+                    msg[languageId] = text;
+                }
+                return this;
             }
 
             public MsgFile Build()
@@ -359,7 +393,7 @@ namespace IntelOrca.Biohazard.REE.Messages
                     {
                         if (data[i] == '\0')
                         {
-                            return new string(data.Slice(0, i).ToArray());
+                            return i == 0 ? "" : new string(data.Slice(0, i).ToArray());
                         }
                     }
                 }

@@ -17,6 +17,26 @@ namespace IntelOrca.Biohazard.REE.Tests
             _pak.Dispose();
         }
 
+        [Theory]
+        [InlineData(LanguageId.Japanese, "ja")]
+        [InlineData(LanguageId.English, "en")]
+        [InlineData(LanguageId.TransitionalChinese, "zh-Hant")]
+        public void GetIsoNameFromId(LanguageId id, string iso)
+        {
+            Assert.Equal(iso, Language.GetIsoNameFromId(id));
+        }
+
+        [Theory]
+        [InlineData(LanguageId.Japanese, "ja")]
+        [InlineData(LanguageId.English, "en")]
+        [InlineData(LanguageId.English, "en-GB")]
+        [InlineData(LanguageId.English, "en-US")]
+        [InlineData(LanguageId.TransitionalChinese, "zh-Hant")]
+        public void GetIdFromIsoName(LanguageId id, string iso)
+        {
+            Assert.Equal(id, Language.GetIdFromIsoName(iso));
+        }
+
         [Fact]
         public void Rebuild_RE4_CH_MES_MAIN_ITEM_CAPTION()
         {
@@ -57,6 +77,23 @@ namespace IntelOrca.Biohazard.REE.Tests
             Assert.Equal("A statue piece in the\r\nshape of a lion's head.", msg52.Values[1].Text);
         }
 
+        [Fact]
+        public void SetMessage_RE4_CH_MES_MAIN_ITEM_CAPTION()
+        {
+            var path = "natives/stm/_chainsaw/message/mes_main_item/ch_mes_main_item_caption.msg.22";
+            var guid = new Guid("6db71d5a-9954-48f0-acf1-96bdd59efbde");
+            var newText = "A strange lion head.";
+
+            var input = new MsgFile(_pak.GetFileData(path));
+            var inputBuilder = input.ToBuilder();
+            inputBuilder.SetMessage(guid, LanguageId.English, newText);
+            var jpnText = inputBuilder.FindMessage(guid)![LanguageId.Japanese];
+            var output = inputBuilder.Build();
+            var newMessage = output.FindMessage(guid)!;
+            Assert.Equal(jpnText, newMessage[LanguageId.Japanese]);
+            Assert.Equal(newText, newMessage[LanguageId.English]);
+        }
+
         private void AssertRebuild(string path)
         {
             var input = new MsgFile(_pak.GetFileData(path));
@@ -75,13 +112,13 @@ namespace IntelOrca.Biohazard.REE.Tests
                 Assert.Equal(inputMsg.Guid, outputMsg.Guid);
                 Assert.Equal(inputMsg.Crc, outputMsg.Crc);
                 Assert.Equal(inputMsg.Name, outputMsg.Name);
-                Assert.Equal(inputMsg.Values.Length, outputMsg.Values.Length);
-                for (var j = 0; j < inputMsg.Values.Length; j++)
+                Assert.Equal(inputMsg.Values.Count, outputMsg.Values.Count);
+                for (var j = 0; j < inputMsg.Values.Count; j++)
                 {
                     Assert.Equal(inputMsg.Values[j], outputMsg.Values[j]);
                 }
-                Assert.Equal(inputMsg.Attributes.Length, outputMsg.Attributes.Length);
-                for (var j = 0; j < inputMsg.Attributes.Length; j++)
+                Assert.Equal(inputMsg.Attributes.Count, outputMsg.Attributes.Count);
+                for (var j = 0; j < inputMsg.Attributes.Count; j++)
                 {
                     Assert.Equal(inputMsg.Attributes[j], outputMsg.Attributes[j]);
                 }

@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Immutable;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace IntelOrca.Biohazard.REE.Messages
@@ -10,8 +10,8 @@ namespace IntelOrca.Biohazard.REE.Messages
         public Guid Guid { get; set; }
         public int Crc { get; set; }
         public string Name { get; set; } = "";
-        public ImmutableArray<MsgValue> Values { get; set; }
-        public ImmutableArray<MsgAttributeValue> Attributes { get; set; }
+        public List<MsgValue> Values { get; } = [];
+        public List<MsgAttributeValue> Attributes { get; } = [];
 
         public string this[LanguageId languageId]
         {
@@ -25,6 +25,18 @@ namespace IntelOrca.Biohazard.REE.Messages
                     }
                 }
                 return string.Empty;
+            }
+            set
+            {
+                for (int i = 0; i < Values.Count; i++)
+                {
+                    if (Values[i].Language == languageId)
+                    {
+                        Values[i] = new MsgValue(languageId, value);
+                        return;
+                    }
+                }
+                throw new ArgumentException($"No value found for language {languageId} in message {Name}.");
             }
         }
     }
