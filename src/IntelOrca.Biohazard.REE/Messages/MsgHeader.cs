@@ -16,6 +16,7 @@ namespace IntelOrca.Biohazard.REE.Messages
         public uint EntryCount;
         public uint AttributeCount;
         public uint LanguageCount;
+        public uint Reserved;
         public ulong DataOffset;
     }
 
