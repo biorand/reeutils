@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Immutable;
+using System.IO;
 using IntelOrca.Biohazard.REE.Extensions;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
-    internal class RszFile(ReadOnlyMemory<byte> data)
+    public class RszFile(ReadOnlyMemory<byte> data)
     {
         private const uint MAGIC = 0x005A5352;
 
@@ -104,17 +105,99 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public class Builder
         {
             public RszTypeRepository Repository { get; }
+            public uint Version { get; }
             public ImmutableArray<RszInstance> Objects { get; }
 
             public Builder(RszTypeRepository repository, RszFile instance)
             {
                 Repository = repository;
+                Version = instance.Header.Version;
                 Objects = instance.ReadObjectList(repository);
             }
 
             public RszFile Build()
             {
-                return new RszFile(new byte[0]);
+                var instanceList = GetInstances();
+                var objectList = Objects;
+
+                var ms = new MemoryStream();
+                var bw = new BinaryWriter(ms);
+
+                // Reserve space for header
+                bw.Skip(Version < 4 ? 32 : 48);
+
+                // Object list
+                foreach (var obj in objectList)
+                {
+                    bw.Write(obj.Id.Index);
+                }
+
+                // Instance list
+                var instanceListOffset = ms.Position;
+                foreach (var instance in instanceList)
+                {
+                    var rszStruct = (RszStructNode)instance.Value!;
+                    bw.Write(rszStruct.Type.Id);
+                    bw.Write(rszStruct.Type.Crc);
+                }
+
+                bw.Align(16);
+                var userDataOffset = ms.Position;
+
+                // Instance data
+                bw.Align(16);
+                var instanceDataOffset = ms.Position;
+                var rszDataWriter = new RszDataWriter(ms);
+                foreach (var instance in instanceList)
+                {
+                    rszDataWriter.Write(instance.Value!);
+                }
+
+                // Header
+                ms.Position = 0;
+                bw.Write(MAGIC);
+                bw.Write(Version);
+                bw.Write(Objects.Length);
+                bw.Write(instanceList.Length);
+                if (Version >= 4)
+                {
+                    bw.Write(0); // User data count
+                    bw.Write(0); // Padding
+                }
+                bw.Write(instanceListOffset);
+                bw.Write(instanceDataOffset);
+                bw.Write(userDataOffset);
+
+                return new RszFile(ms.ToArray());
+            }
+
+            private ImmutableArray<RszInstance> GetInstances()
+            {
+                var instanceList = ImmutableArray.CreateBuilder<RszInstance>();
+
+                // There is always a NULL instance at 0 (probably to prevent 0 from being used as a reference ID)
+                instanceList.Add(new RszInstance()
+                {
+                    Value = new RszStructNode(Repository.FromId(0)!, [])
+                });
+                foreach (var obj in Objects)
+                {
+                    AddInstances(obj, instanceList);
+                }
+                return instanceList.ToImmutableArray();
+            }
+
+            private void AddInstances(IRszNode node, ImmutableArray<RszInstance>.Builder builder)
+            {
+                foreach (var child in node.Children)
+                {
+                    AddInstances(child, builder);
+                }
+                if (node is RszInstance instance)
+                {
+                    instance.Id = new RszInstanceId(builder.Count);
+                    builder.Add(instance);
+                }
             }
         }
     }

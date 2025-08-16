@@ -45,9 +45,9 @@ namespace IntelOrca.Biohazard.REE.Tests
 
         private static RszTypeRepository GetTypeRepository()
         {
-            var jsonGzPath = @"M:\git\reeutils\src\reeutils\data\rszre4.json.gz";
-            var jsonGz = File.ReadAllBytes(jsonGzPath);
-            var repo = RszRepositorySerializer.Default.FromJsonGz(jsonGz);
+            var jsonPath = @"G:\apps\reasy\rszre4_reasy.json";
+            var json = File.ReadAllBytes(jsonPath);
+            var repo = RszRepositorySerializer.Default.FromJson(json);
             return repo;
         }
     }

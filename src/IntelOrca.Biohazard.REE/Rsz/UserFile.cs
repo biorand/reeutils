@@ -1,5 +1,7 @@
 ﻿using System;
+using System.IO;
 using System.Runtime.InteropServices;
+using IntelOrca.Biohazard.REE.Extensions;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
@@ -14,19 +16,49 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public Builder ToBuilder(RszTypeRepository repository)
         {
-            var rszBuilder = Rsz.ToBuilder(repository);
-            return new Builder(this);
+            return new Builder(repository, this);
         }
 
         public class Builder
         {
-            public Builder(UserFile instance)
+            public RszFile Rsz { get; }
+
+            public Builder(RszTypeRepository repository, UserFile instance)
             {
+                Rsz = instance.Rsz;
             }
 
             public UserFile Build()
             {
-                return new UserFile(new byte[0]);
+                var ms = new MemoryStream();
+                var bw = new BinaryWriter(ms);
+
+                // Reserve space for header
+                bw.Skip(48);
+
+                bw.Align(16);
+                var resourceOffset = ms.Position;
+
+                bw.Align(16);
+                var userDataOffset = ms.Position;
+
+                // Instance data
+                bw.Align(16);
+                var rszDataOffset = ms.Position;
+                bw.Write(Rsz.Data.Span);
+
+                // Header
+                ms.Position = 0;
+                bw.Write(MAGIC);
+                bw.Write(0); // Resource count
+                bw.Write(0); // User data count
+                bw.Write(0); // Info count
+                bw.Write(resourceOffset); // Resource offset
+                bw.Write(userDataOffset); // User data offset
+                bw.Write(rszDataOffset); // Data offset
+                bw.Write(0UL); // Reserved
+
+                return new UserFile(ms.ToArray());
             }
         }
     }

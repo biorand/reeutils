@@ -29,7 +29,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 },
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
             });
-            var idMap = stringIdMap.ToDictionary(x => Convert.ToUInt32(x.Key, 16), x => x.Value);
+            var idMap = stringIdMap
+                .Where(x => x.Key != "metadata")
+                .ToDictionary(x => Convert.ToUInt32(x.Key, 16), x => x.Value);
 
             var repo = new RszTypeRepository();
             foreach (var kvp in idMap)
