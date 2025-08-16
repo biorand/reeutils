@@ -12,12 +12,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public int Version => version;
         private ScnHeader Header => new ScnHeader(Version, version <= 18 ? data[..56] : data[..64]);
-        private ReadOnlySpan<FolderInfo> FolderList => data.Get<FolderInfo>(Header.FolderOffset, Header.FolderCount);
+        private ReadOnlySpan<UserDataInfo> UserDataInfoList => data.Get<UserDataInfo>(Header.UserdataOffset, Header.UserDataCount);
+        private ReadOnlySpan<FolderInfo> FolderInfoList => data.Get<FolderInfo>(Header.FolderOffset, Header.FolderCount);
         private RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
 
         public Builder ToBuilder(RszTypeRepository repository)
         {
-            var rszBuilder = Rsz.ToBuilder(repository);
+            var objectList = Rsz.ReadObjectList(repository);
             return new Builder(this);
         }
 

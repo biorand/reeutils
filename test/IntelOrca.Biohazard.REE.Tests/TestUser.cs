@@ -25,7 +25,7 @@ namespace IntelOrca.Biohazard.REE.Tests
 
         private void AssertRebuild(string path)
         {
-            var repo = new RszTypeRepository();
+            var repo = GetTypeRepository();
             var input = new UserFile(_pak.GetFileData(path));
             var inputBuilder = input.ToBuilder(repo);
             var output = inputBuilder.Build();
@@ -42,5 +42,13 @@ namespace IntelOrca.Biohazard.REE.Tests
         }
 
         private static string GetInstallPath() => @"G:\re4r\vanilla";
+
+        private static RszTypeRepository GetTypeRepository()
+        {
+            var jsonGzPath = @"M:\git\reeutils\src\reeutils\data\rszre4.json.gz";
+            var jsonGz = File.ReadAllBytes(jsonGzPath);
+            var repo = RszRepositorySerializer.Default.FromJsonGz(jsonGz);
+            return repo;
+        }
     }
 }

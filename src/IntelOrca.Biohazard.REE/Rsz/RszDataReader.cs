@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System.Collections.Immutable;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
@@ -13,71 +13,53 @@ namespace IntelOrca.Biohazard.REE.Rsz
             _reader = reader;
         }
 
-        public RszInstance Read(RszInstanceId id, RszInstanceInfo info)
+        public RszStructNode ReadStruct(RszType type)
         {
-            var type = _repository.FromId(info.TypeId)
-                ?? throw new Exception($"Unable to find type, Id = {info.TypeId}");
-            return Read(id, type);
+            var fieldValues = ImmutableArray.CreateBuilder<IRszNode>(type.Fields.Length);
+            foreach (var f in type.Fields)
+            {
+                fieldValues.Add(ReadField(f));
+            }
+            return new RszStructNode(type, fieldValues.ToImmutable());
         }
 
-        public RszInstance Read(RszInstanceId id, RszType type)
+        public IRszNode ReadField(RszTypeField field)
         {
-            switch (type.Kind)
+            if (field.IsArray)
             {
-                case RszTypeKind.Array:
+                _reader.Align(4);
+                var arrayLength = _reader.ReadInt32();
+                var array = ImmutableArray.CreateBuilder<IRszNode>(arrayLength);
+                if (arrayLength > 0)
                 {
-                    var arrayLength = _reader.ReadInt32();
-                    var value = new RszInstanceOrReference[arrayLength];
-                    var elementType = type.ElementType!;
-                    if (elementType.Kind == RszTypeKind.Struct)
-                    {
-                        for (var i = 0; i < arrayLength; i++)
-                        {
-                            var refId = _reader.ReadInt32();
-                            value[i] = new RszInstanceId(refId);
-                        }
-                    }
-                    else
-                    {
-                        for (var i = 0; i < arrayLength; i++)
-                        {
-                            value[i] = Read(default, type.ElementType!);
-                        }
-                    }
-                    return new RszInstance(id, type, value);
+                    _reader.Align(field.Align);
                 }
-                case RszTypeKind.Enum:
-                case RszTypeKind.Struct:
+                for (var i = 0; i < arrayLength; i++)
                 {
-                    var value = new RszInstanceOrReference[type.Fields.Length];
-                    for (var i = 0; i < type.Fields.Length; i++)
-                    {
-                        var field = type.Fields[i];
-                        if (field.Type.Kind == RszTypeKind.Struct)
-                        {
-                            var refId = _reader.ReadInt32();
-                            value[i] = new RszInstanceId(refId);
-                        }
-                        else
-                        {
-                            value[i] = Read(default, type.Fields[i].Type);
-                        }
-                    }
-                    return new RszInstance(id, type, value);
+                    array.Add(ReadValue(field));
                 }
-                default:
-                {
-                    var value = (object?)null;
-                    if (type.Kind == RszTypeKind.Int32)
-                    {
-                        value = _reader.ReadInt32();
-                    }
-                    else
-                    {
-                        _reader.Seek(type.Size);
-                    }
-                    return new RszInstance(id, type, value);
-                }
+                return new RszArrayNode(array.ToImmutable());
+            }
+            else
+            {
+                _reader.Align(field.Align);
+                return ReadValue(field);
+            }
+        }
+
+        public IRszNode ReadValue(RszTypeField field)
+        {
+            if (field.Type == RszFieldType.String ||
+                field.Type == RszFieldType.Resource)
+            {
+                _reader.Align(4);
+                var value = _reader.ReadString();
+                return new RszStringNode(value);
+            }
+            else
+            {
+                var data = _reader.ReadBytes(field.Size);
+                return new RszDataNode(field.Type, data);
             }
         }
     }

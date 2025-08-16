@@ -6,6 +6,6 @@
         Struct,
         Enum,
         Array,
-        Int32
+        Clr
     };
 }
