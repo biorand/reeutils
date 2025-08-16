@@ -1,22 +1,21 @@
 ﻿using System;
-using System.Buffers.Binary;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
-    internal ref struct RszInstanceDeserializer
+    internal ref struct RszDataReader
     {
-        public RszTypeRepository Repository { get; }
-        public ReadOnlySpan<byte> Data { get; private set; }
+        private RszTypeRepository _repository;
+        private SpanReader _reader;
 
-        public RszInstanceDeserializer(RszTypeRepository repository, ReadOnlySpan<byte> data)
+        public RszDataReader(RszTypeRepository repository, SpanReader reader)
         {
-            Repository = repository;
-            Data = data;
+            _repository = repository;
+            _reader = reader;
         }
 
         public RszInstance Read(RszInstanceId id, RszInstanceInfo info)
         {
-            var type = Repository.FromId(info.TypeId)
+            var type = _repository.FromId(info.TypeId)
                 ?? throw new Exception($"Unable to find type, Id = {info.TypeId}");
             return Read(id, type);
         }
@@ -27,17 +26,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 case RszTypeKind.Array:
                 {
-                    var arrayLength = BinaryPrimitives.ReadInt32LittleEndian(Data);
-                    Data = Data.Slice(4);
-
+                    var arrayLength = _reader.ReadInt32();
                     var value = new RszInstanceOrReference[arrayLength];
                     var elementType = type.ElementType!;
                     if (elementType.Kind == RszTypeKind.Struct)
                     {
                         for (var i = 0; i < arrayLength; i++)
                         {
-                            var refId = BinaryPrimitives.ReadInt32LittleEndian(Data);
-                            Data = Data.Slice(4);
+                            var refId = _reader.ReadInt32();
                             value[i] = new RszInstanceId(refId);
                         }
                     }
@@ -59,8 +55,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         var field = type.Fields[i];
                         if (field.Type.Kind == RszTypeKind.Struct)
                         {
-                            var refId = BinaryPrimitives.ReadInt32LittleEndian(Data);
-                            Data = Data.Slice(4);
+                            var refId = _reader.ReadInt32();
                             value[i] = new RszInstanceId(refId);
                         }
                         else
@@ -75,9 +70,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     var value = (object?)null;
                     if (type.Kind == RszTypeKind.Int32)
                     {
-                        value = BinaryPrimitives.ReadInt32LittleEndian(Data);
+                        value = _reader.ReadInt32();
                     }
-                    Data = Data.Slice(type.Size);
+                    else
+                    {
+                        _reader.Seek(type.Size);
+                    }
                     return new RszInstance(id, type, value);
                 }
             }

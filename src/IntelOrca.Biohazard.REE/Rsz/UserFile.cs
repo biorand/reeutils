@@ -9,11 +9,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public ReadOnlyMemory<byte> Data => data;
 
-        private ReadOnlySpan<T> GetSpan<T>(ulong offset, int count) where T : unmanaged
-        {
-            return MemoryMarshal.Cast<byte, T>(data.Slice((int)offset, count * sizeof(T)).Span);
-        }
-
         private UserHeader Header => MemoryMarshal.Read<UserHeader>(data.Span);
         private RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
 

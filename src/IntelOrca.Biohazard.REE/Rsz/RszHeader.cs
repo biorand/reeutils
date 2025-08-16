@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Buffers.Binary;
-using System.Runtime.InteropServices;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
-    [StructLayout(LayoutKind.Sequential)]
     internal readonly struct RszHeader(ReadOnlyMemory<byte> data)
     {
         public uint Magic => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(0, 4));
