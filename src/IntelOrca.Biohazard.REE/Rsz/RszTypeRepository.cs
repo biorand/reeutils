@@ -1,11 +1,16 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
-    internal class RszTypeRepository
+    public class RszTypeRepository
     {
         private Dictionary<uint, RszType> _idToTypeMap = [];
         private Dictionary<string, RszType> _nameToTypeMap = [];
+
+        private ModuleBuilder _moduleBuilder;
 
         public RszType? FromId(uint id)
         {
@@ -21,6 +26,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public void AddType(RszType type)
         {
+            GetOrCreateRuntimeType(type);
+
             _idToTypeMap.Add(type.Id, type);
             _nameToTypeMap.Add(type.Name, type);
         }
@@ -42,6 +49,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public RszTypeRepository()
         {
+            var assemblyName = new AssemblyName("DynamicAssembly");
+            var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+            _moduleBuilder = assemblyBuilder.DefineDynamicModule("MainModule");
+
             AddType(new RszType()
             {
                 Kind = RszTypeKind.Null,
@@ -93,6 +104,48 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     new RszTypeField(FromId(0xCC45B258)!, "_Datas")
                 ]
             });
+        }
+
+        private Type? GetOrCreateRuntimeType(RszType type)
+        {
+            if (type.ClrType != null)
+                return type.ClrType;
+
+            switch (type.Kind)
+            {
+                case RszTypeKind.Null:
+                    break;
+                case RszTypeKind.Array:
+                {
+                    var elementClrType = GetOrCreateRuntimeType(type.ElementType!)!;
+                    type.ClrType = elementClrType.MakeArrayType();
+                    break;
+                }
+                case RszTypeKind.Enum:
+                {
+                    var valueType = GetOrCreateRuntimeType(type.Fields[0].Type);
+                    var enumBuilder = _moduleBuilder.DefineEnum(type.Name, TypeAttributes.Public, valueType);
+                    type.ClrType = enumBuilder.CreateTypeInfo().AsType();
+                    break;
+                }
+                case RszTypeKind.Struct:
+                {
+                    var typeBuilder = _moduleBuilder.DefineType(type.Name, TypeAttributes.Public);
+                    foreach (var f in type.Fields)
+                    {
+                        var fieldType = GetOrCreateRuntimeType(f.Type);
+                        typeBuilder.DefineField(f.Name, fieldType, FieldAttributes.Public);
+                    }
+                    type.ClrType = typeBuilder.CreateType();
+                    break;
+                }
+                default:
+                {
+                    type.ClrType = Type.GetType(type.Name);
+                    break;
+                }
+            }
+            return type.ClrType;
         }
     }
 }

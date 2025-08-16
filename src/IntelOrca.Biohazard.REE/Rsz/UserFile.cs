@@ -17,10 +17,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
         private UserHeader Header => MemoryMarshal.Read<UserHeader>(data.Span);
         private RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
 
-        public Builder ToBuilder()
+        public Builder ToBuilder(RszTypeRepository repository)
         {
-            var objects = Rsz.GetObjects(new RszTypeRepository());
-            var root = objects[0];
+            var rszBuilder = Rsz.ToBuilder(repository);
             return new Builder(this);
         }
 

@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using IntelOrca.Biohazard.REE.Extensions;
 
 namespace IntelOrca.Biohazard.REE.Rsz
@@ -19,15 +21,16 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             var deserializer = new RszInstanceDeserializer(repository, InstanceData);
             var result = ImmutableArray.CreateBuilder<RszInstance>();
-            foreach (var instanceInfo in InstanceInfoList)
+            var instanceInfoList = InstanceInfoList;
+            for (var i = 0; i < instanceInfoList.Length; i++)
             {
-                result.Add(deserializer.Read(instanceInfo));
+                result.Add(deserializer.Read(new RszInstanceId(i), instanceInfoList[i]));
             }
 
-            for (var i = 0; i < result.Count; i++)
-            {
-                result[i] = VisitInstanceTree(result[i], result);
-            }
+            // for (var i = 0; i < result.Count; i++)
+            // {
+            //     result[i] = VisitInstanceTree(result[i], result);
+            // }
 
             return result.ToImmutable();
         }
@@ -41,19 +44,19 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     children[i] = VisitInstanceTree(children[i], list);
                 }
             }
-            else if (instance.Value is RszInstanceReference[] references)
+            else if (instance.Value is RszInstanceId[] references)
             {
                 var dereferenced = new RszInstance[references.Length];
                 for (var i = 0; i < references.Length; i++)
                 {
-                    dereferenced[i] = list[references[i].Id];
+                    dereferenced[i] = list[references[i].Index];
                 }
-                instance = new RszInstance(instance.Type, dereferenced);
+                instance = new RszInstance(instance.Id, instance.Type, dereferenced);
             }
             return instance;
         }
 
-        public ImmutableArray<RszInstance> GetObjects(RszTypeRepository repository)
+        private ImmutableArray<RszInstance> GetObjectInstances(RszTypeRepository repository)
         {
             var instanceList = GetInstances(repository);
             var objectList = ImmutableArray.CreateBuilder<RszInstance>();
@@ -64,15 +67,33 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return objectList.ToImmutable();
         }
 
-        public Builder ToBuilder()
+        private ImmutableArray<object> GetObjects(RszTypeRepository repository)
         {
-            return new Builder(this);
+            var clrDeserializer = new RszInstanceClrDeserializer();
+            var clrInstances = clrDeserializer.Deserialize(GetInstances(repository));
+            var objectInstanceIds = ObjectInstanceIds;
+            var result = ImmutableArray.CreateBuilder<object>();
+            for (var i = 0; i < objectInstanceIds.Length; i++)
+            {
+                result.Add(clrInstances[objectInstanceIds[i]]);
+            }
+            return result.ToImmutable();
+        }
+
+        public Builder ToBuilder(RszTypeRepository repository)
+        {
+            return new Builder(repository, this);
         }
 
         public class Builder
         {
-            public Builder(RszFile instance)
+            public RszTypeRepository Repository { get; }
+            public List<object> Objects { get; }
+
+            public Builder(RszTypeRepository repository, RszFile instance)
             {
+                Repository = repository;
+                Objects = instance.GetObjects(repository).ToList();
             }
 
             public RszFile Build()

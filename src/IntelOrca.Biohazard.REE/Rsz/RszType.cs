@@ -1,10 +1,11 @@
-﻿using System.Collections.Immutable;
+﻿using System;
+using System.Collections.Immutable;
 using System.Diagnostics;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
     [DebuggerDisplay("{Name,nq}")]
-    internal class RszType
+    public class RszType
     {
         public RszTypeKind Kind { get; set; }
 
@@ -17,5 +18,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public uint Crc { get; set; }
         public string Name { get; set; } = "";
         public ImmutableArray<RszTypeField> Fields { get; set; }
+
+        public Type? ClrType { get; set; }
     }
 }

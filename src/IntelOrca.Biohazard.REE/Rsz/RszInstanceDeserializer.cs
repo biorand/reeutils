@@ -14,14 +14,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
             Data = data;
         }
 
-        public RszInstance Read(in RszInstanceInfo info)
+        public RszInstance Read(RszInstanceId id, RszInstanceInfo info)
         {
             var type = Repository.FromId(info.TypeId)
                 ?? throw new Exception($"Unable to find type, Id = {info.TypeId}");
-            return Read(type);
+            return Read(id, type);
         }
 
-        public RszInstance Read(in RszType type)
+        public RszInstance Read(RszInstanceId id, RszType type)
         {
             switch (type.Kind)
             {
@@ -30,37 +30,45 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     var arrayLength = BinaryPrimitives.ReadInt32LittleEndian(Data);
                     Data = Data.Slice(4);
 
+                    var value = new RszInstanceOrReference[arrayLength];
                     var elementType = type.ElementType!;
                     if (elementType.Kind == RszTypeKind.Struct)
                     {
-                        var value = new RszInstanceReference[arrayLength];
                         for (var i = 0; i < arrayLength; i++)
                         {
-                            var id = BinaryPrimitives.ReadInt32LittleEndian(Data);
+                            var refId = BinaryPrimitives.ReadInt32LittleEndian(Data);
                             Data = Data.Slice(4);
-                            value[i] = new RszInstanceReference(id);
+                            value[i] = new RszInstanceId(refId);
                         }
-                        return new RszInstance(type, value);
                     }
                     else
                     {
-                        var value = new RszInstance[arrayLength];
                         for (var i = 0; i < arrayLength; i++)
                         {
-                            value[i] = Read(type.ElementType!);
+                            value[i] = Read(default, type.ElementType!);
                         }
-                        return new RszInstance(type, value);
                     }
+                    return new RszInstance(id, type, value);
                 }
                 case RszTypeKind.Enum:
                 case RszTypeKind.Struct:
                 {
-                    var value = new RszInstance[type.Fields.Length];
+                    var value = new RszInstanceOrReference[type.Fields.Length];
                     for (var i = 0; i < type.Fields.Length; i++)
                     {
-                        value[i] = Read(type.Fields[i].Type);
+                        var field = type.Fields[i];
+                        if (field.Type.Kind == RszTypeKind.Struct)
+                        {
+                            var refId = BinaryPrimitives.ReadInt32LittleEndian(Data);
+                            Data = Data.Slice(4);
+                            value[i] = new RszInstanceId(refId);
+                        }
+                        else
+                        {
+                            value[i] = Read(default, type.Fields[i].Type);
+                        }
                     }
-                    return new RszInstance(type, value);
+                    return new RszInstance(id, type, value);
                 }
                 default:
                 {
@@ -70,7 +78,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         value = BinaryPrimitives.ReadInt32LittleEndian(Data);
                     }
                     Data = Data.Slice(type.Size);
-                    return new RszInstance(type, value);
+                    return new RszInstance(id, type, value);
                 }
             }
         }

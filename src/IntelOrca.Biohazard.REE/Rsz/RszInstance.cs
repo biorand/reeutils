@@ -2,8 +2,34 @@
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
-    internal readonly struct RszInstance(RszType type, object? value)
+    internal readonly struct RszInstanceOrReference
     {
+        private readonly RszInstance _instance;
+        private readonly RszInstanceId _reference;
+
+        public bool IsInstance => _reference.Index == 0;
+        public bool IsReference => _reference.Index != 0;
+
+        public RszInstance AsInstance() => IsInstance ? _instance : throw new InvalidOperationException();
+        public RszInstanceId AsReference() => IsReference ? _reference : throw new InvalidOperationException();
+
+        public RszInstanceOrReference(RszInstance instance)
+        {
+            _instance = instance;
+        }
+
+        public RszInstanceOrReference(RszInstanceId reference)
+        {
+            _reference = reference;
+        }
+
+        public static implicit operator RszInstanceOrReference(RszInstance instance) => new(instance);
+        public static implicit operator RszInstanceOrReference(RszInstanceId reference) => new(reference);
+    }
+
+    internal readonly struct RszInstance(RszInstanceId id, RszType type, object? value)
+    {
+        public RszInstanceId Id => id;
         public RszType Type => type;
         public object? Value => value;
 
@@ -30,10 +56,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
         }
     }
 
-    public readonly struct RszInstanceReference(int id)
+    public readonly struct RszInstanceId(int index)
     {
-        public int Id => id;
+        public int Index => index;
 
-        public override string ToString() => $"${id}";
+        public override string ToString() => $"${index}";
     }
 }

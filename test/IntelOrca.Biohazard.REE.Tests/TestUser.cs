@@ -25,10 +25,11 @@ namespace IntelOrca.Biohazard.REE.Tests
 
         private void AssertRebuild(string path)
         {
+            var repo = new RszTypeRepository();
             var input = new UserFile(_pak.GetFileData(path));
-            var inputBuilder = input.ToBuilder();
+            var inputBuilder = input.ToBuilder(repo);
             var output = inputBuilder.Build();
-            var outputBuilder = output.ToBuilder();
+            var outputBuilder = output.ToBuilder(repo);
 
             // Check our new file is same size as old one (should be for most cases)
             Assert.Equal(input.Data.Length, output.Data.Length);
