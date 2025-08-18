@@ -3,8 +3,15 @@ using IntelOrca.Biohazard.REE.Package;
 
 namespace IntelOrca.Biohazard.REE.Tests
 {
-    public class TestPakFile
+    public sealed class TestPakFile : IDisposable
     {
+        private OriginalPakHelper _pakHelper = new();
+
+        public void Dispose()
+        {
+            _pakHelper.Dispose();
+        }
+
         [Theory]
         [InlineData("natives/stm/_chainsaw/appsystem/ui/userdata/itemcraftsettinguserdata.user.2", 1398412279)]
         [InlineData("natives/stm/_chainsaw/appsystem/weapon/lasersight/playerlasersightcontrolleruserdata.user.2", -891513479)]
@@ -12,8 +19,7 @@ namespace IntelOrca.Biohazard.REE.Tests
         [InlineData("natives/stm/_chainsaw/appsystem/ui/userdata/guiparamholdersettinguserdata.user.2", -946285964)]
         public void Checksum(string path, int expected)
         {
-            using var pakFile = GetVanillaPak();
-            var fileData = pakFile.GetFileData(path)!;
+            var fileData = _pakHelper.GetFileData(GameNames.RE4, path)!;
             var actual = MurMur3.HashData(fileData);
             Assert.Equal(expected, actual);
         }
@@ -39,7 +45,7 @@ namespace IntelOrca.Biohazard.REE.Tests
                 "natives/stm/streaming/_chainsaw/environment/texture/sm79_600_a_albd.tex.143221013"
             ]);
 
-            var dlcPath = Path.Combine(GetInstallPath(), "dlc", "re_dlc_stm_2109314.pak");
+            var dlcPath = Path.Combine(_pakHelper.GetInstallPath(GameNames.RE4), "dlc", "re_dlc_stm_2109314.pak");
             using var pakFile = new PakFile(dlcPath);
             using var tempFolder = new TempFolder();
             await pakFile.ExtractAllAsync(pakList, tempFolder.Path);
@@ -56,13 +62,5 @@ namespace IntelOrca.Biohazard.REE.Tests
                 Assert.Equal(expectedHash, MurMur3.HashData(data));
             }
         }
-
-        private static PatchedPakFile GetVanillaPak()
-        {
-            var patch3 = Path.Combine(GetInstallPath(), "re_chunk_000.pak.patch_003.pak");
-            return new PatchedPakFile(patch3);
-        }
-
-        private static string GetInstallPath() => @"D:\SteamLibrary\steamapps\common\RESIDENT EVIL 4  BIOHAZARD RE4";
     }
 }

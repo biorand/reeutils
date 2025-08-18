@@ -1,20 +1,14 @@
 ﻿using IntelOrca.Biohazard.REE.Messages;
-using IntelOrca.Biohazard.REE.Package;
 
 namespace IntelOrca.Biohazard.REE.Tests
 {
-    public class TestMsg : IDisposable
+    public sealed class TestMsg : IDisposable
     {
-        private PatchedPakFile _pak;
-
-        public TestMsg()
-        {
-            _pak = GetVanillaPak();
-        }
+        private OriginalPakHelper _pakHelper = new();
 
         public void Dispose()
         {
-            _pak.Dispose();
+            _pakHelper.Dispose();
         }
 
         [Theory]
@@ -53,7 +47,7 @@ namespace IntelOrca.Biohazard.REE.Tests
         public void GetMessage_RE4_CH_MES_MAIN_CONV_CP42()
         {
             var path = "natives/stm/_chainsaw/message/mes_main_conv/ch_mes_main_conv_cp42.msg.22";
-            var input = new MsgFile(_pak.GetFileData(path));
+            var input = new MsgFile(_pakHelper.GetFileData(GameNames.RE4, path));
             var msg2 = input.GetMessage(2);
             Assert.Equal(new Guid("7a607509-3453-4135-b6e8-1dd8b5b6211e"), msg2.Guid);
             Assert.Equal("CH_Mes_Main_Conv_cp42_0001_0020_cha300", msg2.Name);
@@ -68,7 +62,7 @@ namespace IntelOrca.Biohazard.REE.Tests
         public void GetMessage_RE4_CH_MES_MAIN_ITEM_CAPTION()
         {
             var path = "natives/stm/_chainsaw/message/mes_main_item/ch_mes_main_item_caption.msg.22";
-            var input = new MsgFile(_pak.GetFileData(path));
+            var input = new MsgFile(_pakHelper.GetFileData(GameNames.RE4, path));
             var msg52 = input.GetMessage(52);
             Assert.Equal(new Guid("6db71d5a-9954-48f0-acf1-96bdd59efbde"), msg52.Guid);
             Assert.Equal(0x5fb85666, msg52.Crc);
@@ -84,7 +78,7 @@ namespace IntelOrca.Biohazard.REE.Tests
             var guid = new Guid("6db71d5a-9954-48f0-acf1-96bdd59efbde");
             var newText = "A strange lion head.";
 
-            var input = new MsgFile(_pak.GetFileData(path));
+            var input = new MsgFile(_pakHelper.GetFileData(GameNames.RE4, path));
             var inputBuilder = input.ToBuilder();
             inputBuilder.SetString(guid, LanguageId.English, newText);
             var jpnText = inputBuilder.FindMessage(guid)![LanguageId.Japanese];
@@ -96,7 +90,7 @@ namespace IntelOrca.Biohazard.REE.Tests
 
         private void AssertRebuild(string path)
         {
-            var input = new MsgFile(_pak.GetFileData(path));
+            var input = new MsgFile(_pakHelper.GetFileData(GameNames.RE4, path));
             var inputBuilder = input.ToBuilder();
             var output = inputBuilder.Build();
             var outputBuilder = output.ToBuilder();
@@ -127,13 +121,5 @@ namespace IntelOrca.Biohazard.REE.Tests
             // Check our new file is same size as old one (should be for most cases)
             Assert.Equal(input.Data.Length, output.Data.Length);
         }
-
-        private static PatchedPakFile GetVanillaPak()
-        {
-            var patch3 = Path.Combine(GetInstallPath(), "re_chunk_000.pak.patch_003.pak");
-            return new PatchedPakFile(patch3);
-        }
-
-        private static string GetInstallPath() => @"D:\SteamLibrary\steamapps\common\RESIDENT EVIL 4  BIOHAZARD RE4";
     }
 }
