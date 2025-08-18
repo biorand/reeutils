@@ -130,6 +130,15 @@ namespace IntelOrca.Biohazard.REE.Messages
             return null;
         }
 
+        public string? GetString(Guid guid, LanguageId languageId)
+        {
+            if (FindMessage(guid) is Msg msg)
+            {
+                return msg[languageId];
+            }
+            return null;
+        }
+
         public Msg GetMessage(int index)
         {
             if (index < 0 || index >= Count)
@@ -243,13 +252,83 @@ namespace IntelOrca.Biohazard.REE.Messages
                 return Messages.FirstOrDefault(x => x.Guid == guid);
             }
 
-            public Builder SetMessage(Guid guid, LanguageId languageId, string text)
+            public string? GetString(Guid guid, LanguageId languageId)
+            {
+                if (FindMessage(guid) is Msg msg)
+                {
+                    return msg[languageId];
+                }
+                return null;
+            }
+
+            public Builder SetString(Guid guid, LanguageId languageId, string text)
             {
                 if (FindMessage(guid) is Msg msg)
                 {
                     msg[languageId] = text;
                 }
                 return this;
+            }
+
+            public Builder SetStringAll(Guid guid, string text)
+            {
+                if (FindMessage(guid) is Msg msg)
+                {
+                    for (var i = 0; i < msg.Values.Count; i++)
+                    {
+                        msg.Values[i] = new MsgValue(msg.Values[i].Language, text);
+                    }
+                }
+                return this;
+            }
+
+            public Builder SetString(string name, LanguageId languageId, string text)
+            {
+                if (FindMessage(name) is Msg msg)
+                {
+                    msg[languageId] = text;
+                }
+                return this;
+            }
+
+            public Builder SetStringAll(string name, string text)
+            {
+                if (FindMessage(name) is Msg msg)
+                {
+                    for (var i = 0; i < msg.Values.Count; i++)
+                    {
+                        msg.Values[i] = new MsgValue(msg.Values[i].Language, text);
+                    }
+                }
+                return this;
+            }
+
+            public Msg Create(string value)
+            {
+                var guid = Guid.NewGuid();
+                return Create(guid, guid.ToString(), value);
+            }
+
+            public Msg Create(string name, string value)
+            {
+                var guid = Guid.NewGuid();
+                return Create(guid, name, value);
+            }
+
+            public Msg Create(Guid guid, string name, string value)
+            {
+                var msg = new Msg()
+                {
+                    Guid = guid,
+                    Crc = 0,
+                    Name = name
+                };
+                foreach (var l in Languages)
+                {
+                    msg.Values.Add(new MsgValue(l, value));
+                }
+                Messages.Add(msg);
+                return msg;
             }
 
             public MsgFile Build()

@@ -86,7 +86,7 @@ namespace IntelOrca.Biohazard.REE.Tests
 
             var input = new MsgFile(_pak.GetFileData(path));
             var inputBuilder = input.ToBuilder();
-            inputBuilder.SetMessage(guid, LanguageId.English, newText);
+            inputBuilder.SetString(guid, LanguageId.English, newText);
             var jpnText = inputBuilder.FindMessage(guid)![LanguageId.Japanese];
             var output = inputBuilder.Build();
             var newMessage = output.FindMessage(guid)!;
