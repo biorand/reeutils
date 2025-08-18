@@ -1,4 +1,5 @@
-﻿using IntelOrca.Biohazard.REE.Package;
+﻿using System.Text;
+using IntelOrca.Biohazard.REE.Package;
 using IntelOrca.Biohazard.REE.Variables;
 
 namespace IntelOrca.Biohazard.REE.Tests
@@ -30,6 +31,17 @@ namespace IntelOrca.Biohazard.REE.Tests
             var output = inputBuilder.Build();
             var outputBuilder = output.ToBuilder();
 
+            var oldSpan = input.Data.Span;
+            var newSpan = output.Data.Span;
+            var sb = new StringBuilder();
+            for (var i = 0; i < oldSpan.Length; i++)
+            {
+                if (oldSpan[i] != newSpan[i])
+                {
+                    sb.AppendLine($"{i:X8}");
+                }
+            }
+
             // Check our new file is same size as old one (should be for most cases)
             Assert.Equal(input.Data.Length, output.Data.Length);
         }
@@ -40,6 +52,6 @@ namespace IntelOrca.Biohazard.REE.Tests
             return new PatchedPakFile(patch3);
         }
 
-        private static string GetInstallPath() => @"D:\SteamLibrary\steamapps\common\RESIDENT EVIL 4  BIOHAZARD RE4";
+        private static string GetInstallPath() => @"G:\re4r\vanilla";
     }
 }

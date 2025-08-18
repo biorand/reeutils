@@ -53,8 +53,12 @@ namespace IntelOrca.Biohazard.REE.Extensions
         {
             for (var i = 0; i < values.Length; i++)
             {
-                bw.Write(ref MemoryMarshal.GetReference(values.Slice(i, 1)));
+                bw.Write(in MemoryMarshal.GetReference(values.Slice(i, 1)));
             }
+        }
+        public static void Write<T>(this BinaryWriter bw, T[] values) where T : unmanaged
+        {
+            Write(bw, new ReadOnlySpan<T>(values));
         }
 
         public static void WriteUTF16(this BinaryWriter bw, string value)

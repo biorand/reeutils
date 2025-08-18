@@ -156,35 +156,49 @@ namespace IntelOrca.Biohazard.REE.Variables
                     embedOffsets[i] = (ulong)ms.Position;
                     bw.Write(Children[i].Build().Data.Span);
                 }
-                if (Children.Count != 0)
-                {
-                }
                 bw.Align(16);
 
+                // Write offsets for sorted tables
                 header.HashInfoOffset = (ulong)ms.Position;
                 var offset = ms.Position + 32;
                 bw.Write(offset);
-                offset += Variables.Count * sizeof(Guid);
+                offset += variables.Length * sizeof(Guid);
                 bw.Write(offset);
-                offset += Variables.Count * sizeof(int);
+                offset += variables.Length * sizeof(int);
                 bw.Write(offset);
-                offset += Variables.Count * sizeof(int);
+                offset += variables.Length * sizeof(int);
                 bw.Write(offset);
-                for (var i = 0; i < Variables.Count; i++)
+
+                // Write sorted guids
+                var sortedGuidArray = new (int Index, Guid Guid)[variables.Length];
+                for (var i = 0; i < variables.Length; i++)
                 {
-                    bw.Write(variables[i].Guid);
+                    sortedGuidArray[i] = (i, variables[i].Guid);
                 }
-                for (var i = 0; i < Variables.Count; i++)
+                Array.Sort(sortedGuidArray, (a, b) => a.Guid.CompareTo(b.Guid));
+                for (var i = 0; i < variables.Length; i++)
                 {
-                    bw.Write(i);
+                    bw.Write(sortedGuidArray[i].Guid);
                 }
-                for (var i = 0; i < Variables.Count; i++)
+                for (var i = 0; i < variables.Length; i++)
                 {
-                    bw.Write(variables[i].NameHash);
+                    bw.Write(sortedGuidArray[i].Index);
                 }
-                for (var i = 0; i < Variables.Count; i++)
+
+                // Write sorted hash names
+                var sortedHashArray = new (int Index, uint NameHash)[variables.Length];
+                for (var i = 0; i < variables.Length; i++)
                 {
-                    bw.Write(i);
+                    sortedHashArray[i] = (i, variables[i].NameHash);
+                }
+                Array.Sort(sortedHashArray, (a, b) => a.NameHash.CompareTo(b.NameHash));
+                for (var i = 0; i < variables.Length; i++)
+                {
+                    bw.Write(sortedHashArray[i].NameHash);
+                }
+                for (var i = 0; i < variables.Length; i++)
+                {
+                    bw.Write(sortedHashArray[i].Index);
                 }
 
                 // Second pass
