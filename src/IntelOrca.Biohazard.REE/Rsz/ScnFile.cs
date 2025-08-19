@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using IntelOrca.Biohazard.REE.Extensions;
 
@@ -15,14 +18,61 @@ namespace IntelOrca.Biohazard.REE.Rsz
         private ScnHeader Header => new ScnHeader(Version, version <= 18 ? data[..56] : data[..64]);
         private ReadOnlySpan<GameObjectInfo> GameObjectInfoList => data.Get<GameObjectInfo>((ulong)Header.Size, Header.GameObjectCount);
         private ReadOnlySpan<FolderInfo> FolderInfoList => data.Get<FolderInfo>(Header.FolderOffset, Header.FolderCount);
+        private ReadOnlySpan<PrefabInfo> PrefabInfoList => data.Get<PrefabInfo>(Header.PrefabOffset, Header.PrefabCount);
+        private ReadOnlySpan<ResourceInfo> ResourceInfoList => data.Get<ResourceInfo>(Header.ResourceOffset, Header.ResourceCount);
         private ReadOnlySpan<UserDataInfo> UserDataInfoList => data.Get<UserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
         private RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
 
-        public RszScene ReadHierarchy(RszTypeRepository repository)
+        public ImmutableArray<string> Prefabs
+        {
+            get
+            {
+                var result = ImmutableArray.CreateBuilder<string>();
+                var prefabInfoList = PrefabInfoList;
+                for (var i = 0; i < prefabInfoList.Length; i++)
+                {
+                    result.Add(GetString(prefabInfoList[i].PathOffset));
+                }
+                return result.ToImmutable();
+            }
+        }
+
+        public ImmutableArray<string> Resources
+        {
+            get
+            {
+                var result = ImmutableArray.CreateBuilder<string>();
+                var resourceInfoList = ResourceInfoList;
+                for (var i = 0; i < resourceInfoList.Length; i++)
+                {
+                    result.Add(GetString(resourceInfoList[i].PathOffset));
+                }
+                return result.ToImmutable();
+            }
+        }
+
+        private string GetString(ulong offset)
+        {
+            if (offset != 0)
+            {
+                var span = MemoryMarshal.Cast<byte, char>(Data.Slice((int)offset).Span);
+                for (var i = 0; i < span.Length; i++)
+                {
+                    if (span[i] == '\0')
+                    {
+                        return new string(span.Slice(0, i).ToArray());
+                    }
+                }
+            }
+            return string.Empty;
+        }
+
+        public RszScene ReadScene(RszTypeRepository repository)
         {
             var objectList = Rsz.ReadObjectList(repository);
             var folderInfoList = FolderInfoList.ToImmutableArray();
             var gameObjectInfoList = GameObjectInfoList.ToImmutableArray();
+            var prefabs = Prefabs;
             return BuildRoot();
 
             RszScene BuildRoot()
@@ -47,18 +97,19 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             RszFolder BuildFolder(int id)
             {
-                var settings = (RszStructNode)objectList[folderInfoList[id].ObjectId].Value!;
+                var info = folderInfoList[id];
+                var settings = (RszStructNode)objectList[info.ObjectId];
                 var children = ImmutableArray.CreateBuilder<IRszSceneNode>();
                 for (var i = 0; i < folderInfoList.Length; i++)
                 {
-                    if (folderInfoList[i].ParentId == id)
+                    if (folderInfoList[i].ParentId == info.ObjectId)
                     {
                         children.Add(BuildFolder(i));
                     }
                 }
                 for (var i = 0; i < gameObjectInfoList.Length; i++)
                 {
-                    if (gameObjectInfoList[i].ParentId == id)
+                    if (gameObjectInfoList[i].ParentId == info.ObjectId)
                     {
                         children.Add(BuildGameObject(i));
                     }
@@ -69,14 +120,17 @@ namespace IntelOrca.Biohazard.REE.Rsz
             RszGameObject BuildGameObject(int id)
             {
                 var info = gameObjectInfoList[id];
-                var settings = (RszStructNode)objectList[info.ObjectId].Value!;
+                var settings = (RszStructNode)objectList[info.ObjectId];
 
                 var components = ImmutableArray.CreateBuilder<IRszNode>();
                 for (var i = 0; i < info.ComponentCount; i++)
                 {
-                    components.Add(objectList[info.ObjectId + 1 + i].Value!);
+                    components.Add(objectList[info.ObjectId + 1 + i]);
                 }
 
+                var prefab = info.PrefabId >= 0 && info.PrefabId < prefabs.Length
+                    ? prefabs[info.PrefabId]
+                    : null;
                 var children = ImmutableArray.CreateBuilder<RszGameObject>();
                 for (var i = 0; i < gameObjectInfoList.Length; i++)
                 {
@@ -86,28 +140,187 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                 }
 
-                return new RszGameObject(info.Guid, settings, components.ToImmutable(), children.ToImmutable());
+                return new RszGameObject(info.Guid, prefab, settings, components.ToImmutable(), children.ToImmutable());
             }
         }
 
         public Builder ToBuilder(RszTypeRepository repository)
         {
-            var root = ReadHierarchy(repository);
-            return new Builder(this);
+            return new Builder(repository, this);
         }
 
         public class Builder
         {
+            public RszTypeRepository Repository { get; }
             public int Version { get; }
+            public List<string> Resources { get; } = [];
+            public RszScene Scene { get; set; } = new RszScene();
 
-            public Builder(ScnFile instance)
+            public Builder(RszTypeRepository repository, int version)
             {
+                Repository = repository;
+                Version = version;
+            }
+
+            public Builder(RszTypeRepository repository, ScnFile instance)
+            {
+                Repository = repository;
                 Version = instance.Version;
+                Resources = instance.Resources.ToList();
+                Scene = instance.ReadScene(repository);
+            }
+
+            private ImmutableArray<RszGameObject> GetGameObjects()
+            {
+                var builder = ImmutableArray.CreateBuilder<RszGameObject>();
+                Visit(Scene);
+                return builder.ToImmutable();
+
+                void Visit(IRszSceneNode node)
+                {
+                    if (node is RszGameObject gameObject)
+                    {
+                        builder.Add(gameObject);
+                    }
+                    foreach (var child in node.Children)
+                    {
+                        Visit(child);
+                    }
+                }
             }
 
             public ScnFile Build()
             {
-                return new ScnFile(Version, new byte[0]);
+                var folders = new List<FolderInfo>();
+                var gameObjects = new List<GameObjectInfo>();
+                var prefabs = new List<string>();
+                var prefabToId = new Dictionary<string, int>();
+                var objectList = ImmutableArray.CreateBuilder<IRszNode>();
+                Traverse(-1, Scene);
+
+                var rszBuilder = new RszFile.Builder(Repository, 48);
+                rszBuilder.Objects = objectList.ToImmutable();
+                var rsz = rszBuilder.Build();
+
+                var ms = new MemoryStream();
+                var bw = new BinaryWriter(ms);
+                var stringPool = new StringPoolBuilder(ms);
+
+                // Reserve space for header
+                bw.Skip(Version >= 19 ? 64 : 56);
+
+                foreach (var gameObject in gameObjects)
+                {
+                    bw.Write(gameObject);
+                }
+
+                bw.Align(16);
+                var folderOffset = ms.Position;
+                foreach (var folder in folders)
+                {
+                    bw.Write(folder);
+                }
+
+                bw.Align(16);
+                var resourceOffset = ms.Position;
+                foreach (var resource in Resources)
+                {
+                    stringPool.WriteStringOffset64(resource);
+                }
+
+                bw.Align(16);
+                var prefabOffset = ms.Position;
+                foreach (var prefab in prefabs)
+                {
+                    stringPool.WriteStringOffset32(prefab);
+                    bw.Write(0);
+                }
+
+                bw.Align(16);
+                var userDataOffset = ms.Position;
+                var userDataList = rsz.UserDataInfoList;
+                foreach (var userDataInfo in userDataList)
+                {
+                    bw.Write(userDataInfo.TypeId);
+                    bw.Write(0);
+                    stringPool.WriteStringOffset64("???");
+                }
+
+                bw.Align(16);
+                stringPool.WriteStrings();
+
+                // Instance data
+                bw.Align(16);
+                var rszDataOffset = ms.Position;
+                bw.Write(rsz.Data.Span);
+
+                // Header
+                ms.Position = 0;
+                bw.Write(MAGIC);
+                bw.Write(gameObjects.Count); // Game object count
+                bw.Write(Resources.Count); // Resource count
+                bw.Write(folders.Count); // Folder count
+                bw.Write(prefabs.Count); // Prefab count
+                bw.Write(userDataList.Length); // User data count
+                bw.Write(folderOffset); // Folder offset
+                bw.Write(resourceOffset); // Resource offset
+                bw.Write(prefabOffset); // Resource offset
+                bw.Write(userDataOffset); // User data offset
+                bw.Write(rszDataOffset); // RSZ data offset
+
+                return new ScnFile(Version, ms.ToArray());
+
+                int AddObject(IRszNode node)
+                {
+                    var index = objectList.Count;
+                    objectList.Add(node);
+                    return index;
+                }
+
+                int AddPrefab(string? prefab)
+                {
+                    if (prefab == null)
+                        return -1;
+
+                    if (prefabToId.TryGetValue(prefab, out var id))
+                        return id;
+
+                    var index = prefabs.Count;
+                    prefabs.Add(prefab);
+                    prefabToId.Add(prefab, index);
+                    return index;
+                }
+
+                void Traverse(int parentId, IRszNode node)
+                {
+                    var id = parentId;
+                    if (node is RszFolder folderNode)
+                    {
+                        id = AddObject(folderNode.Settings);
+                        folders.Add(new FolderInfo()
+                        {
+                            ObjectId = id,
+                            ParentId = parentId
+                        });
+                    }
+                    else if (node is RszGameObject gameObjectNode)
+                    {
+                        id = AddObject(gameObjectNode.Settings);
+                        gameObjects.Add(new GameObjectInfo()
+                        {
+                            Guid = gameObjectNode.Guid,
+                            ObjectId = id,
+                            ParentId = parentId,
+                            ComponentCount = 0,
+                            PrefabId = AddPrefab(gameObjectNode.Prefab)
+                        });
+                    }
+
+                    foreach (var child in node.Children)
+                    {
+                        Traverse(id, child);
+                    }
+                }
             }
         }
 
@@ -127,6 +340,37 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public short ComponentCount;
             public short Padding;
             public int PrefabId;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ResourceInfo
+        {
+            public ulong PathOffset;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct PrefabInfo
+        {
+            public uint PathOffset;
+            public int ParentId;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct UserDataInfo
+        {
+            public uint TypeId;
+            public uint Padding;
+            public ulong PathOffset;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct EmbeddedUserDataInfo
+        {
+            public int InstanceId;
+            public uint TypeId;
+            public uint JsonPathHash;
+            public uint DataSize;
+            public ulong RszOffset;
         }
     }
 }

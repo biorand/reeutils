@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Collections.Generic;
+using System.IO;
 using IntelOrca.Biohazard.REE.Extensions;
 
 namespace IntelOrca.Biohazard.REE.Rsz
@@ -6,21 +7,19 @@ namespace IntelOrca.Biohazard.REE.Rsz
     internal class RszDataWriter
     {
         private readonly Stream _stream;
+        private readonly Dictionary<IRszNode, RszInstanceId> _instanceMap;
         private readonly BinaryWriter _bw;
 
-        public RszDataWriter(Stream stream)
+        public RszDataWriter(Stream stream, Dictionary<IRszNode, RszInstanceId> instanceMap)
         {
             _stream = stream;
+            _instanceMap = instanceMap;
             _bw = new BinaryWriter(stream);
         }
 
         public void Write(IRszNode node)
         {
-            if (node is RszInstance instance)
-            {
-                _bw.Write(instance.Id.Index);
-            }
-            else if (node is RszStructNode structNode)
+            if (node is RszStructNode structNode)
             {
                 var rszType = structNode.Type;
                 for (var i = 0; i < rszType.Fields.Length; i++)
@@ -37,13 +36,29 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         }
                         for (var j = 0; j < arrayNode.Children.Length; j++)
                         {
-                            Write(arrayNode.Children[j]);
+                            var child = arrayNode.Children[j];
+                            if (_instanceMap.TryGetValue(child, out var instanceId))
+                            {
+                                _bw.Write(instanceId.Index);
+                            }
+                            else
+                            {
+                                Write(child);
+                            }
                         }
                     }
                     else
                     {
-                        _bw.Align(field.Align);
-                        Write(structNode.Children[i]);
+                        var child = structNode.Children[i];
+                        if (_instanceMap.TryGetValue(child, out var instanceId))
+                        {
+                            _bw.Write(instanceId.Index);
+                        }
+                        else
+                        {
+                            _bw.Align(field.Align);
+                            Write(child);
+                        }
                     }
                 }
             }
@@ -53,7 +68,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 _bw.Write(stringNode.Value.Length + 1);
                 foreach (var ch in stringNode.Value)
                 {
-                    _bw.Write(ch);
+                    _bw.Write((short)ch);
                 }
                 _bw.Write((short)0);
             }

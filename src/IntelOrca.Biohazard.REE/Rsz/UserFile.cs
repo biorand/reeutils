@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Immutable;
 using System.IO;
 using System.Runtime.InteropServices;
 using IntelOrca.Biohazard.REE.Extensions;
@@ -21,15 +22,21 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public class Builder
         {
-            public RszFile Rsz { get; }
+            public RszTypeRepository Repository { get; }
+            public ImmutableArray<IRszNode> Objects { get; }
 
             public Builder(RszTypeRepository repository, UserFile instance)
             {
-                Rsz = instance.Rsz;
+                Repository = repository;
+                Objects = instance.Rsz.ReadObjectList(repository);
             }
 
             public UserFile Build()
             {
+                var rszBuilder = new RszFile.Builder(Repository, 48);
+                rszBuilder.Objects = Objects;
+                var rsz = rszBuilder.Build();
+
                 var ms = new MemoryStream();
                 var bw = new BinaryWriter(ms);
 
@@ -45,7 +52,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 // Instance data
                 bw.Align(16);
                 var rszDataOffset = ms.Position;
-                bw.Write(Rsz.Data.Span);
+                bw.Write(rsz.Data.Span);
 
                 // Header
                 ms.Position = 0;

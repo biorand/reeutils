@@ -4,16 +4,10 @@ using System.Collections.Immutable;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
-    public class RszInstance : IRszNode
+    public readonly struct RszInstance(RszInstanceId id, IRszNode value)
     {
-        public RszInstanceId Id { get; set; }
-        public IRszNode? Value { get; set; }
-
-        public ImmutableArray<IRszNode> Children
-        {
-            get => Value?.Children ?? [];
-            set => Value!.Children = value;
-        }
+        public RszInstanceId Id => id;
+        public IRszNode Value => value;
 
         public override string ToString() => $"{Value}[{Id.Index}]";
     }
@@ -132,11 +126,16 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
     public interface IRszSceneNode : IRszNode
     {
+        new ImmutableArray<IRszSceneNode> Children { get; set; }
     }
 
     public sealed class RszScene : IRszSceneNode
     {
         private ImmutableArray<IRszSceneNode> _children = [];
+
+        public RszScene()
+        {
+        }
 
         public RszScene(ImmutableArray<IRszSceneNode> children)
         {
@@ -201,15 +200,17 @@ namespace IntelOrca.Biohazard.REE.Rsz
     {
         private RszStructNode _settings;
 
-        public RszGameObject(Guid guid, RszStructNode settings, ImmutableArray<IRszNode> components, ImmutableArray<RszGameObject> children)
+        public RszGameObject(Guid guid, string? prefab, RszStructNode settings, ImmutableArray<IRszNode> components, ImmutableArray<RszGameObject> children)
         {
             Guid = guid;
+            Prefab = prefab;
             _settings = settings;
             Components = components;
             Children = children;
         }
 
         public Guid Guid { get; set; }
+        public string? Prefab { get; set; }
 
         public RszStructNode Settings
         {
@@ -227,6 +228,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public ImmutableArray<IRszNode> Components { get; set; }
 
         public ImmutableArray<RszGameObject> Children { get; set; }
+
+        ImmutableArray<IRszSceneNode> IRszSceneNode.Children
+        {
+            get => Children.CastArray<IRszSceneNode>();
+            set => Children = value.CastArray<RszGameObject>();
+        }
 
         ImmutableArray<IRszNode> IRszNode.Children
         {

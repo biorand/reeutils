@@ -23,6 +23,7 @@ namespace IntelOrca.Biohazard.REE.Tests
             var input = new ScnFile(20, _pakHelper.GetFileData(GameNames.RE4, path));
             var inputBuilder = input.ToBuilder(repo);
             var output = inputBuilder.Build();
+            var dog = output.ReadScene(repo);
             var outputBuilder = output.ToBuilder(repo);
 
             // Check our new file is same size as old one (should be for most cases)

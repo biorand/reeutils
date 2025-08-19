@@ -9,8 +9,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public uint GameObjectCount => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(4, 4));
         public uint ResourceCount => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(8, 4));
         public uint FolderCount => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(12, 4));
-        public uint UserDataCount => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(16, 4));
-        public uint PrefabCount => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(20, 4));
+        public uint UserDataCount => Version >= 20
+            ? BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(20, 4))
+            : BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(16, 4));
+        public uint PrefabCount => Version >= 20
+            ? BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(16, 4))
+            : BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(20, 4));
         public ulong FolderOffset => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(24, 8));
         public ulong ResourceOffset => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(32, 8));
         public ulong PrefabOffset => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(40, 8));

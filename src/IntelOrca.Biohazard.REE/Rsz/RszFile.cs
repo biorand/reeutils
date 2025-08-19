@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Immutable;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
 using IntelOrca.Biohazard.REE.Extensions;
 
 namespace IntelOrca.Biohazard.REE.Rsz
@@ -14,7 +16,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         private RszHeader Header => new RszHeader(data);
         private ReadOnlySpan<RszInstanceId> ObjectInstanceIds => data.Get<RszInstanceId>(Header.Size, (int)Header.ObjectCount);
         private ReadOnlySpan<RszInstanceInfo> InstanceInfoList => data.Get<RszInstanceInfo>(Header.InstanceOffset, Header.InstanceCount);
-        private ReadOnlySpan<UserDataInfo> UserDataInfoList => data.Get<UserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
+        internal ReadOnlySpan<UserDataInfo> UserDataInfoList => data.Get<UserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
         private ReadOnlySpan<byte> InstanceData => data.Slice((int)Header.DataOffset).Span;
 
         private ImmutableArray<RszInstance> ReadInstanceList(RszTypeRepository repository)
@@ -35,35 +37,27 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 var instanceIndex = userDataInfoList[i].InstanceId;
                 var rszType = instanceRszTypes[instanceIndex];
-                result[userDataInfoList[i].InstanceId] = new RszInstance()
-                {
-                    Id = new RszInstanceId(i),
-                    Value = new RszUserDataNode(rszType)
-                };
+                result[instanceIndex] = new RszInstance(new RszInstanceId(instanceIndex), new RszUserDataNode(rszType));
             }
 
             var rszDataReader = new RszDataReader(repository, new SpanReader(InstanceData));
             for (var i = 0; i < instanceInfoList.Length; i++)
             {
-                if (result[i] != null)
+                if (result[i].Id.Index != 0)
                     continue;
 
                 var rszType = instanceRszTypes[i];
-                result[i] = new RszInstance()
-                {
-                    Id = new RszInstanceId(i),
-                    Value = rszDataReader.ReadStruct(rszType)
-                };
+                result[i] = new RszInstance(new RszInstanceId(i), rszDataReader.ReadStruct(rszType));
             }
 
             for (var i = 0; i < instanceInfoList.Length; i++)
             {
-                VisitInstanceTree(result[i], x =>
+                VisitInstanceTree(result[i].Value, x =>
                 {
                     if (x is RszDataNode dataNode && dataNode.Type == RszFieldType.Object)
                     {
                         var instanceId = dataNode.AsInt32();
-                        return result[instanceId];
+                        return result[instanceId].Value;
                     }
                     return x;
                 });
@@ -86,13 +80,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return transform(node);
         }
 
-        public ImmutableArray<RszInstance> ReadObjectList(RszTypeRepository repository)
+        public ImmutableArray<IRszNode> ReadObjectList(RszTypeRepository repository)
         {
             var instanceList = ReadInstanceList(repository);
-            var objectList = ImmutableArray.CreateBuilder<RszInstance>();
+            var objectList = ImmutableArray.CreateBuilder<IRszNode>();
             foreach (var instanceId in ObjectInstanceIds)
             {
-                objectList.Add(instanceList[instanceId.Index]);
+                objectList.Add(instanceList[instanceId.Index].Value);
             }
             return objectList.ToImmutable();
         }
@@ -106,7 +100,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             public RszTypeRepository Repository { get; }
             public uint Version { get; }
-            public ImmutableArray<RszInstance> Objects { get; }
+            public ImmutableArray<IRszNode> Objects { get; set; } = [];
+
+            public Builder(RszTypeRepository repository, uint version)
+            {
+                Repository = repository;
+                Version = version;
+            }
 
             public Builder(RszTypeRepository repository, RszFile instance)
             {
@@ -117,8 +117,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             public RszFile Build()
             {
-                var instanceList = GetInstances();
-                var objectList = Objects;
+                var (instanceList, objectList) = GetInstances();
+                var instanceMap = instanceList.ToDictionary(x => x.Value, x => x.Id);
 
                 var ms = new MemoryStream();
                 var bw = new BinaryWriter(ms);
@@ -147,7 +147,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 // Instance data
                 bw.Align(16);
                 var instanceDataOffset = ms.Position;
-                var rszDataWriter = new RszDataWriter(ms);
+                var rszDataWriter = new RszDataWriter(ms, instanceMap);
                 foreach (var instance in instanceList)
                 {
                     rszDataWriter.Write(instance.Value!);
@@ -171,34 +171,81 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 return new RszFile(ms.ToArray());
             }
 
-            private ImmutableArray<RszInstance> GetInstances()
+            private (ImmutableArray<RszInstance> Instances, ImmutableArray<RszInstance> Objects) GetInstances()
             {
                 var instanceList = ImmutableArray.CreateBuilder<RszInstance>();
+                var objectList = ImmutableArray.CreateBuilder<RszInstance>();
 
                 // There is always a NULL instance at 0 (probably to prevent 0 from being used as a reference ID)
-                instanceList.Add(new RszInstance()
-                {
-                    Value = new RszStructNode(Repository.FromId(0)!, [])
-                });
+                instanceList.Add(new RszInstance(new RszInstanceId(0), new RszStructNode(Repository.FromId(0)!, [])));
+
                 foreach (var obj in Objects)
                 {
-                    AddInstances(obj, instanceList);
+                    objectList.Add(CreateInstanceTree(obj, instanceList));
                 }
-                return instanceList.ToImmutableArray();
+                return (instanceList.ToImmutable(), objectList.ToImmutable());
             }
 
-            private void AddInstances(IRszNode node, ImmutableArray<RszInstance>.Builder builder)
+            private static RszInstance CreateInstanceTree(IRszNode node, ImmutableArray<RszInstance>.Builder builder)
             {
-                foreach (var child in node.Children)
+                if (node is RszStructNode structNode)
                 {
-                    AddInstances(child, builder);
+                    AddInstances(structNode);
+                    return AddInstance(structNode);
                 }
-                if (node is RszInstance instance)
+                else
                 {
-                    instance.Id = new RszInstanceId(builder.Count);
+                    throw new NotSupportedException("Non struct node added to object list.");
+                }
+
+                void AddInstances(RszStructNode node)
+                {
+                    var rszType = node.Type;
+                    for (var i = 0; i < rszType.Fields.Length; i++)
+                    {
+                        var child = node.Children[i];
+                        var rszField = rszType.Fields[i];
+                        if (rszField.IsArray)
+                        {
+                            var childArray = (RszArrayNode)child;
+                            for (var j = 0; j < childArray.Children.Length; j++)
+                            {
+                                if (childArray.Children[j] is RszStructNode childStructNode)
+                                {
+                                    AddInstances(childStructNode);
+                                    AddInstance(childStructNode);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (child is RszStructNode childStructNode)
+                            {
+                                AddInstances(childStructNode);
+                                if (rszField.Type == RszFieldType.Object)
+                                {
+                                    AddInstance(child);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                RszInstance AddInstance(IRszNode node)
+                {
+                    var instance = new RszInstance(new RszInstanceId(builder.Count), node);
                     builder.Add(instance);
+                    return instance;
                 }
             }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct UserDataInfo
+        {
+            public int InstanceId;
+            public uint TypeId;
+            public ulong PathOffset;
         }
     }
 }
