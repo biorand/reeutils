@@ -6,7 +6,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
     internal readonly struct ScnHeader(int version, ReadOnlyMemory<byte> data)
     {
         public uint Magic => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(0, 4));
-        public uint InfoCount => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(4, 4));
+        public uint GameObjectCount => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(4, 4));
         public uint ResourceCount => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(8, 4));
         public uint FolderCount => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(12, 4));
         public uint UserDataCount => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(16, 4));
@@ -14,7 +14,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public ulong FolderOffset => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(24, 8));
         public ulong ResourceOffset => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(32, 8));
         public ulong PrefabOffset => BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(40, 8));
-        public ulong UserdataOffset => Version <= 18
+        public ulong UserDataOffset => Version <= 18
             ? 0
             : BinaryPrimitives.ReadUInt32LittleEndian(data.Span.Slice(48, 8));
 

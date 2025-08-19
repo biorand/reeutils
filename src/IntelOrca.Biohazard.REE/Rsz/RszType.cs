@@ -10,5 +10,17 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public uint Crc { get; set; }
         public string Name { get; set; } = "";
         public ImmutableArray<RszTypeField> Fields { get; set; } = [];
+
+        public int FindFieldIndex(string name)
+        {
+            for (var i = 0; i < Fields.Length; i++)
+            {
+                if (Fields[i].Name == name)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
     }
 }
