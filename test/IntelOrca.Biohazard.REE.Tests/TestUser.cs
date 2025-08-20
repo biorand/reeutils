@@ -25,7 +25,7 @@ namespace IntelOrca.Biohazard.REE.Tests
             var output = inputBuilder.Build();
             var outputBuilder = output.ToBuilder(repo);
 
-            // Check our new file is same size as old one (should be for most cases)
+            Assert.True(input.Data.Span.SequenceEqual(output.Data.Span));
             Assert.Equal(input.Data.Length, output.Data.Length);
         }
 

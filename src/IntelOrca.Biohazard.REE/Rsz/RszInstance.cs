@@ -17,6 +17,17 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public ImmutableArray<IRszNode> Children { get; set; }
     }
 
+    public readonly struct RszNullNode : IRszNode
+    {
+        public ImmutableArray<IRszNode> Children
+        {
+            get => [];
+            set => throw new NotSupportedException();
+        }
+
+        public override string ToString() => "NULL";
+    }
+
     public readonly struct RszDataNode : IRszNode
     {
         public RszFieldType Type { get; }
@@ -66,6 +77,23 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public override string ToString() => Value;
     }
 
+    public readonly struct RszResourceNode : IRszNode
+    {
+        public ImmutableArray<IRszNode> Children
+        {
+            get => [];
+            set => throw new InvalidOperationException();
+        }
+        public string Value { get; }
+
+        public RszResourceNode(string value)
+        {
+            Value = value;
+        }
+
+        public override string ToString() => Value;
+    }
+
     public class RszArrayNode : IRszNode
     {
         public ImmutableArray<IRszNode> Children { get; set; }
@@ -108,19 +136,15 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public override string ToString() => Type.Name.ToString();
     }
 
-    public class RszUserDataNode : IRszNode
+    public class RszUserDataNode(RszType type, string path) : IRszNode
     {
-        public RszType Type { get; }
+        public RszType Type => type;
+        public string Path => path;
 
         public ImmutableArray<IRszNode> Children
         {
             get => [];
             set => throw new NotSupportedException();
-        }
-
-        public RszUserDataNode(RszType type)
-        {
-            Type = type;
         }
     }
 

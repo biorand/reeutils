@@ -7,6 +7,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
         private RszTypeRepository _repository;
         private SpanReader _reader;
 
+        public int BytesRead => _reader.Address;
+
         public RszDataReader(RszTypeRepository repository, SpanReader reader)
         {
             _repository = repository;
@@ -49,12 +51,17 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public IRszNode ReadValue(RszTypeField field)
         {
-            if (field.Type == RszFieldType.String ||
-                field.Type == RszFieldType.Resource)
+            if (field.Type == RszFieldType.String)
             {
                 _reader.Align(4);
                 var value = _reader.ReadString();
                 return new RszStringNode(value);
+            }
+            else if (field.Type == RszFieldType.Resource)
+            {
+                _reader.Align(4);
+                var value = _reader.ReadString();
+                return new RszResourceNode(value);
             }
             else
             {

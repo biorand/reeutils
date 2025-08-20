@@ -153,40 +153,24 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             public RszTypeRepository Repository { get; }
             public int Version { get; }
+            public int RszVersion { get; }
             public List<string> Resources { get; } = [];
             public RszScene Scene { get; set; } = new RszScene();
 
-            public Builder(RszTypeRepository repository, int version)
+            public Builder(RszTypeRepository repository, int version, int rszVersion)
             {
                 Repository = repository;
                 Version = version;
+                RszVersion = rszVersion;
             }
 
             public Builder(RszTypeRepository repository, ScnFile instance)
             {
                 Repository = repository;
                 Version = instance.Version;
+                RszVersion = instance.Rsz.Version;
                 Resources = instance.Resources.ToList();
                 Scene = instance.ReadScene(repository);
-            }
-
-            private ImmutableArray<RszGameObject> GetGameObjects()
-            {
-                var builder = ImmutableArray.CreateBuilder<RszGameObject>();
-                Visit(Scene);
-                return builder.ToImmutable();
-
-                void Visit(IRszSceneNode node)
-                {
-                    if (node is RszGameObject gameObject)
-                    {
-                        builder.Add(gameObject);
-                    }
-                    foreach (var child in node.Children)
-                    {
-                        Visit(child);
-                    }
-                }
             }
 
             public ScnFile Build()
@@ -198,7 +182,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var objectList = ImmutableArray.CreateBuilder<IRszNode>();
                 Traverse(-1, Scene);
 
-                var rszBuilder = new RszFile.Builder(Repository, 48);
+                var rszBuilder = new RszFile.Builder(Repository, RszVersion);
                 rszBuilder.Objects = objectList.ToImmutable();
                 var rsz = rszBuilder.Build();
 
@@ -232,18 +216,18 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var prefabOffset = ms.Position;
                 foreach (var prefab in prefabs)
                 {
-                    stringPool.WriteStringOffset32(prefab);
-                    bw.Write(0);
+                    stringPool.WriteStringOffset64(prefab);
                 }
 
                 bw.Align(16);
                 var userDataOffset = ms.Position;
                 var userDataList = rsz.UserDataInfoList;
-                foreach (var userDataInfo in userDataList)
+                var userDataListPaths = rsz.UserDataInfoPaths;
+                for (var i = 0; i < userDataList.Length; i++)
                 {
-                    bw.Write(userDataInfo.TypeId);
+                    bw.Write(userDataList[i].TypeId);
                     bw.Write(0);
-                    stringPool.WriteStringOffset64("???");
+                    stringPool.WriteStringOffset64(userDataListPaths[i]);
                 }
 
                 bw.Align(16);
@@ -311,9 +295,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                             Guid = gameObjectNode.Guid,
                             ObjectId = id,
                             ParentId = parentId,
-                            ComponentCount = 0,
+                            ComponentCount = gameObjectNode.Components.Length,
                             PrefabId = AddPrefab(gameObjectNode.Prefab)
                         });
+                        foreach (var component in gameObjectNode.Components)
+                        {
+                            AddObject(component);
+                        }
                     }
 
                     foreach (var child in node.Children)
@@ -337,8 +325,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public Guid Guid;
             public int ObjectId;
             public int ParentId;
-            public short ComponentCount;
-            public short Padding;
+            public int ComponentCount;
             public int PrefabId;
         }
 
@@ -351,8 +338,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         [StructLayout(LayoutKind.Sequential)]
         private struct PrefabInfo
         {
-            public uint PathOffset;
-            public int ParentId;
+            public ulong PathOffset;
         }
 
         [StructLayout(LayoutKind.Sequential)]

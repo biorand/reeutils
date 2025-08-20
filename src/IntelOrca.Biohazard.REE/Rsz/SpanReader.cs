@@ -9,6 +9,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
         private int _address;
         private ReadOnlySpan<byte> _data;
 
+        public int Address => _address;
+
         public SpanReader(ReadOnlySpan<byte> data)
         {
             _address = 0;

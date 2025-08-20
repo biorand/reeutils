@@ -23,17 +23,19 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public class Builder
         {
             public RszTypeRepository Repository { get; }
+            public int RszVersion { get; }
             public ImmutableArray<IRszNode> Objects { get; }
 
             public Builder(RszTypeRepository repository, UserFile instance)
             {
                 Repository = repository;
+                RszVersion = instance.Rsz.Version;
                 Objects = instance.Rsz.ReadObjectList(repository);
             }
 
             public UserFile Build()
             {
-                var rszBuilder = new RszFile.Builder(Repository, 48);
+                var rszBuilder = new RszFile.Builder(Repository, RszVersion);
                 rszBuilder.Objects = Objects;
                 var rsz = rszBuilder.Build();
 

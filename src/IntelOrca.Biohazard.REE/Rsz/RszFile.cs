@@ -19,6 +19,38 @@ namespace IntelOrca.Biohazard.REE.Rsz
         internal ReadOnlySpan<UserDataInfo> UserDataInfoList => data.Get<UserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
         private ReadOnlySpan<byte> InstanceData => data.Slice((int)Header.DataOffset).Span;
 
+        internal int Version => (int)Header.Version;
+
+        internal ImmutableArray<string> UserDataInfoPaths
+        {
+            get
+            {
+                var result = ImmutableArray.CreateBuilder<string>();
+                var userDataInfoList = UserDataInfoList;
+                for (var i = 0; i < userDataInfoList.Length; i++)
+                {
+                    result.Add(GetString(userDataInfoList[i].PathOffset));
+                }
+                return result.ToImmutable();
+            }
+        }
+
+        private string GetString(ulong offset)
+        {
+            if (offset != 0)
+            {
+                var span = MemoryMarshal.Cast<byte, char>(Data.Slice((int)offset).Span);
+                for (var i = 0; i < span.Length; i++)
+                {
+                    if (span[i] == '\0')
+                    {
+                        return new string(span.Slice(0, i).ToArray());
+                    }
+                }
+            }
+            return string.Empty;
+        }
+
         private ImmutableArray<RszInstance> ReadInstanceList(RszTypeRepository repository)
         {
             var instanceInfoList = InstanceInfoList;
@@ -37,7 +69,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 var instanceIndex = userDataInfoList[i].InstanceId;
                 var rszType = instanceRszTypes[instanceIndex];
-                result[instanceIndex] = new RszInstance(new RszInstanceId(instanceIndex), new RszUserDataNode(rszType));
+                var path = GetString(userDataInfoList[i].PathOffset);
+                result[instanceIndex] = new RszInstance(new RszInstanceId(instanceIndex), new RszUserDataNode(rszType, path));
             }
 
             var rszDataReader = new RszDataReader(repository, new SpanReader(InstanceData));
@@ -47,17 +80,22 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     continue;
 
                 var rszType = instanceRszTypes[i];
-                result[i] = new RszInstance(new RszInstanceId(i), rszDataReader.ReadStruct(rszType));
+                var rszValue = rszType.Id == 0 ? new RszNullNode() : (IRszNode)rszDataReader.ReadStruct(rszType);
+                result[i] = new RszInstance(new RszInstanceId(i), rszValue);
             }
 
             for (var i = 0; i < instanceInfoList.Length; i++)
             {
                 VisitInstanceTree(result[i].Value, x =>
                 {
-                    if (x is RszDataNode dataNode && dataNode.Type == RszFieldType.Object)
+                    if (x is RszDataNode dataNode)
                     {
-                        var instanceId = dataNode.AsInt32();
-                        return result[instanceId].Value;
+                        if (dataNode.Type == RszFieldType.Object ||
+                            dataNode.Type == RszFieldType.UserData)
+                        {
+                            var instanceId = dataNode.AsInt32();
+                            return result[instanceId].Value;
+                        }
                     }
                     return x;
                 });
@@ -99,10 +137,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public class Builder
         {
             public RszTypeRepository Repository { get; }
-            public uint Version { get; }
+            public int Version { get; }
             public ImmutableArray<IRszNode> Objects { get; set; } = [];
 
-            public Builder(RszTypeRepository repository, uint version)
+            public Builder(RszTypeRepository repository, int version)
             {
                 Repository = repository;
                 Version = version;
@@ -111,7 +149,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public Builder(RszTypeRepository repository, RszFile instance)
             {
                 Repository = repository;
-                Version = instance.Header.Version;
+                Version = (int)instance.Header.Version;
                 Objects = instance.ReadObjectList(repository);
             }
 
@@ -122,6 +160,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                 var ms = new MemoryStream();
                 var bw = new BinaryWriter(ms);
+                var stringPool = new StringPoolBuilder(ms);
 
                 // Reserve space for header
                 bw.Skip(Version < 4 ? 32 : 48);
@@ -136,13 +175,39 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var instanceListOffset = ms.Position;
                 foreach (var instance in instanceList)
                 {
-                    var rszStruct = (RszStructNode)instance.Value!;
-                    bw.Write(rszStruct.Type.Id);
-                    bw.Write(rszStruct.Type.Crc);
+                    if (instance.Value is RszNullNode)
+                    {
+                        bw.Write(0);
+                        bw.Write(0);
+                    }
+                    else if (instance.Value is RszUserDataNode userDataNode)
+                    {
+                        bw.Write(userDataNode.Type.Id);
+                        bw.Write(userDataNode.Type.Crc);
+                    }
+                    else
+                    {
+                        var rszStruct = (RszStructNode)instance.Value!;
+                        bw.Write(rszStruct.Type.Id);
+                        bw.Write(rszStruct.Type.Crc);
+                    }
                 }
 
                 bw.Align(16);
                 var userDataOffset = ms.Position;
+                var userDataCount = 0;
+                for (var i = 0; i < instanceList.Length; i++)
+                {
+                    if (instanceList[i].Value is RszUserDataNode userDataNode)
+                    {
+                        bw.Write(i);
+                        bw.Write(userDataNode.Type.Id);
+                        stringPool.WriteStringOffset64(userDataNode.Path);
+                        userDataCount++;
+                    }
+                }
+
+                stringPool.WriteStrings();
 
                 // Instance data
                 bw.Align(16);
@@ -161,7 +226,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 bw.Write(instanceList.Length);
                 if (Version >= 4)
                 {
-                    bw.Write(0); // User data count
+                    bw.Write(userDataCount);
                     bw.Write(0); // Padding
                 }
                 bw.Write(instanceListOffset);
@@ -177,7 +242,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var objectList = ImmutableArray.CreateBuilder<RszInstance>();
 
                 // There is always a NULL instance at 0 (probably to prevent 0 from being used as a reference ID)
-                instanceList.Add(new RszInstance(new RszInstanceId(0), new RszStructNode(Repository.FromId(0)!, [])));
+                instanceList.Add(new RszInstance(new RszInstanceId(0), new RszNullNode()));
 
                 foreach (var obj in Objects)
                 {
@@ -215,6 +280,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
                                     AddInstances(childStructNode);
                                     AddInstance(childStructNode);
                                 }
+                                else if (childArray.Children[j] is RszUserDataNode userDataNode)
+                                {
+                                    AddInstance(userDataNode);
+                                }
                             }
                         }
                         else
@@ -222,7 +291,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
                             if (child is RszStructNode childStructNode)
                             {
                                 AddInstances(childStructNode);
-                                if (rszField.Type == RszFieldType.Object)
+                                if (rszField.Type == RszFieldType.Object ||
+                                    rszField.Type == RszFieldType.UserData)
                                 {
                                     AddInstance(child);
                                 }
@@ -233,9 +303,16 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                 RszInstance AddInstance(IRszNode node)
                 {
-                    var instance = new RszInstance(new RszInstanceId(builder.Count), node);
-                    builder.Add(instance);
-                    return instance;
+                    if (node is RszNullNode)
+                    {
+                        return builder[0];
+                    }
+                    else
+                    {
+                        var instance = new RszInstance(new RszInstanceId(builder.Count), node);
+                        builder.Add(instance);
+                        return instance;
+                    }
                 }
             }
         }
