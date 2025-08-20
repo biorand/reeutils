@@ -36,7 +36,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             var repo = new RszTypeRepository();
             foreach (var kvp in idMap)
             {
-                var rszType = new RszType();
+                var rszType = new RszType(repo);
                 rszType.Id = kvp.Key;
                 rszType.Crc = kvp.Value.Crc;
                 rszType.Name = kvp.Value.Name ?? "";
