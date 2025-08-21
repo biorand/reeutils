@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
@@ -16,7 +17,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
         private RszHeader Header => new RszHeader(data);
         private ReadOnlySpan<RszInstanceId> ObjectInstanceIds => data.Get<RszInstanceId>(Header.Size, (int)Header.ObjectCount);
         private ReadOnlySpan<RszInstanceInfo> InstanceInfoList => data.Get<RszInstanceInfo>(Header.InstanceOffset, Header.InstanceCount);
-        internal ReadOnlySpan<UserDataInfo> UserDataInfoList => data.Get<UserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
+        internal ReadOnlySpan<UserDataInfo> UserDataInfoList => Version < 16
+            ? throw new InvalidOperationException()
+            : data.Get<UserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
+        internal ReadOnlySpan<EmbeddedUserDataInfo> EmbeddedUserDataInfoList => Version >= 16
+            ? throw new InvalidOperationException()
+            : data.Get<EmbeddedUserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
         private ReadOnlySpan<byte> InstanceData => data.Slice((int)Header.DataOffset).Span;
 
         internal int Version => (int)Header.Version;
@@ -25,11 +31,27 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             get
             {
+                if (Version < 16)
+                    throw new InvalidOperationException();
+
                 var result = ImmutableArray.CreateBuilder<string>();
                 var userDataInfoList = UserDataInfoList;
                 for (var i = 0; i < userDataInfoList.Length; i++)
                 {
                     result.Add(GetString(userDataInfoList[i].PathOffset));
+                }
+                return result.ToImmutable();
+            }
+        }
+
+        private ImmutableArray<RszFile> EmbeddedRszList
+        {
+            get
+            {
+                var result = ImmutableArray.CreateBuilder<RszFile>();
+                foreach (var userData in EmbeddedUserDataInfoList)
+                {
+                    result.Add(new RszFile(Data.Slice((int)userData.Offset, (int)userData.Size)));
                 }
                 return result.ToImmutable();
             }
@@ -61,16 +83,33 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 instanceRszTypes[i] = repository.FromId(rszTypeId) ?? throw new Exception($"Type ID {rszTypeId} not found");
             }
 
-            var userDataInfoList = UserDataInfoList;
 
             var result = ImmutableArray.CreateBuilder<RszInstance>();
             result.Count = instanceInfoList.Length;
-            for (var i = 0; i < userDataInfoList.Length; i++)
+
+            if (Version < 16)
             {
-                var instanceIndex = userDataInfoList[i].InstanceId;
-                var rszType = instanceRszTypes[instanceIndex];
-                var path = GetString(userDataInfoList[i].PathOffset);
-                result[instanceIndex] = new RszInstance(new RszInstanceId(instanceIndex), new RszUserDataNode(rszType, path));
+                var userDataInfoList = EmbeddedUserDataInfoList;
+                for (var i = 0; i < userDataInfoList.Length; i++)
+                {
+                    var instanceIndex = userDataInfoList[i].InstanceId;
+                    var rszType = instanceRszTypes[instanceIndex];
+                    var rszFile = new RszFile(Data.Slice((int)userDataInfoList[i].Offset, (int)userDataInfoList[i].Size));
+                    result[instanceIndex] = new RszInstance(
+                        new RszInstanceId(instanceIndex),
+                        new RszEmbeddedUserDataNode(rszType, (int)userDataInfoList[i].JsonPathHash, rszFile));
+                }
+            }
+            else
+            {
+                var userDataInfoList = UserDataInfoList;
+                for (var i = 0; i < userDataInfoList.Length; i++)
+                {
+                    var instanceIndex = userDataInfoList[i].InstanceId;
+                    var rszType = instanceRszTypes[instanceIndex];
+                    var path = GetString(userDataInfoList[i].PathOffset);
+                    result[instanceIndex] = new RszInstance(new RszInstanceId(instanceIndex), new RszUserDataNode(rszType, path));
+                }
             }
 
             var rszDataReader = new RszDataReader(repository, new SpanReader(InstanceData));
@@ -182,8 +221,19 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     else if (instance.Value is RszUserDataNode userDataNode)
                     {
+                        if (Version < 16)
+                            throw new NotSupportedException();
+
                         bw.Write(userDataNode.Type.Id);
                         bw.Write(userDataNode.Type.Crc);
+                    }
+                    else if (instance.Value is RszEmbeddedUserDataNode embeddedUserDataNode)
+                    {
+                        if (Version >= 16)
+                            throw new NotSupportedException();
+
+                        bw.Write(embeddedUserDataNode.Type.Id);
+                        bw.Write(embeddedUserDataNode.Type.Crc);
                     }
                     else
                     {
@@ -196,6 +246,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 bw.Align(16);
                 var userDataOffset = ms.Position;
                 var userDataCount = 0;
+
+                var embeddedUserData = new List<(RszFile, long)>();
                 for (var i = 0; i < instanceList.Length; i++)
                 {
                     if (instanceList[i].Value is RszUserDataNode userDataNode)
@@ -205,9 +257,29 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         stringPool.WriteStringOffset64(userDataNode.Path);
                         userDataCount++;
                     }
+                    else if (instanceList[i].Value is RszEmbeddedUserDataNode embeddedUserDataNode)
+                    {
+                        bw.Write(i);
+                        bw.Write(embeddedUserDataNode.Type.Id);
+                        bw.Write(embeddedUserDataNode.Hash);
+                        bw.Write(embeddedUserDataNode.Embedded.Data.Length);
+                        embeddedUserData.Add((embeddedUserDataNode.Embedded, ms.Position));
+                        bw.Write(0L);
+                        userDataCount++;
+                    }
                 }
 
                 stringPool.WriteStrings();
+
+                foreach (var (file, markerPos) in embeddedUserData)
+                {
+                    bw.Align(16);
+                    var embeddedFilePosition = ms.Position;
+                    ms.Position = markerPos;
+                    bw.Write(embeddedFilePosition);
+                    ms.Position = embeddedFilePosition;
+                    bw.Write(file.Data.Span);
+                }
 
                 // Instance data
                 bw.Align(16);
@@ -284,6 +356,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
                                 {
                                     AddInstance(userDataNode);
                                 }
+                                else if (childArray.Children[j] is RszEmbeddedUserDataNode embeddedUserDataNode)
+                                {
+                                    AddInstance(embeddedUserDataNode);
+                                }
                             }
                         }
                         else
@@ -330,6 +406,15 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public int InstanceId;
             public uint TypeId;
             public ulong PathOffset;
+        }
+
+        internal struct EmbeddedUserDataInfo
+        {
+            public int InstanceId;
+            public uint TypeId;
+            public uint JsonPathHash;
+            public uint Size;
+            public ulong Offset;
         }
     }
 }

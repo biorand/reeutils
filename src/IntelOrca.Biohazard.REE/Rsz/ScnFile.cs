@@ -221,13 +221,18 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                 bw.Align(16);
                 var userDataOffset = ms.Position;
-                var userDataList = rsz.UserDataInfoList;
-                var userDataListPaths = rsz.UserDataInfoPaths;
-                for (var i = 0; i < userDataList.Length; i++)
+                var userDataCount = 0;
+                if (Version >= 20)
                 {
-                    bw.Write(userDataList[i].TypeId);
-                    bw.Write(0);
-                    stringPool.WriteStringOffset64(userDataListPaths[i]);
+                    var userDataList = rsz.UserDataInfoList;
+                    var userDataListPaths = rsz.UserDataInfoPaths;
+                    for (var i = 0; i < userDataList.Length; i++)
+                    {
+                        bw.Write(userDataList[i].TypeId);
+                        bw.Write(0);
+                        stringPool.WriteStringOffset64(userDataListPaths[i]);
+                    }
+                    userDataCount = userDataList.Length;
                 }
 
                 bw.Align(16);
@@ -245,7 +250,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 bw.Write(Resources.Count); // Resource count
                 bw.Write(folders.Count); // Folder count
                 bw.Write(prefabs.Count); // Prefab count
-                bw.Write(userDataList.Length); // User data count
+                bw.Write(userDataCount); // User data count
                 bw.Write(folderOffset); // Folder offset
                 bw.Write(resourceOffset); // Resource offset
                 bw.Write(prefabOffset); // Resource offset
@@ -295,7 +300,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                             Guid = gameObjectNode.Guid,
                             ObjectId = id,
                             ParentId = parentId,
-                            ComponentCount = gameObjectNode.Components.Length,
+                            ComponentCount = (short)gameObjectNode.Components.Length,
                             PrefabId = AddPrefab(gameObjectNode.Prefab)
                         });
                         foreach (var component in gameObjectNode.Components)
@@ -325,7 +330,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public Guid Guid;
             public int ObjectId;
             public int ParentId;
-            public int ComponentCount;
+            public short ComponentCount;
+            public short Padding;
             public int PrefabId;
         }
 

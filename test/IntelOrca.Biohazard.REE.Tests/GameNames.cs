@@ -2,6 +2,7 @@
 {
     public static class GameNames
     {
+        public const string RE2 = "re2";
         public const string RE4 = "re4";
     }
 }

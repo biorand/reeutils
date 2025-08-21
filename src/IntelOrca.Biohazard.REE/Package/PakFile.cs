@@ -17,8 +17,8 @@ namespace IntelOrca.Biohazard.REE.Package
 
         private readonly Stream _stream;
         private Header _header;
-        private ImmutableArray<Entry> _entries;
-        private ImmutableDictionary<ulong, int> _hashToEntry;
+        private ImmutableArray<Entry> _entries = [];
+        private ImmutableDictionary<ulong, int> _hashToEntry = ImmutableDictionary<ulong, int>.Empty;
 
         public PakFile(string path) : this(File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
@@ -31,6 +31,8 @@ namespace IntelOrca.Biohazard.REE.Package
         public PakFile(Stream stream)
         {
             _stream = stream;
+            if (stream.Length == 0)
+                return;
 
             var br = new BinaryReader(stream);
             _header = ReadHeader(br);

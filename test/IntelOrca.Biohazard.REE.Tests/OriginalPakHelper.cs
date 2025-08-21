@@ -1,4 +1,5 @@
 ﻿using IntelOrca.Biohazard.REE.Package;
+using IntelOrca.Biohazard.REE.Rsz;
 
 namespace IntelOrca.Biohazard.REE.Tests
 {
@@ -43,6 +44,8 @@ namespace IntelOrca.Biohazard.REE.Tests
         {
             return game switch
             {
+                GameNames.RE2 => FindFirstExisting(
+                    @"F:\games\steamapps\common\RESIDENT EVIL 2  BIOHAZARD RE2"),
                 GameNames.RE4 => FindFirstExisting(
                     @"G:\re4r\vanilla"),
                 _ => throw new NotSupportedException()
@@ -59,6 +62,19 @@ namespace IntelOrca.Biohazard.REE.Tests
                 }
             }
             throw new Exception("No defined path exists for this game.");
+        }
+
+        public RszTypeRepository GetTypeRepository(string gameName)
+        {
+            var jsonPath = gameName switch
+            {
+                GameNames.RE2 => @"G:\apps\reasy\rszre2.json",
+                GameNames.RE4 => @"G:\apps\reasy\rszre4_reasy.json",
+                _ => throw new NotImplementedException()
+            };
+            var json = File.ReadAllBytes(jsonPath);
+            var repo = RszRepositorySerializer.Default.FromJson(json);
+            return repo;
         }
     }
 }

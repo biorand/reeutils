@@ -12,30 +12,28 @@ namespace IntelOrca.Biohazard.REE.Tests
         }
 
         [Fact]
-        public void Rebuild_RE4_LEVEL_CP10_CHP1_1_010()
+        public void Rebuild_RE2_ST4_701_0_GIMMICK()
         {
-            AssertRebuild("natives/stm/_chainsaw/leveldesign/chapter/cp10_chp1_1/level_cp10_chp1_1_010.scn.20");
+            AssertRebuild(GameNames.RE2, "natives/x64/objectroot/scene/location/rpd/level_100/environments/st4_701_0/gimmick.scn.19", 0);
         }
 
-        private void AssertRebuild(string path)
+        [Fact]
+        public void Rebuild_RE4_LEVEL_CP10_CHP1_1_010()
         {
-            var repo = GetTypeRepository();
-            var input = new ScnFile(20, _pakHelper.GetFileData(GameNames.RE4, path));
+            AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/leveldesign/chapter/cp10_chp1_1/level_cp10_chp1_1_010.scn.20", 71164);
+        }
+
+        private void AssertRebuild(string gameName, string path, int expectedLength)
+        {
+            var repo = _pakHelper.GetTypeRepository(gameName);
+            var input = new ScnFile(FileVersion.FromPath(path), _pakHelper.GetFileData(gameName, path));
             var inputBuilder = input.ToBuilder(repo);
             var output = inputBuilder.Build();
             var outputBuilder = output.ToBuilder(repo);
 
             // Check our new file is same size as old one
             // Unfortunately the original file has random alignment, so we are a bit off
-            Assert.Equal(71164, output.Data.Length);
-        }
-
-        private static RszTypeRepository GetTypeRepository()
-        {
-            var jsonPath = @"G:\apps\reasy\rszre4_reasy.json";
-            var json = File.ReadAllBytes(jsonPath);
-            var repo = RszRepositorySerializer.Default.FromJson(json);
-            return repo;
+            Assert.Equal(expectedLength, output.Data.Length);
         }
     }
 }
