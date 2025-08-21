@@ -219,11 +219,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     stringPool.WriteStringOffset64(prefab);
                 }
 
-                bw.Align(16);
-                var userDataOffset = ms.Position;
+                var userDataOffset = 0L;
                 var userDataCount = 0;
                 if (Version >= 20)
                 {
+                    bw.Align(16);
+                    userDataOffset = ms.Position;
                     var userDataList = rsz.UserDataInfoList;
                     var userDataListPaths = rsz.UserDataInfoPaths;
                     for (var i = 0; i < userDataList.Length; i++)

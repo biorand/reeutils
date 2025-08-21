@@ -14,7 +14,7 @@ namespace IntelOrca.Biohazard.REE.Tests
         [Fact]
         public void Rebuild_RE2_ST4_701_0_GIMMICK()
         {
-            AssertRebuild(GameNames.RE2, "natives/x64/objectroot/scene/location/rpd/level_100/environments/st4_701_0/gimmick.scn.19", 0);
+            AssertRebuild(GameNames.RE2, "natives/x64/objectroot/scene/location/rpd/level_100/environments/st4_701_0/gimmick.scn.19", 31448);
         }
 
         [Fact]
