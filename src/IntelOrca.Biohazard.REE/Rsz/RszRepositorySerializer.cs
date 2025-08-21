@@ -40,7 +40,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 rszType.Id = kvp.Key;
                 rszType.Crc = kvp.Value.Crc;
                 rszType.Name = kvp.Value.Name ?? "";
-
+                repo.AddType(rszType);
+            }
+            foreach (var kvp in idMap)
+            {
+                var rszType = repo.FromId(kvp.Key) ?? throw new Exception();
                 var fields = ImmutableArray.CreateBuilder<RszTypeField>();
                 foreach (var f in kvp.Value.Fields ?? [])
                 {
@@ -52,11 +56,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         Name = f.Name ?? "",
                         Size = f.Size,
                         Type = fieldType,
-                        IsArray = f.Array
+                        IsArray = f.Array,
+                        ObjectType = string.IsNullOrEmpty(f.OriginalType) ? null : repo.FromName(f.OriginalType)
                     });
                 }
                 rszType.Fields = fields.ToImmutable();
-                repo.AddType(rszType);
             }
             return repo;
         }

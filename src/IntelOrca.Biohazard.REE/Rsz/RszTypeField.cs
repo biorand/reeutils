@@ -10,5 +10,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public int Size { get; set; }
         public bool IsArray { get; set; }
         public RszFieldType Type { get; set; }
+        public RszType? ObjectType { get; set; }
     }
 }

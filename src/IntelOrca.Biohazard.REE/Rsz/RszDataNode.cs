@@ -4,7 +4,7 @@ using System.Collections.Immutable;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
-    public readonly struct RszDataNode : IRszNode, IRszSerializable
+    public readonly struct RszDataNode : IRszNode
     {
         public RszFieldType Type { get; }
         public ReadOnlyMemory<byte> Data { get; }
@@ -21,13 +21,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             Data = data;
         }
 
-        public object Deserialize(Type targetClrType)
-        {
-            var deserialized = Deserialize();
-            return Convert.ChangeType(deserialized, targetClrType);
-        }
-
-        public object Deserialize()
+        public object Decode()
         {
             return Type switch
             {
@@ -47,15 +41,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 4 => BinaryPrimitives.ReadInt32LittleEndian(Data.Span).ToString(),
                 8 => BinaryPrimitives.ReadInt64LittleEndian(Data.Span).ToString(),
                 _ => $"{Data.Length} bytes"
-            };
-        }
-
-        private static Type? GetBestClrType(RszFieldType fieldType)
-        {
-            return fieldType switch
-            {
-                RszFieldType.S32 => typeof(int),
-                _ => null
             };
         }
     }

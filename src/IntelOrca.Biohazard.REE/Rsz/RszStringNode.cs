@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
-    public readonly struct RszStringNode : IRszNode, IRszSerializable
+    public readonly struct RszStringNode : IRszNode
     {
         public ImmutableArray<IRszNode> Children
         {
@@ -15,11 +15,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public RszStringNode(string value)
         {
             Value = value;
-        }
-
-        public object Deserialize(Type targetClrType)
-        {
-            return Convert.ChangeType(Value, targetClrType);
         }
 
         public override string ToString() => Value;

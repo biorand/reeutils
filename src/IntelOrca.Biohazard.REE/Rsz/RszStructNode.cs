@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
-    public class RszStructNode : IRszNode, IRszSerializable
+    public class RszStructNode : IRszNode
     {
         public RszType Type { get; }
         public ImmutableArray<IRszNode> Children { get; set; }
@@ -50,21 +50,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             // TODO
             return true;
-        }
-
-        public object Deserialize(Type targetClrType)
-        {
-            var obj = Activator.CreateInstance(targetClrType)!;
-            foreach (var property in targetClrType.GetProperties())
-            {
-                var propertyClrType = property.PropertyType;
-                var value = this[property.Name];
-                if (value is IRszSerializable serializable)
-                {
-                    property.SetValue(obj, serializable.Deserialize(propertyClrType));
-                }
-            }
-            return obj;
         }
 
         public override string ToString() => Type.Name.ToString();
