@@ -22,7 +22,7 @@ namespace IntelOrca.Biohazard.REE.Tests
         public byte[] GetFileData(string game, string path)
         {
             var pak = GetPatchedPak(game);
-            return pak.GetFileData(path) ?? throw new FileNotFoundException($"{path} not found", path);
+            return pak.GetEntryData(path) ?? throw new FileNotFoundException($"{path} not found", path);
         }
 
         private PatchedPakFile GetPatchedPak(string game)

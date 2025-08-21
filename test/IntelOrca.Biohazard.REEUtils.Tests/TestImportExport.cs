@@ -51,7 +51,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
         private async Task CheckFileAsync(string path, string extension)
         {
             using var tempFolder = new TempFolder();
-            var userData = _pak.GetFileData(path) ?? throw new Exception();
+            var userData = _pak.GetEntryData(path) ?? throw new Exception();
             var scnPath = tempFolder.GetSubPath($"test{extension}");
             var jsonPath = tempFolder.GetSubPath("test.json");
             File.WriteAllBytes(scnPath, userData);

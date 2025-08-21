@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace IntelOrca.Biohazard.REE.Package
 {
-    public sealed class PatchedPakFile : IDisposable
+    public sealed class PatchedPakFile : IPakFile, IDisposable
     {
         private readonly ImmutableArray<PakFile> _files;
 
@@ -20,11 +21,17 @@ namespace IntelOrca.Biohazard.REE.Package
                 {
                     var basePath = match.Groups[1].Value;
                     var endNumber = int.Parse(match.Groups[2].Value);
-                    files.Add(new PakFile(basePath));
+                    if (File.Exists(basePath))
+                    {
+                        files.Add(new PakFile(basePath));
+                    }
                     for (var i = 1; i <= endNumber; i++)
                     {
                         var patchFileName = $"{basePath}.patch_{i:000}.pak";
-                        files.Add(new PakFile(patchFileName));
+                        if (File.Exists(patchFileName))
+                        {
+                            files.Add(new PakFile(patchFileName));
+                        }
                     }
                 }
                 else
@@ -55,7 +62,20 @@ namespace IntelOrca.Biohazard.REE.Package
             }
         }
 
-        public byte[]? GetFileData(string path)
+        public byte[]? GetEntryData(ulong hash)
+        {
+            for (var i = _files.Length - 1; i >= 0; i--)
+            {
+                var data = _files[i].GetEntryData(hash);
+                if (data != null)
+                {
+                    return data;
+                }
+            }
+            return null;
+        }
+
+        public byte[]? GetEntryData(string path)
         {
             for (var i = _files.Length - 1; i >= 0; i--)
             {
@@ -67,5 +87,10 @@ namespace IntelOrca.Biohazard.REE.Package
             }
             return null;
         }
+
+        public ImmutableArray<ulong> FileHashes => _files
+            .SelectMany(x => x.FileHashes)
+            .OrderBy(x => x)
+            .ToImmutableArray();
     }
 }

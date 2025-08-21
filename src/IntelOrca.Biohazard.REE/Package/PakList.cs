@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using IntelOrca.Biohazard.REE.Compression;
-using IntelOrca.Biohazard.REE.Cryptography;
 
 namespace IntelOrca.Biohazard.REE.Package
 {
@@ -39,7 +38,7 @@ namespace IntelOrca.Biohazard.REE.Package
                 var path = line.Trim();
                 if (!string.IsNullOrEmpty(line))
                 {
-                    _map[GetHash(path)] = path;
+                    _map[PakFile.GetNormalizedPathHash(path)] = path;
                 }
             }
             Entries = [.. _map.Values.OrderBy(x => x)];
@@ -49,13 +48,6 @@ namespace IntelOrca.Biohazard.REE.Package
         {
             _map.TryGetValue(hash, out var path);
             return path;
-        }
-
-        private static ulong GetHash(string path)
-        {
-            var dwHashLower = (ulong)MurMur3.HashData(path.ToLower());
-            var dwHashUpper = (ulong)MurMur3.HashData(path.ToUpper());
-            return dwHashLower | (dwHashUpper << 32);
         }
 
         /// <summary>
