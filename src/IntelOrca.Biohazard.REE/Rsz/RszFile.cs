@@ -318,6 +318,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        private struct RszInstanceInfo
+        {
+            public uint TypeId;
+            public uint Crc;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
         internal struct UserDataInfo
         {
             public int InstanceId;
