@@ -26,7 +26,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             public RszTypeRepository Repository { get; }
             public int RszVersion { get; }
-            public ImmutableArray<IRszNode> Objects { get; }
+            public ImmutableArray<IRszNode> Objects { get; set; }
 
             public Builder(RszTypeRepository repository, UserFile instance)
             {

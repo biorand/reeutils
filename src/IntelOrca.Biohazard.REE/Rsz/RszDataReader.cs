@@ -40,7 +40,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 {
                     array.Add(ReadValue(field));
                 }
-                return new RszArrayNode(array.ToImmutable());
+                return new RszArrayNode(field.Type, array.ToImmutable());
             }
             else
             {

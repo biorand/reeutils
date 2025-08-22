@@ -52,6 +52,27 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return true;
         }
 
+        public RszStructNode SetField(string name, IRszNode value)
+        {
+            var index = Type.FindFieldIndex(name);
+            if (index == -1)
+                throw new ArgumentException($"{0} is not a field of {Type.Name}.");
+
+            return new RszStructNode(Type, Children.SetItem(index, value));
+        }
+
+        public RszStructNode SetField(string name, object value)
+        {
+            var index = Type.FindFieldIndex(name);
+            if (index == -1)
+                throw new ArgumentException($"{0} is not a field of {Type.Name}.");
+
+            var fieldType = Type.Fields[index].Type;
+            return new RszStructNode(
+                Type,
+                Children.SetItem(index, RszSerializer.Serialize(fieldType, value)));
+        }
+
         public override string ToString() => Type.Name.ToString();
     }
 }
