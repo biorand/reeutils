@@ -49,9 +49,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return new RszArrayNode(Type, Children.SetItem(index, node));
         }
 
-        public RszArrayNode SetItem(int index, object node)
+        public RszArrayNode SetItem(int index, object value)
         {
-            return new RszArrayNode(Type, Children.SetItem(index, RszSerializer.Serialize(Type, node)));
+            if (value is IRszNode node)
+                return SetItem(index, node);
+            return new RszArrayNode(Type, Children.SetItem(index, RszSerializer.Serialize(Type, value)));
         }
 
         public RszArrayNode RemoveAt(int index)

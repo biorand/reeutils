@@ -76,7 +76,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
             }
         }
 
-        public static IRszNode Set(this IRszNode node, string path, object value)
+        public static T Set<T>(this T node, string path, object value) where T : IRszNode
+        {
+            return (T)Set((IRszNode)node, path, value);
+        }
+
+        private static object Set(this IRszNode node, string path, object value)
         {
             var cutIndex = path.IndexOfAny(['.', '['], 1);
             var left = path;
@@ -108,7 +113,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     throw new Exception("Array nodes must be accessed with square brackets.");
 
                 var rightSq = left.IndexOf(']');
-                if (rightSq != -1)
+                if (rightSq == -1)
                     throw new Exception("No end bracket found");
 
                 var bracketSlice = left.Substring(1, rightSq - 1);

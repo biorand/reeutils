@@ -195,7 +195,18 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public RszFile Build()
             {
                 var (instanceList, objectList) = GetInstances();
-                var instanceMap = instanceList.ToDictionary(x => x.Value, x => x.Id);
+
+                var dict = new Dictionary<IRszNode, Queue<RszInstanceId>>();
+                foreach (var instance in instanceList)
+                {
+                    if (!dict.TryGetValue(instance.Value, out var q))
+                    {
+                        q = new Queue<RszInstanceId>();
+                        dict.Add(instance.Value, q);
+                    }
+                    q.Enqueue(instance.Id);
+                }
+                var getInstance = new Func<IRszNode, RszInstanceId>(node => dict[node].Dequeue());
 
                 var ms = new MemoryStream();
                 var bw = new BinaryWriter(ms);
@@ -284,7 +295,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 // Instance data
                 bw.Align(16);
                 var instanceDataOffset = ms.Position;
-                var rszDataWriter = new RszDataWriter(ms, instanceMap);
+                var rszDataWriter = new RszDataWriter(ms, getInstance);
                 foreach (var instance in instanceList)
                 {
                     rszDataWriter.Write(instance.Value!);
@@ -372,6 +383,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
                                 {
                                     AddInstance(child);
                                 }
+                            }
+                            else if (child is RszUserDataNode userDataNode)
+                            {
+                                AddInstance(userDataNode);
+                            }
+                            else if (child is RszEmbeddedUserDataNode embeddedUserDataNode)
+                            {
+                                AddInstance(embeddedUserDataNode);
                             }
                         }
                     }

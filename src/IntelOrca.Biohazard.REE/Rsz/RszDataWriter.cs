@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using IntelOrca.Biohazard.REE.Extensions;
 
@@ -8,16 +7,16 @@ namespace IntelOrca.Biohazard.REE.Rsz
     internal class RszDataWriter
     {
         private readonly Stream _stream;
-        private readonly Dictionary<IRszNode, RszInstanceId> _instanceMap;
+        private readonly Func<IRszNode, RszInstanceId> _getInstance;
         private readonly BinaryWriter _bw;
         private readonly long _baseAddress;
 
         public int BytesWritten => (int)(_stream.Position - _baseAddress);
 
-        public RszDataWriter(Stream stream, Dictionary<IRszNode, RszInstanceId> instanceMap)
+        public RszDataWriter(Stream stream, Func<IRszNode, RszInstanceId> getInstance)
         {
             _stream = stream;
-            _instanceMap = instanceMap;
+            _getInstance = getInstance;
             _bw = new BinaryWriter(stream);
             _baseAddress = stream.Position;
         }
@@ -52,52 +51,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         }
                         for (var j = 0; j < arrayNode.Children.Length; j++)
                         {
-                            var child = arrayNode.Children[j];
-                            if (_instanceMap.TryGetValue(child, out var instanceId))
-                            {
-                                _bw.Write(instanceId.Index);
-                            }
-                            else
-                            {
-                                Write(child);
-                            }
+                            WriteField(field, arrayNode.Children[j]);
                         }
                     }
                     else
                     {
-                        var child = structNode.Children[i];
-
                         Align(field.Align);
-                        if (field.Type == RszFieldType.Object || field.Type == RszFieldType.UserData)
-                        {
-                            if (_instanceMap.TryGetValue(child, out var instanceId))
-                            {
-                                _bw.Write(instanceId.Index);
-                            }
-                            else
-                            {
-                                throw new Exception($"No instance in map found for {field.Name}.");
-                            }
-                        }
-                        else if (field.Type == RszFieldType.String || field.Type == RszFieldType.Resource)
-                        {
-                            Write(child);
-                        }
-                        else
-                        {
-                            var oldPosition = _bw.BaseStream.Position;
-                            Write(child);
-                            var newPosition = _bw.BaseStream.Position;
-                            var bytesWritten = (int)(newPosition - oldPosition);
-                            if (bytesWritten < field.Size)
-                            {
-                                _bw.Seek(field.Size - bytesWritten, SeekOrigin.Current);
-                            }
-                            else if (bytesWritten > field.Size)
-                            {
-                                throw new Exception($"{field.Name} is {field.Size} bytes, but {bytesWritten} was written.");
-                            }
-                        }
+                        WriteField(field, structNode.Children[i]);
                     }
                 }
             }
@@ -131,6 +91,34 @@ namespace IntelOrca.Biohazard.REE.Rsz
             else if (node is RszDataNode dataNode)
             {
                 _bw.Write(dataNode.Data.Span);
+            }
+        }
+
+        public void WriteField(RszTypeField field, IRszNode node)
+        {
+            if (field.Type == RszFieldType.Object || field.Type == RszFieldType.UserData)
+            {
+                var instanceId = node is RszNullNode ? default : _getInstance(node);
+                _bw.Write(instanceId.Index);
+            }
+            else if (field.Type == RszFieldType.String || field.Type == RszFieldType.Resource)
+            {
+                Write(node);
+            }
+            else
+            {
+                var oldPosition = _bw.BaseStream.Position;
+                Write(node);
+                var newPosition = _bw.BaseStream.Position;
+                var bytesWritten = (int)(newPosition - oldPosition);
+                if (bytesWritten < field.Size)
+                {
+                    _bw.Seek(field.Size - bytesWritten, SeekOrigin.Current);
+                }
+                else if (bytesWritten > field.Size)
+                {
+                    throw new Exception($"{field.Name} is {field.Size} bytes, but {bytesWritten} was written.");
+                }
             }
         }
     }

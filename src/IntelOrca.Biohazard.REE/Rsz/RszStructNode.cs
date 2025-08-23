@@ -63,6 +63,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public RszStructNode SetField(string name, object value)
         {
+            if (value is IRszNode node)
+                return SetField(name, node);
+
             var index = Type.FindFieldIndex(name);
             if (index == -1)
                 throw new ArgumentException($"{0} is not a field of {Type.Name}.");
