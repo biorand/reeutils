@@ -45,16 +45,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public int AsInt32() => BinaryPrimitives.ReadInt32LittleEndian(Data.Span);
 
-        public override string ToString()
-        {
-            return Data.Length switch
-            {
-                1 => Data.Span[0].ToString(),
-                2 => BinaryPrimitives.ReadInt16LittleEndian(Data.Span).ToString(),
-                4 => BinaryPrimitives.ReadInt32LittleEndian(Data.Span).ToString(),
-                8 => BinaryPrimitives.ReadInt64LittleEndian(Data.Span).ToString(),
-                _ => $"{Data.Length} bytes"
-            };
-        }
+        public override string ToString() => Decode().ToString();
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using IntelOrca.Biohazard.REE.Extensions;
 
@@ -64,15 +65,38 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     else
                     {
-                        Align(field.Align);
                         var child = structNode.Children[i];
-                        if (_instanceMap.TryGetValue(child, out var instanceId))
+
+                        Align(field.Align);
+                        if (field.Type == RszFieldType.Object || field.Type == RszFieldType.UserData)
                         {
-                            _bw.Write(instanceId.Index);
+                            if (_instanceMap.TryGetValue(child, out var instanceId))
+                            {
+                                _bw.Write(instanceId.Index);
+                            }
+                            else
+                            {
+                                throw new Exception($"No instance in map found for {field.Name}.");
+                            }
+                        }
+                        else if (field.Type == RszFieldType.String || field.Type == RszFieldType.Resource)
+                        {
+                            Write(child);
                         }
                         else
                         {
+                            var oldPosition = _bw.BaseStream.Position;
                             Write(child);
+                            var newPosition = _bw.BaseStream.Position;
+                            var bytesWritten = (int)(newPosition - oldPosition);
+                            if (bytesWritten < field.Size)
+                            {
+                                _bw.Seek(field.Size - bytesWritten, SeekOrigin.Current);
+                            }
+                            else if (bytesWritten > field.Size)
+                            {
+                                throw new Exception($"{field.Name} is {field.Size} bytes, but {bytesWritten} was written.");
+                            }
                         }
                     }
                 }

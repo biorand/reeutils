@@ -105,6 +105,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     if (field.Type == RszFieldType.Object)
                     {
                         var objectType = field.ObjectType ?? throw new Exception("Expected field to have an object type");
+                        if (propertyValue == null)
+                            throw new Exception($"{clrType.FullName}.{property.Name} was null.");
                         children.Add(Serialize(objectType, propertyValue));
                     }
                     else
