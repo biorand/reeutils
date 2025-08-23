@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
@@ -26,21 +25,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
             _nameToTypeMap.Add(type.Name, type);
         }
 
-        private Type? FindNativeClrType(string name)
+        public RszStructNode Create(string name)
         {
-            return name switch
-            {
-                "System.Byte" => typeof(byte),
-                "System.Int16" => typeof(short),
-                "System.Int32" => typeof(int),
-                "System.Int64" => typeof(long),
-                "System.SByte" => typeof(sbyte),
-                "System.String" => typeof(string),
-                "System.UInt16" => typeof(ushort),
-                "System.UInt32" => typeof(uint),
-                "System.UInt64" => typeof(ulong),
-                _ => null
-            };
+            return FromName(name)!.Create();
         }
     }
 }

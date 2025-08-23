@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+﻿using System;
+using System.Collections.Immutable;
 using System.Diagnostics;
 
 namespace IntelOrca.Biohazard.REE.Rsz
@@ -54,6 +55,45 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
             }
             return -1;
+        }
+
+        public RszStructNode Create()
+        {
+            var children = ImmutableArray.CreateBuilder<IRszNode>();
+            foreach (var field in Fields)
+            {
+                if (field.IsArray)
+                {
+                    children.Add(new RszArrayNode(field.Type, []));
+                }
+                else
+                {
+                    if (field.Type == RszFieldType.String)
+                    {
+                        children.Add(new RszStringNode(""));
+                    }
+                    else if (field.Type == RszFieldType.Object)
+                    {
+                        if (field.ObjectType == null)
+                        {
+
+                        }
+                        else
+                        {
+                            children.Add(field.ObjectType.Create());
+                        }
+                    }
+                    else if (field.Type == RszFieldType.UserData || field.Type == RszFieldType.Resource)
+                    {
+                        throw new NotSupportedException();
+                    }
+                    else
+                    {
+                        children.Add(new RszDataNode(field.Type, new byte[field.Size]));
+                    }
+                }
+            }
+            return new RszStructNode(this, children.ToImmutable());
         }
     }
 }

@@ -117,14 +117,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             public void BeginEnumBlock(string name)
             {
-                AppendLine($"public enum {name}");
+                AppendLine($"internal enum {name}");
                 AppendLine("{");
                 Indent();
             }
 
             public void BeginClassBlock(string name)
             {
-                AppendLine($"public class {name}");
+                AppendLine($"internal class {name}");
                 AppendLine("{");
                 Indent();
             }

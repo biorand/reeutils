@@ -120,12 +120,27 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public static IRszNode Serialize(RszFieldType type, object obj)
         {
+            if (obj is IList list)
+            {
+                var children = ImmutableArray.CreateBuilder<IRszNode>(list.Count);
+                for (var i = 0; i < list.Count; i++)
+                {
+                    children.Add(Serialize(type, list[i]));
+                }
+                return new RszArrayNode(type, children.ToImmutable());
+            }
+
             return type switch
             {
                 RszFieldType.Bool => new RszDataNode(type, ToMemory<bool>(obj)),
+                RszFieldType.S8 => new RszDataNode(type, ToMemory<sbyte>(obj)),
+                RszFieldType.U8 => new RszDataNode(type, ToMemory<byte>(obj)),
+                RszFieldType.S16 => new RszDataNode(type, ToMemory<short>(obj)),
+                RszFieldType.U16 => new RszDataNode(type, ToMemory<ushort>(obj)),
                 RszFieldType.S32 => new RszDataNode(type, ToMemory<int>(obj)),
                 RszFieldType.U32 => new RszDataNode(type, ToMemory<uint>(obj)),
                 RszFieldType.F32 => new RszDataNode(type, ToMemory<float>(obj)),
+                RszFieldType.F64 => new RszDataNode(type, ToMemory<double>(obj)),
                 RszFieldType.Vec2 => new RszDataNode(type, ToMemory<Vector2>(obj)),
                 RszFieldType.Vec3 => new RszDataNode(type, ToMemory<Vector3>(obj)),
                 RszFieldType.Vec4 => new RszDataNode(type, ToMemory<Vector4>(obj)),
