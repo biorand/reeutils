@@ -178,6 +178,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public RszTypeRepository Repository { get; }
             public int Version { get; }
             public ImmutableArray<IRszNode> Objects { get; set; } = [];
+            public long AlignOffset { get; set; }
 
             public Builder(RszTypeRepository repository, int version)
             {
@@ -206,7 +207,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     q.Enqueue(instance.Id);
                 }
-                var getInstance = new Func<IRszNode, RszInstanceId>(node => dict[node].Dequeue());
+                var getInstance = new Func<IRszNode, RszInstanceId>(node =>
+                    node is RszUserDataNode
+                        ? dict[node].Peek()
+                        : dict[node].Dequeue());
 
                 var ms = new MemoryStream();
                 var bw = new BinaryWriter(ms);
@@ -254,7 +258,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                 }
 
-                bw.Align(16);
+                // Userdata
+                bw.Align(16, AlignOffset);
                 var userDataOffset = ms.Position;
                 var userDataCount = 0;
 
@@ -280,11 +285,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                 }
 
+                // String data
                 stringPool.WriteStrings();
 
+                // Embedded userdata
                 foreach (var (file, markerPos) in embeddedUserData)
                 {
-                    bw.Align(16);
+                    bw.Align(16, AlignOffset);
                     var embeddedFilePosition = ms.Position;
                     ms.Position = markerPos;
                     bw.Write(embeddedFilePosition);
@@ -293,7 +300,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
 
                 // Instance data
-                bw.Align(16);
+                bw.Align(16, AlignOffset);
                 var instanceDataOffset = ms.Position;
                 var rszDataWriter = new RszDataWriter(ms, getInstance);
                 foreach (var instance in instanceList)
@@ -402,12 +409,26 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     {
                         return builder[0];
                     }
-                    else
+                    else if (node is RszUserDataNode userDataNode)
                     {
-                        var instance = new RszInstance(new RszInstanceId(builder.Count), node);
-                        builder.Add(instance);
-                        return instance;
+                        // Avoid duplicate user data entries
+                        var path = userDataNode.Path;
+                        foreach (var b in builder)
+                        {
+                            if (b.Value is RszUserDataNode otherUserDataNode && otherUserDataNode.Path == userDataNode.Path)
+                            {
+                                if (otherUserDataNode.Type != userDataNode.Type)
+                                {
+                                    throw new Exception($"Mismatch of RSZ type for user data: {path}");
+                                }
+                                return b;
+                            }
+                        }
                     }
+
+                    var instance = new RszInstance(new RszInstanceId(builder.Count), node);
+                    builder.Add(instance);
+                    return instance;
                 }
             }
         }

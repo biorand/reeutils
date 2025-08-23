@@ -23,6 +23,12 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertRebuild("natives/stm/_chainsaw/appsystem/weaponcustom/weapondetailcustomuserdata.user.2");
         }
 
+        [Fact]
+        public void Rebuild_RE4_WEAPONEQUIPPARAMCATALOGUSERDATA()
+        {
+            AssertRebuild("natives/stm/_chainsaw/appsystem/weapon/weaponequipparamcataloguserdata.user.2");
+        }
+
         private void AssertRebuild(string path)
         {
             var repo = GetTypeRepository();

@@ -43,26 +43,45 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                 var ms = new MemoryStream();
                 var bw = new BinaryWriter(ms);
+                var stringPool = new StringPoolBuilder(ms);
 
                 // Reserve space for header
                 bw.Skip(48);
 
+                // Resources
                 bw.Align(16);
                 var resourceOffset = ms.Position;
 
+                // Userdata
                 bw.Align(16);
-                var userDataOffset = ms.Position;
+                var userDataOffset = 0L;
+                var userDataCount = 0;
+                userDataOffset = ms.Position;
+                var userDataList = rsz.UserDataInfoList;
+                var userDataListPaths = rsz.UserDataInfoPaths;
+                for (var i = 0; i < userDataList.Length; i++)
+                {
+                    bw.Write(userDataList[i].TypeId);
+                    bw.Write(0);
+                    stringPool.WriteStringOffset64(userDataListPaths[i]);
+                }
+                userDataCount = userDataList.Length;
+
+                // Strings
+                bw.Align(16);
+                stringPool.WriteStrings();
 
                 // Instance data
-                bw.Align(16);
                 var rszDataOffset = ms.Position;
+                rszBuilder.AlignOffset = rszDataOffset;
+                rsz = rszBuilder.Build();
                 bw.Write(rsz.Data.Span);
 
                 // Header
                 ms.Position = 0;
                 bw.Write(MAGIC);
                 bw.Write(0); // Resource count
-                bw.Write(0); // User data count
+                bw.Write(userDataCount); // User data count
                 bw.Write(0); // Info count
                 bw.Write(resourceOffset); // Resource offset
                 bw.Write(userDataOffset); // User data offset

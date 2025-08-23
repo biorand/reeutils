@@ -193,11 +193,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 // Reserve space for header
                 bw.Skip(Version >= 19 ? 64 : 56);
 
+                // Game objects
                 foreach (var gameObject in gameObjects)
                 {
                     bw.Write(gameObject);
                 }
 
+                // Folders
                 bw.Align(16);
                 var folderOffset = ms.Position;
                 foreach (var folder in folders)
@@ -205,6 +207,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     bw.Write(folder);
                 }
 
+                // Resources
                 bw.Align(16);
                 var resourceOffset = ms.Position;
                 foreach (var resource in Resources)
@@ -212,6 +215,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     stringPool.WriteStringOffset64(resource);
                 }
 
+                // Prefabs
                 bw.Align(16);
                 var prefabOffset = ms.Position;
                 foreach (var prefab in prefabs)
@@ -219,6 +223,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     stringPool.WriteStringOffset64(prefab);
                 }
 
+                // Userdata
                 var userDataOffset = 0L;
                 var userDataCount = 0;
                 if (Version >= 20)
@@ -236,12 +241,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     userDataCount = userDataList.Length;
                 }
 
+                // String data
                 bw.Align(16);
                 stringPool.WriteStrings();
 
                 // Instance data
-                bw.Align(16);
                 var rszDataOffset = ms.Position;
+                rszBuilder.AlignOffset = rszDataOffset;
+                rsz = rszBuilder.Build();
                 bw.Write(rsz.Data.Span);
 
                 // Header

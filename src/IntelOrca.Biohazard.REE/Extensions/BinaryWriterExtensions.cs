@@ -6,9 +6,9 @@ namespace IntelOrca.Biohazard.REE.Extensions
 {
     internal unsafe static class BinaryWriterExtensions
     {
-        public static void Align(this BinaryWriter bw, int alignment)
+        public static void Align(this BinaryWriter bw, int alignment, long alignOffset = 0)
         {
-            var position = bw.BaseStream.Position;
+            var position = alignOffset + bw.BaseStream.Position;
             var remainder = (int)(position % alignment);
             if (remainder != 0)
             {
