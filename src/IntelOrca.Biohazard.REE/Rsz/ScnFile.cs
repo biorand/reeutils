@@ -317,9 +317,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         }
                     }
 
-                    foreach (var child in node.Children)
+                    if (node is IRszNodeContainer container)
                     {
-                        Traverse(id, child);
+                        foreach (var child in container.Children)
+                        {
+                            Traverse(id, child);
+                        }
                     }
                 }
             }

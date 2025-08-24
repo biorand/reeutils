@@ -93,9 +93,12 @@ namespace IntelOrca.Biohazard.REE
                 DiscoverString(userDataNode.Path);
             }
 
-            foreach (var child in node.Children)
+            if (node is IRszNodeContainer container)
             {
-                Visit(child);
+                foreach (var child in container.Children)
+                {
+                    Visit(child);
+                }
             }
         }
     }

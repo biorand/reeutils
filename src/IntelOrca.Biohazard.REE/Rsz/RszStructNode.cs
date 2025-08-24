@@ -4,7 +4,7 @@ using System.Collections.Immutable;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
-    public class RszStructNode : IRszNode
+    public class RszStructNode : IRszNodeContainer
     {
         public RszType Type { get; }
         public ImmutableArray<IRszNode> Children { get; set; }
@@ -100,6 +100,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     : RszSerializer.Serialize(field.Type, value)));
         }
 
-        public override string ToString() => Type.Name.ToString();
+        public RszStructNode WithChildren(ImmutableArray<IRszNode> children) => new RszStructNode(Type, children);
+
+        IRszNodeContainer IRszNodeContainer.WithChildren(ImmutableArray<IRszNode> children) => WithChildren(children);
+
+        public override string ToString() => Type.Name;
     }
 }

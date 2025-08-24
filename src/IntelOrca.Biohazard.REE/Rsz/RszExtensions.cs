@@ -126,6 +126,29 @@ namespace IntelOrca.Biohazard.REE.Rsz
             }
         }
 
+        public static T UpdateAll<T>(this T node, Func<IRszNode, IRszNode> cb) where T : IRszNodeContainer
+        {
+            return (T)UpdateAllInternal(node, cb);
+
+            static IRszNode UpdateAllInternal(IRszNode node, Func<IRszNode, IRszNode> cb)
+            {
+                var newNode = cb(node);
+                if (newNode is IRszNodeContainer container)
+                {
+                    var children = container.Children.ToBuilder();
+                    for (var i = 0; i < children.Count; i++)
+                    {
+                        children[i] = UpdateAllInternal(children[i], cb);
+                    }
+                    return container.WithChildren(children.ToImmutable());
+                }
+                else
+                {
+                    return newNode;
+                }
+            }
+        }
+
         public static T Get<T>(this IRszNode node, string path)
         {
             var result = Get(node, path);

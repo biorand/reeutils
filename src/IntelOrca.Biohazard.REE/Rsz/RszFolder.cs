@@ -6,12 +6,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
     public sealed class RszFolder : IRszSceneNode
     {
         private RszStructNode _settings;
-        private ImmutableArray<IRszSceneNode> _children = [];
+        public ImmutableArray<IRszSceneNode> Children { get; } = [];
 
         public RszFolder(RszStructNode settings, ImmutableArray<IRszSceneNode> children)
         {
             _settings = settings;
-            _children = children;
+            Children = children;
         }
 
         public RszStructNode Settings
@@ -27,18 +27,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
             }
         }
 
-        public ImmutableArray<IRszSceneNode> Children
-        {
-            get => _children;
-            set => _children = value;
-        }
-
-        ImmutableArray<IRszNode> IRszNode.Children
-        {
-            get => _children.CastArray<IRszNode>();
-            set => _children = value.CastArray<IRszSceneNode>();
-        }
-
         public RszFolder WithChildren(ImmutableArray<IRszSceneNode> children)
         {
             return new RszFolder(Settings, children);
@@ -46,7 +34,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public string Name => ((RszStringNode)_settings[0]).Value;
 
+        ImmutableArray<IRszNode> IRszNodeContainer.Children => Children.CastArray<IRszNode>();
         IRszSceneNode IRszSceneNode.WithChildren(ImmutableArray<IRszSceneNode> children) => WithChildren(children);
+        IRszNodeContainer IRszNodeContainer.WithChildren(ImmutableArray<IRszNode> children) => WithChildren(children.CastArray<IRszSceneNode>());
 
         public override string ToString() => Name;
     }

@@ -4,7 +4,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 {
     public sealed class RszScene : IRszSceneNode
     {
-        private ImmutableArray<IRszSceneNode> _children = [];
+        public ImmutableArray<IRszSceneNode> Children { get; } = [];
 
         public RszScene()
         {
@@ -12,31 +12,18 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public RszScene(ImmutableArray<IRszSceneNode> children)
         {
-            _children = children;
+            Children = children;
         }
 
         public RszScene Add(IRszSceneNode node)
         {
-            return new RszScene(_children.Add(node));
+            return new RszScene(Children.Add(node));
         }
 
-        public IRszSceneNode WithChildren(ImmutableArray<IRszSceneNode> children)
-        {
-            return new RszScene(children);
-        }
+        ImmutableArray<IRszNode> IRszNodeContainer.Children => Children.CastArray<IRszNode>();
 
-        public ImmutableArray<IRszSceneNode> Children
-        {
-            get => _children;
-            set => _children = value;
-        }
-
-        ImmutableArray<IRszNode> IRszNode.Children
-        {
-            get => _children.CastArray<IRszNode>();
-            set => _children = value.CastArray<IRszSceneNode>();
-        }
-
+        public IRszSceneNode WithChildren(ImmutableArray<IRszSceneNode> children) => new RszScene(children);
         IRszSceneNode IRszSceneNode.WithChildren(ImmutableArray<IRszSceneNode> children) => WithChildren(children);
+        IRszNodeContainer IRszNodeContainer.WithChildren(ImmutableArray<IRszNode> children) => WithChildren(children.CastArray<IRszSceneNode>());
     }
 }

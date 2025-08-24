@@ -2,9 +2,9 @@
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
-    public interface IRszSceneNode : IRszNode
+    public interface IRszSceneNode : IRszNodeContainer
     {
-        new ImmutableArray<IRszSceneNode> Children { get; set; }
+        new ImmutableArray<IRszSceneNode> Children { get; }
 
         IRszSceneNode WithChildren(ImmutableArray<IRszSceneNode> children);
     }

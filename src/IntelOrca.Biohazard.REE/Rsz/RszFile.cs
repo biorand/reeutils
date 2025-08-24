@@ -125,36 +125,26 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             for (var i = 0; i < instanceInfoList.Length; i++)
             {
-                VisitInstanceTree(result[i].Value, x =>
+                var value = result[i].Value;
+                if (value is IRszNodeContainer container)
                 {
-                    if (x is RszDataNode dataNode)
+                    result[i] = new RszInstance(result[i].Id, container.UpdateAll(node =>
                     {
-                        if (dataNode.Type == RszFieldType.Object ||
-                            dataNode.Type == RszFieldType.UserData)
+                        if (node is RszDataNode dataNode)
                         {
-                            var instanceId = dataNode.AsInt32();
-                            return result[instanceId].Value;
+                            if (dataNode.Type == RszFieldType.Object ||
+                                dataNode.Type == RszFieldType.UserData)
+                            {
+                                var instanceId = dataNode.AsInt32();
+                                return result[instanceId].Value;
+                            }
                         }
-                    }
-                    return x;
-                });
+                        return node;
+                    }));
+                }
             }
 
             return result.ToImmutable();
-        }
-
-        private IRszNode VisitInstanceTree(IRszNode node, Func<IRszNode, IRszNode> transform)
-        {
-            if (node.Children.IsDefaultOrEmpty)
-                return transform(node);
-
-            var array = node.Children.ToBuilder();
-            for (var i = 0; i < node.Children.Length; i++)
-            {
-                array[i] = VisitInstanceTree(array[i], transform);
-            }
-            node.Children = array.ToImmutable();
-            return transform(node);
         }
 
         public ImmutableArray<IRszNode> ReadObjectList(RszTypeRepository repository)

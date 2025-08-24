@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
-    public class RszArrayNode : IRszNode, IEnumerable<IRszNode>
+    public class RszArrayNode : IRszNodeContainer, IEnumerable<IRszNode>
     {
         public RszFieldType Type { get; set; }
         public ImmutableArray<IRszNode> Children { get; set; }
@@ -60,6 +60,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             return new RszArrayNode(Type, Children.RemoveAt(index));
         }
+
+        public RszArrayNode WithChildren(ImmutableArray<IRszNode> children) => new RszArrayNode(Type, children);
+        IRszNodeContainer IRszNodeContainer.WithChildren(ImmutableArray<IRszNode> children) => WithChildren(children);
 
         public IEnumerator<IRszNode> GetEnumerator() => ((IEnumerable<IRszNode>)Children).GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
