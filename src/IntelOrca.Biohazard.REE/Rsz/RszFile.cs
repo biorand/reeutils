@@ -128,7 +128,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var value = result[i].Value;
                 if (value is IRszNodeContainer container)
                 {
-                    result[i] = new RszInstance(result[i].Id, container.UpdateAll(node =>
+                    result[i] = new RszInstance(result[i].Id, container.Visit(node =>
                     {
                         if (node is RszDataNode dataNode)
                         {
