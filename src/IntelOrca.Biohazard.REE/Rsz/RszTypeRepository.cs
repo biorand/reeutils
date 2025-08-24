@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Collections.Immutable;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
@@ -17,6 +18,20 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             _nameToTypeMap.TryGetValue(name, out var result);
             return result;
+        }
+
+        public ImmutableArray<RszType> GetNestedTypes(RszType type)
+        {
+            var result = ImmutableArray.CreateBuilder<RszType>();
+            foreach (var t in _nameToTypeMap.Values)
+            {
+                if (t.Namespace == type.Name)
+                {
+                    result.Add(t);
+                }
+            }
+            result.Sort(new System.Comparison<RszType>((a, b) => a.Name.CompareTo(b.Name)));
+            return result.ToImmutable();
         }
 
         public void AddType(RszType type)

@@ -33,30 +33,42 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     else
                     {
-                        writer.BeginClassBlock(t.NameWithoutNamespace);
-                        foreach (var f in t.Fields)
-                        {
-                            var fieldType = GetFieldTypeName(f);
-                            if (f.IsArray)
-                            {
-                                writer.Property($"System.Collections.Generic.List<{fieldType}>", f.Name, "[]");
-                            }
-                            else
-                            {
-                                writer.Property(fieldType, f.Name, f.Type == RszFieldType.String
-                                    ? "\"\""
-                                    : fieldType.StartsWith("System.")
-                                        ? null
-                                        : "new()");
-                            }
-                        }
-                        writer.EndBlock();
+                        WriteType(t);
                     }
                 }
                 writer.EndBlock();
             }
 
             return writer.ToString();
+
+            void WriteType(RszType t)
+            {
+                writer.BeginClassBlock(t.NameWithoutNamespace);
+                foreach (var f in t.Fields)
+                {
+                    var fieldType = GetFieldTypeName(f);
+                    if (f.IsArray)
+                    {
+                        writer.Property($"System.Collections.Generic.List<{fieldType}>", f.Name, "[]");
+                    }
+                    else
+                    {
+                        writer.Property(fieldType, f.Name, f.Type == RszFieldType.String
+                            ? "\"\""
+                            : fieldType.StartsWith("System.")
+                                ? null
+                                : "new()");
+                    }
+                }
+
+                var nestedTypes = t.Repository.GetNestedTypes(t);
+                foreach (var nestedType in nestedTypes)
+                {
+                    WriteType(nestedType);
+                }
+
+                writer.EndBlock();
+            }
         }
 
         private string GetFieldTypeName(RszTypeField field)
@@ -84,7 +96,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
             if (types.Contains(type))
                 return types;
 
-            types.Add(type);
+            // Do not include nested types
+            if (type.Repository.FromName(type.Namespace) == null)
+                types.Add(type);
 
             foreach (var f in type.Fields)
             {

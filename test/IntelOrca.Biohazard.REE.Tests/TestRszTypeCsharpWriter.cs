@@ -15,7 +15,7 @@ namespace IntelOrca.Biohazard.REE.Tests
         public void Generate()
         {
             var repo = _pakHelper.GetTypeRepository(GameNames.RE4);
-            var userData = repo.FromName("chainsaw.GimmickSaveDataTable")!;
+            var userData = repo.FromName("chainsaw.WeaponItem")!;
 
             var csharpWriter = new RszTypeCsharpWriter();
             var output = csharpWriter.Generate(userData);
