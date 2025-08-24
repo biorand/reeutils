@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Immutable;
 
 namespace IntelOrca.Biohazard.REE.Rsz
@@ -70,10 +71,33 @@ namespace IntelOrca.Biohazard.REE.Rsz
             if (index == -1)
                 throw new ArgumentException($"{0} is not a field of {Type.Name}.");
 
-            var fieldType = Type.Fields[index].Type;
+            var field = Type.Fields[index];
+            if (value is IList list)
+            {
+                var children = ImmutableArray.CreateBuilder<IRszNode>();
+                foreach (var item in list)
+                {
+                    if (item is IRszNode itemNode)
+                    {
+                        children.Add(itemNode);
+                    }
+                    else if (field.Type == RszFieldType.Object)
+                    {
+                        children.Add(RszSerializer.Serialize(field.ObjectType!, item));
+                    }
+                    else
+                    {
+                        children.Add(RszSerializer.Serialize(field.Type, item));
+                    }
+                }
+                return new RszStructNode(Type, Children.SetItem(index, new RszArrayNode(field.Type, children.ToImmutable())));
+            }
+
             return new RszStructNode(
                 Type,
-                Children.SetItem(index, RszSerializer.Serialize(fieldType, value)));
+                Children.SetItem(index, field.Type == RszFieldType.Object
+                    ? RszSerializer.Serialize(field.ObjectType!, value)
+                    : RszSerializer.Serialize(field.Type, value)));
         }
 
         public override string ToString() => Type.Name.ToString();

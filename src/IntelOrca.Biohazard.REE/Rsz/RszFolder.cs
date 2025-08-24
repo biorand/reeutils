@@ -39,7 +39,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
             set => _children = value.CastArray<IRszSceneNode>();
         }
 
+        public RszFolder WithChildren(ImmutableArray<IRszSceneNode> children)
+        {
+            return new RszFolder(Settings, children);
+        }
+
         public string Name => ((RszStringNode)_settings[0]).Value;
+
+        IRszSceneNode IRszSceneNode.WithChildren(ImmutableArray<IRszSceneNode> children) => WithChildren(children);
 
         public override string ToString() => Name;
     }

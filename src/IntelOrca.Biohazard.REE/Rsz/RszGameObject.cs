@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Immutable;
+using System.Linq;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
@@ -7,7 +8,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
     {
         private RszStructNode _settings;
 
-        public RszGameObject(Guid guid, string? prefab, RszStructNode settings, ImmutableArray<IRszNode> components, ImmutableArray<RszGameObject> children)
+        public RszGameObject(Guid guid, string? prefab, RszStructNode settings, ImmutableArray<RszStructNode> components, ImmutableArray<RszGameObject> children)
         {
             Guid = guid;
             Prefab = prefab;
@@ -32,7 +33,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             }
         }
 
-        public ImmutableArray<IRszNode> Components { get; set; }
+        public ImmutableArray<RszStructNode> Components { get; set; }
 
         public ImmutableArray<RszGameObject> Children { get; set; }
 
@@ -49,6 +50,76 @@ namespace IntelOrca.Biohazard.REE.Rsz
         }
 
         public string Name => ((RszStringNode)_settings[0]).Value;
+
+        public RszGameObject WithName(string name)
+        {
+            return WithSettings(_settings.Set("Name", name));
+        }
+
+        public RszStructNode? FindComponent(string type)
+        {
+            return Components.FirstOrDefault(x => x.Type.Name == type);
+        }
+
+        public RszGameObject WithSettings(RszStructNode settings)
+        {
+            if (settings?.Type.Name != "via.GameObject")
+            {
+                throw new ArgumentException("Settings must be of type via.GameObject.");
+            }
+            return new RszGameObject(
+                Guid,
+                Prefab,
+                settings,
+                Components,
+                Children);
+        }
+
+        public RszGameObject WithComponents(ImmutableArray<RszStructNode> components)
+        {
+            return new RszGameObject(
+                Guid,
+                Prefab,
+                Settings,
+                components,
+                Children);
+        }
+
+        public RszGameObject WithChildren(ImmutableArray<RszGameObject> children)
+        {
+            return new RszGameObject(
+                Guid,
+                Prefab,
+                Settings,
+                Components,
+                children);
+        }
+
+        public RszGameObject AddOrUpdateComponent(RszStructNode component)
+        {
+            for (var i = 0; i < Components.Length; i++)
+            {
+                if (Components[i].Type == component.Type)
+                {
+                    return WithComponents(Components.SetItem(i, component));
+                }
+            }
+            return WithComponents(Components.Add(component));
+        }
+
+        public RszGameObject AddOrUpdateChild(RszGameObject gameObject)
+        {
+            for (var i = 0; i < Children.Length; i++)
+            {
+                if (Children[i].Guid == gameObject.Guid)
+                {
+                    return WithChildren(Children.SetItem(i, gameObject));
+                }
+            }
+            return WithChildren(Children.Add(gameObject));
+        }
+
+        IRszSceneNode IRszSceneNode.WithChildren(ImmutableArray<IRszSceneNode> children) => WithChildren(children.CastArray<RszGameObject>());
 
         public override string ToString() => Name;
     }

@@ -74,6 +74,16 @@ namespace IntelOrca.Biohazard.REE.Rsz
             if (obj is null)
                 return new RszNullNode();
 
+            if (obj is IList objList)
+            {
+                var objArray = ImmutableArray.CreateBuilder<IRszNode>();
+                foreach (var objListItem in objList)
+                {
+                    objArray.Add(Serialize(type, objListItem));
+                }
+                return new RszArrayNode(RszFieldType.Object, objArray.ToImmutable());
+            }
+
             var clrType = obj.GetType();
             var children = ImmutableArray.CreateBuilder<IRszNode>();
             foreach (var field in type.Fields)

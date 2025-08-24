@@ -122,10 +122,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var info = gameObjectInfoList[id];
                 var settings = (RszStructNode)objectList[info.ObjectId];
 
-                var components = ImmutableArray.CreateBuilder<IRszNode>();
+                var components = ImmutableArray.CreateBuilder<RszStructNode>();
                 for (var i = 0; i < info.ComponentCount; i++)
                 {
-                    components.Add(objectList[info.ObjectId + 1 + i]);
+                    components.Add((RszStructNode)objectList[info.ObjectId + 1 + i]);
                 }
 
                 var prefab = info.PrefabId >= 0 && info.PrefabId < prefabs.Length

@@ -1,14 +1,31 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
     public static class RszExtensions
     {
-        public static RszGameObject? FindGameObject(this IRszSceneNode node, Guid guid)
+        public static IEnumerable<RszGameObject> EnumerateGameObjects(this IRszSceneNode node)
         {
             if (node is RszGameObject gameObject)
             {
-                if (gameObject.Guid == guid)
+                yield return gameObject;
+            }
+
+            foreach (var child in node.Children)
+            {
+                foreach (var childGameObject in EnumerateGameObjects(child))
+                {
+                    yield return childGameObject;
+                }
+            }
+        }
+
+        public static RszGameObject? FindGameObject(this IRszSceneNode node, Func<RszGameObject, bool> condition)
+        {
+            if (node is RszGameObject gameObject)
+            {
+                if (condition(gameObject))
                 {
                     return gameObject;
                 }
@@ -16,7 +33,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             foreach (var child in node.Children)
             {
-                var result = child.FindGameObject(guid);
+                var result = child.FindGameObject(condition);
                 if (result != null)
                 {
                     return result;
@@ -26,10 +43,96 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return null;
         }
 
+        public static RszGameObject? FindGameObject(this IRszSceneNode node, Guid guid) => FindGameObject(node, go => go.Guid == guid);
+        public static RszGameObject? FindGameObject(this IRszSceneNode node, string name) => FindGameObject(node, go => go.Name == name);
+
+        public static T ReplaceGameObject<T>(this T node, RszGameObject newGameObject) where T : IRszSceneNode
+        {
+            if (node.Children.IsDefaultOrEmpty)
+                return node;
+
+            if (node is RszGameObject gameObject)
+            {
+                var children = gameObject.Children.ToBuilder();
+                for (var i = 0; i < node.Children.Length; i++)
+                {
+                    if (children[i].Guid == newGameObject.Guid)
+                    {
+                        children[i] = newGameObject;
+                    }
+                    else
+                    {
+                        children[i] = children[i].ReplaceGameObject(newGameObject);
+                    }
+                }
+                return (T)(IRszSceneNode)gameObject.WithChildren(children.ToImmutable());
+            }
+            else
+            {
+                var children = node.Children.ToBuilder();
+                for (var i = 0; i < node.Children.Length; i++)
+                {
+                    if (children[i] is RszGameObject oldGameObject && oldGameObject.Guid == newGameObject.Guid)
+                    {
+                        children[i] = newGameObject;
+                    }
+                    else
+                    {
+                        children[i] = children[i].ReplaceGameObject(newGameObject);
+                    }
+                }
+                return (T)node.WithChildren(children.ToImmutable());
+            }
+        }
+
+        public static T RemoveGameObject<T>(this T node, Guid guid) where T : IRszSceneNode
+        {
+            if (node.Children.IsDefaultOrEmpty)
+                return node;
+
+            if (node is RszGameObject gameObject)
+            {
+                var children = gameObject.Children.ToBuilder();
+                for (var i = 0; i < children.Count; i++)
+                {
+                    if (children[i].Guid == guid)
+                    {
+                        children.RemoveAt(i);
+                        i--;
+                    }
+                    else
+                    {
+                        children[i] = children[i].RemoveGameObject(guid);
+                    }
+                }
+                return (T)(IRszSceneNode)gameObject.WithChildren(children.ToImmutable());
+            }
+            else
+            {
+                var children = node.Children.ToBuilder();
+                for (var i = 0; i < children.Count; i++)
+                {
+                    if (children[i] is RszGameObject oldGameObject && oldGameObject.Guid == guid)
+                    {
+                        children.RemoveAt(i);
+                        i--;
+                    }
+                    else
+                    {
+                        children[i] = children[i].RemoveGameObject(guid);
+                    }
+                }
+                return (T)node.WithChildren(children.ToImmutable());
+            }
+        }
+
         public static T Get<T>(this IRszNode node, string path)
         {
             var result = Get(node, path);
-            return (T)result;
+            if (result.GetType() == typeof(T))
+                return (T)result;
+
+            return (T)RszSerializer.Deserialize(node, typeof(T))!;
         }
 
         private static object Get(this IRszNode node, string path)

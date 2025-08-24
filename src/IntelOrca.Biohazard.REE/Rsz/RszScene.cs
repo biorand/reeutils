@@ -15,6 +15,16 @@ namespace IntelOrca.Biohazard.REE.Rsz
             _children = children;
         }
 
+        public RszScene Add(IRszSceneNode node)
+        {
+            return new RszScene(_children.Add(node));
+        }
+
+        public IRszSceneNode WithChildren(ImmutableArray<IRszSceneNode> children)
+        {
+            return new RszScene(children);
+        }
+
         public ImmutableArray<IRszSceneNode> Children
         {
             get => _children;
@@ -26,5 +36,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             get => _children.CastArray<IRszNode>();
             set => _children = value.CastArray<IRszSceneNode>();
         }
+
+        IRszSceneNode IRszSceneNode.WithChildren(ImmutableArray<IRszSceneNode> children) => WithChildren(children);
     }
 }
