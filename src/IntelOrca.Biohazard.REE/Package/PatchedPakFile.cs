@@ -9,88 +9,39 @@ namespace IntelOrca.Biohazard.REE.Package
 {
     public sealed class PatchedPakFile : IPakFile, IDisposable
     {
-        private readonly ImmutableArray<PakFile> _files;
+        private readonly PakFileCollection _collection;
 
-        public PatchedPakFile(params string[] paths)
+        public PatchedPakFile(string basePakPath)
         {
-            var files = new List<PakFile>();
-            foreach (var path in paths)
+            if (!File.Exists(basePakPath))
+                throw new FileNotFoundException($"{basePakPath} does not exist.", basePakPath);
+
+            var fileOrder = new List<string>() { basePakPath };
+            var basePakFileName = Path.GetFileName(basePakPath);
+            var directory = Path.GetDirectoryName(basePakPath);
+            var files = Directory.GetFiles(directory);
+            foreach (var f in files)
             {
-                var match = Regex.Match(path, @"(^.*)\.patch_([0-9]{3})\.pak$");
+                var match = Regex.Match(Path.GetFileName(f), @"(^.*)\.patch_([0-9]{3})\.pak$");
                 if (match.Success)
                 {
                     var basePath = match.Groups[1].Value;
-                    var endNumber = int.Parse(match.Groups[2].Value);
-                    if (File.Exists(basePath))
-                    {
-                        files.Add(new PakFile(basePath));
-                    }
-                    for (var i = 1; i <= endNumber; i++)
-                    {
-                        var patchFileName = $"{basePath}.patch_{i:000}.pak";
-                        if (File.Exists(patchFileName))
-                        {
-                            files.Add(new PakFile(patchFileName));
-                        }
-                    }
-                }
-                else
-                {
-                    files.Add(new PakFile(path));
-                    for (var i = 1; i < 10000; i++)
-                    {
-                        var patchFileName = $"{path}.patch_{i:000}.pak";
-                        if (File.Exists(patchFileName))
-                        {
-                            files.Add(new PakFile(patchFileName));
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
+                    if (basePath != basePakFileName)
+                        continue;
+
+                    fileOrder.Add(f);
                 }
             }
-            _files = [.. files];
+
+            fileOrder.Sort(StringComparer.OrdinalIgnoreCase);
+            _collection = new PakFileCollection(fileOrder
+                .Select(x => (IPakFile)new PakFile(x))
+                .ToImmutableArray());
         }
 
-        public void Dispose()
-        {
-            foreach (var f in _files)
-            {
-                f.Dispose();
-            }
-        }
-
-        public byte[]? GetEntryData(ulong hash)
-        {
-            for (var i = _files.Length - 1; i >= 0; i--)
-            {
-                var data = _files[i].GetEntryData(hash);
-                if (data != null)
-                {
-                    return data;
-                }
-            }
-            return null;
-        }
-
-        public byte[]? GetEntryData(string path)
-        {
-            for (var i = _files.Length - 1; i >= 0; i--)
-            {
-                var data = _files[i].GetEntryData(path);
-                if (data != null)
-                {
-                    return data;
-                }
-            }
-            return null;
-        }
-
-        public ImmutableArray<ulong> FileHashes => _files
-            .SelectMany(x => x.FileHashes)
-            .OrderBy(x => x)
-            .ToImmutableArray();
+        public void Dispose() => _collection.Dispose();
+        public ImmutableArray<ulong> FileHashes => _collection.FileHashes;
+        public byte[]? GetEntryData(ulong hash) => _collection.GetEntryData(hash);
+        public byte[]? GetEntryData(string path) => _collection.GetEntryData(path);
     }
 }

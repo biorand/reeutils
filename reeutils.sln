@@ -19,6 +19,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IntelOrca.Biohazard.REE", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IntelOrca.Biohazard.REE.Tests", "test\IntelOrca.Biohazard.REE.Tests\IntelOrca.Biohazard.REE.Tests.csproj", "{FA12DC67-ECA0-4B5B-9114-C013F701889A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "reeexamples", "src\reeexamples\reeexamples.csproj", "{756CF99D-989E-4BD9-8CDE-2A557946D209}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,10 @@ Global
 		{FA12DC67-ECA0-4B5B-9114-C013F701889A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FA12DC67-ECA0-4B5B-9114-C013F701889A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FA12DC67-ECA0-4B5B-9114-C013F701889A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{756CF99D-989E-4BD9-8CDE-2A557946D209}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{756CF99D-989E-4BD9-8CDE-2A557946D209}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{756CF99D-989E-4BD9-8CDE-2A557946D209}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{756CF99D-989E-4BD9-8CDE-2A557946D209}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -55,6 +61,7 @@ Global
 		{551A28AC-9B89-4758-A028-0272D95F46E3} = {2B075075-C7A0-4627-B427-8CD0653501A9}
 		{AC27CD08-A8CB-4900-ADAB-10EE5F0F3980} = {54BA45C4-CA72-4F4C-926A-4D63BD52237C}
 		{FA12DC67-ECA0-4B5B-9114-C013F701889A} = {2B075075-C7A0-4627-B427-8CD0653501A9}
+		{756CF99D-989E-4BD9-8CDE-2A557946D209} = {54BA45C4-CA72-4F4C-926A-4D63BD52237C}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {465E4D4C-59F0-415F-93F2-18A5F5DD161E}

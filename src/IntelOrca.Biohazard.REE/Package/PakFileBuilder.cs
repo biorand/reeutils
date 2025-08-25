@@ -13,12 +13,14 @@ namespace IntelOrca.Biohazard.REE.Package
 
         public Dictionary<string, object> Entries => _entries;
 
-        public void AddEntry(string path, byte[] data)
+        public void AddEntry(string path, byte[] data) => AddEntry(path, data.AsSpan());
+        public void AddEntry(string path, ReadOnlyMemory<byte> data) => AddEntry(path, data.Span);
+        public void AddEntry(string path, ReadOnlySpan<byte> data)
         {
             if (path == null) throw new ArgumentNullException(nameof(path));
             if (data == null) throw new ArgumentNullException(nameof(data));
 
-            _entries[path] = data;
+            _entries[path] = data.ToArray();
         }
 
         public void AddEntry(string path, string srcPath)
@@ -46,13 +48,13 @@ namespace IntelOrca.Biohazard.REE.Package
             }
         }
 
-        public void Save(string path, CompressionKind CompressionKind)
+        public void Save(string path, CompressionKind CompressionKind = CompressionKind.Zstd)
         {
             using var stream = File.OpenWrite(path);
             Save(stream, CompressionKind);
         }
 
-        public void Save(Stream stream, CompressionKind CompressionKind)
+        public void Save(Stream stream, CompressionKind CompressionKind = CompressionKind.Zstd)
         {
             var header = new PakFile.Header
             {

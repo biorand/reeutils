@@ -8,7 +8,7 @@ namespace IntelOrca.Biohazard.REE.Tests
     /// </summary>
     internal sealed class OriginalPakHelper : IDisposable
     {
-        private readonly Dictionary<string, PatchedPakFile> _pakFiles = [];
+        private readonly Dictionary<string, IPakFile> _pakFiles = [];
         private readonly object _sync = new object();
 
         public void Dispose()
@@ -25,15 +25,14 @@ namespace IntelOrca.Biohazard.REE.Tests
             return pak.GetEntryData(path) ?? throw new FileNotFoundException($"{path} not found", path);
         }
 
-        private PatchedPakFile GetPatchedPak(string game)
+        private IPakFile GetPatchedPak(string game)
         {
             lock (_sync)
             {
                 if (!_pakFiles.TryGetValue(game, out var result))
                 {
                     var dir = GetInstallPath(game);
-                    var basePath = Path.Combine(dir, "re_chunk_000.pak");
-                    result = new PatchedPakFile(basePath);
+                    result = new RePakCollection(dir);
                     _pakFiles[game] = result;
                 }
                 return result;
