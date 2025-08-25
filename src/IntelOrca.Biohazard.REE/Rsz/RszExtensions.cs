@@ -113,40 +113,20 @@ namespace IntelOrca.Biohazard.REE.Rsz
             if (node.Children.IsDefaultOrEmpty)
                 return node;
 
-            if (node is RszGameObject gameObject)
+            var children = node.Children.ToBuilder();
+            for (var i = 0; i < children.Count; i++)
             {
-                var children = gameObject.Children.ToBuilder();
-                for (var i = 0; i < children.Count; i++)
+                if (children[i] is RszGameObject oldGameObject && oldGameObject.Guid == guid)
                 {
-                    if (children[i].Guid == guid)
-                    {
-                        children.RemoveAt(i);
-                        i--;
-                    }
-                    else
-                    {
-                        children[i] = children[i].RemoveGameObject(guid);
-                    }
+                    children.RemoveAt(i);
+                    i--;
                 }
-                return (T)(IRszSceneNode)gameObject.WithChildren(children.ToImmutable());
-            }
-            else
-            {
-                var children = node.Children.ToBuilder();
-                for (var i = 0; i < children.Count; i++)
+                else
                 {
-                    if (children[i] is RszGameObject oldGameObject && oldGameObject.Guid == guid)
-                    {
-                        children.RemoveAt(i);
-                        i--;
-                    }
-                    else
-                    {
-                        children[i] = children[i].RemoveGameObject(guid);
-                    }
+                    children[i] = children[i].RemoveGameObject(guid);
                 }
-                return (T)node.WithChildren(children.ToImmutable());
             }
+            return (T)node.WithChildren(children.ToImmutable());
         }
 
         public static T Visit<T>(this T node, Func<IRszNode, IRszNode> cb) where T : IRszNodeContainer
@@ -156,6 +136,24 @@ namespace IntelOrca.Biohazard.REE.Rsz
             static IRszNode UpdateAllInternal(IRszNode node, Func<IRszNode, IRszNode> cb)
             {
                 var newNode = cb(node);
+                if (newNode is RszGameObject gameObject)
+                {
+                    var components = gameObject.Components.ToBuilder();
+                    for (var i = 0; i < components.Count; i++)
+                    {
+                        components[i] = (RszStructNode)UpdateAllInternal(components[i], cb);
+                    }
+
+                    var children = gameObject.Children.ToBuilder();
+                    for (var i = 0; i < children.Count; i++)
+                    {
+                        children[i] = (RszGameObject)UpdateAllInternal(children[i], cb);
+                    }
+
+                    return gameObject
+                        .WithComponents(components.ToImmutable())
+                        .WithChildren(children.ToImmutable());
+                }
                 if (newNode is IRszNodeContainer container)
                 {
                     var children = container.Children.ToBuilder();
@@ -273,6 +271,41 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 throw new NotImplementedException();
             }
+        }
+
+        /// <summary>
+        /// Clones the game object tree, generating new GUIDs for all game objects,
+        /// and fixing any references to the old GUID.
+        /// </summary>
+        /// <param name="gameObject"></param>
+        /// <returns></returns>
+        public static RszGameObject Clone(this RszGameObject rootGameObject)
+        {
+            var map = new Dictionary<Guid, Guid>();
+
+            // Create new guids for all game objects
+            var root = rootGameObject
+                .VisitGameObjects(gameObject =>
+                {
+                    // Change to new guid (keep map of old to new)
+                    var newGuid = Guid.NewGuid();
+                    map[gameObject.Guid] = newGuid;
+                    return gameObject.WithGuid(newGuid);
+                });
+
+            // Fix references
+            return root.Visit(node =>
+            {
+                if (node is RszDataNode dataNode && dataNode.Type == RszFieldType.GameObjectRef)
+                {
+                    var refGuid = (Guid)dataNode.Decode();
+                    if (map.TryGetValue(refGuid, out var newGuid))
+                    {
+                        return RszSerializer.Serialize(RszFieldType.GameObjectRef, newGuid);
+                    }
+                }
+                return node;
+            });
         }
     }
 }

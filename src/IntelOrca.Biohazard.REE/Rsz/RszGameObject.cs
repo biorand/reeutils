@@ -37,6 +37,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public ImmutableArray<RszGameObject> Children { get; set; }
 
+        public RszGameObject WithGuid(Guid guid) => new RszGameObject(guid, Prefab, Settings, Components, Children);
+
         public string Name => ((RszStringNode)_settings[0]).Value;
 
         public RszGameObject WithName(string name)
@@ -110,8 +112,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
         ImmutableArray<IRszSceneNode> IRszSceneNode.Children => Children.CastArray<IRszSceneNode>();
         ImmutableArray<IRszNode> IRszNodeContainer.Children => Children.CastArray<IRszNode>();
 
-        IRszSceneNode IRszSceneNode.WithChildren(ImmutableArray<IRszSceneNode> children) => WithChildren(children.CastArray<RszGameObject>());
-        IRszNodeContainer IRszNodeContainer.WithChildren(ImmutableArray<IRszNode> children) => WithChildren(children.CastArray<RszGameObject>());
+        IRszSceneNode IRszSceneNode.WithChildren(ImmutableArray<IRszSceneNode> children) => WithChildren(children.Cast<RszGameObject>().ToImmutableArray());
+        IRszNodeContainer IRszNodeContainer.WithChildren(ImmutableArray<IRszNode> children) => WithChildren(children.Cast<RszGameObject>().ToImmutableArray());
 
         public override string ToString() => Name;
     }

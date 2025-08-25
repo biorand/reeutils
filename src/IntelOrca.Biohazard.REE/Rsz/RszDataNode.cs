@@ -43,7 +43,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.Vec3 => MemoryMarshal.Read<Vector3>(Data.Span),
                 RszFieldType.Vec4 => MemoryMarshal.Read<Vector4>(Data.Span),
                 RszFieldType.Quaternion => MemoryMarshal.Read<Quaternion>(Data.Span),
-                RszFieldType.Guid => MemoryMarshal.Read<Guid>(Data.Span),
+                RszFieldType.Guid or RszFieldType.GameObjectRef => MemoryMarshal.Read<Guid>(Data.Span),
                 RszFieldType.Range => MemoryMarshal.Read<Native.Range>(Data.Span),
                 RszFieldType.KeyFrame => MemoryMarshal.Read<KeyFrame>(Data.Span),
                 _ => throw new NotSupportedException()

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Immutable;
+using System.Linq;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
@@ -36,7 +37,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         ImmutableArray<IRszNode> IRszNodeContainer.Children => Children.CastArray<IRszNode>();
         IRszSceneNode IRszSceneNode.WithChildren(ImmutableArray<IRszSceneNode> children) => WithChildren(children);
-        IRszNodeContainer IRszNodeContainer.WithChildren(ImmutableArray<IRszNode> children) => WithChildren(children.CastArray<IRszSceneNode>());
+        IRszNodeContainer IRszNodeContainer.WithChildren(ImmutableArray<IRszNode> children) => WithChildren(children.Cast<IRszSceneNode>().ToImmutableArray());
 
         public override string ToString() => Name;
     }

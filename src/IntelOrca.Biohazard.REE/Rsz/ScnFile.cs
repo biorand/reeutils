@@ -155,6 +155,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public int Version { get; }
             public int RszVersion { get; }
             public List<string> Resources { get; } = [];
+            public List<string> Prefabs { get; } = [];
             public RszScene Scene { get; set; } = new RszScene();
 
             public Builder(RszTypeRepository repository, int version, int rszVersion)
@@ -170,7 +171,32 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 Version = instance.Version;
                 RszVersion = instance.Rsz.Version;
                 Resources = instance.Resources.ToList();
+                Prefabs = instance.Prefabs.ToList();
                 Scene = instance.ReadScene(repository);
+            }
+
+            public Builder AddMissingResources()
+            {
+                var resourceHash = new HashSet<string>(Resources, StringComparer.OrdinalIgnoreCase);
+                Scene.Visit(node =>
+                {
+                    if (node is RszResourceNode resourceNode && !string.IsNullOrEmpty(resourceNode.Value))
+                    {
+                        var resourceValue = resourceNode.Value;
+                        if (resourceHash.Add(resourceValue))
+                        {
+                            Resources.Add(resourceValue);
+                        }
+                    }
+                    return node;
+                });
+                return this;
+            }
+
+            public Builder RebuildResources()
+            {
+                Resources.Clear();
+                return AddMissingResources();
             }
 
             public ScnFile Build()

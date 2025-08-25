@@ -155,7 +155,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.Vec3 => new RszDataNode(type, ToMemory<Vector3>(obj)),
                 RszFieldType.Vec4 => new RszDataNode(type, ToMemory<Vector4>(obj)),
                 RszFieldType.Quaternion => new RszDataNode(type, ToMemory<Quaternion>(obj)),
-                RszFieldType.Guid => new RszDataNode(type, ToMemory<Guid>(obj)),
+                RszFieldType.Guid or RszFieldType.GameObjectRef => new RszDataNode(type, ToMemory<Guid>(obj)),
                 RszFieldType.Range => new RszDataNode(type, ToMemory<Native.Range>(obj)),
                 RszFieldType.KeyFrame => new RszDataNode(type, ToMemory<KeyFrame>(obj)),
                 RszFieldType.String => new RszStringNode((string)obj),
