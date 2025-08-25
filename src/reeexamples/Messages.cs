@@ -12,7 +12,8 @@ namespace reeexamples
         /// <param name="args"></param>
         public static void Main(string[] args)
         {
-            var path = @"F:\games\steamapps\common\RESIDENT EVIL 4  BIOHAZARD RE4";
+            // WARNING: Make sure game directory has no fluffy mods installed
+            var path = @"C:\Program Files (x86)\Steam\steamapps\common\RESIDENT EVIL 4  BIOHAZARD RE4";
             var msgFilePath = "natives/stm/_chainsaw/message/mes_main_item/ch_mes_main_item_caption.msg.22";
 
             // Load in all the game's PAK files
