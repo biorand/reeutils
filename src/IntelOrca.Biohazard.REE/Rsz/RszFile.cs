@@ -438,6 +438,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public ulong PathOffset;
         }
 
+#pragma warning disable 649
         internal struct EmbeddedUserDataInfo
         {
             public int InstanceId;
@@ -446,5 +447,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public uint Size;
             public ulong Offset;
         }
+#pragma warning restore 649
     }
 }

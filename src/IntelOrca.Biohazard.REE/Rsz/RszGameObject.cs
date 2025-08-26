@@ -38,6 +38,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public ImmutableArray<RszGameObject> Children { get; set; }
 
         public RszGameObject WithGuid(Guid guid) => new RszGameObject(guid, Prefab, Settings, Components, Children);
+        public RszGameObject WithPrefab(string prefab) => new RszGameObject(Guid, prefab, Settings, Components, Children);
 
         public string Name => ((RszStringNode)_settings[0]).Value;
 

@@ -5,22 +5,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
 {
     public static class RszExtensions
     {
-        public static IEnumerable<RszGameObject> EnumerateGameObjects(this IRszSceneNode node)
-        {
-            if (node is RszGameObject gameObject)
-            {
-                yield return gameObject;
-            }
-
-            foreach (var child in node.Children)
-            {
-                foreach (var childGameObject in EnumerateGameObjects(child))
-                {
-                    yield return childGameObject;
-                }
-            }
-        }
-
         public static RszGameObject? FindGameObject(this IRszSceneNode node, Func<RszGameObject, bool> condition)
         {
             if (node is RszGameObject gameObject)
@@ -46,66 +30,24 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public static RszGameObject? FindGameObject(this IRszSceneNode node, Guid guid) => FindGameObject(node, go => go.Guid == guid);
         public static RszGameObject? FindGameObject(this IRszSceneNode node, string name) => FindGameObject(node, go => go.Name == name);
 
-        public static T VisitGameObjects<T>(this T node, Func<RszGameObject, RszGameObject> cb) where T : IRszSceneNode
-        {
-            IRszSceneNode newNode = node is RszGameObject gameObject ? cb(gameObject) : node;
-            if (newNode is RszGameObject newGameObject)
-            {
-                var children = newGameObject.Children.ToBuilder();
-                for (var i = 0; i < node.Children.Length; i++)
-                {
-                    children[i] = VisitGameObjects(children[i], cb);
-                }
-                return (T)(IRszSceneNode)newGameObject.WithChildren(children.ToImmutable());
-            }
-            else
-            {
-                var children = node.Children.ToBuilder();
-                for (var i = 0; i < node.Children.Length; i++)
-                {
-                    children[i] = VisitGameObjects(children[i], cb);
-                }
-                return (T)node.WithChildren(children.ToImmutable());
-            }
-        }
-
         public static T UpdateGameObject<T>(this T node, RszGameObject newGameObject) where T : IRszSceneNode
         {
             if (node.Children.IsDefaultOrEmpty)
                 return node;
 
-            if (node is RszGameObject gameObject)
+            var children = node.Children.ToBuilder();
+            for (var i = 0; i < node.Children.Length; i++)
             {
-                var children = gameObject.Children.ToBuilder();
-                for (var i = 0; i < node.Children.Length; i++)
+                if (children[i] is RszGameObject oldGameObject && oldGameObject.Guid == newGameObject.Guid)
                 {
-                    if (children[i].Guid == newGameObject.Guid)
-                    {
-                        children[i] = newGameObject;
-                    }
-                    else
-                    {
-                        children[i] = children[i].UpdateGameObject(newGameObject);
-                    }
+                    children[i] = newGameObject;
                 }
-                return (T)(IRszSceneNode)gameObject.WithChildren(children.ToImmutable());
-            }
-            else
-            {
-                var children = node.Children.ToBuilder();
-                for (var i = 0; i < node.Children.Length; i++)
+                else
                 {
-                    if (children[i] is RszGameObject oldGameObject && oldGameObject.Guid == newGameObject.Guid)
-                    {
-                        children[i] = newGameObject;
-                    }
-                    else
-                    {
-                        children[i] = children[i].UpdateGameObject(newGameObject);
-                    }
+                    children[i] = children[i].UpdateGameObject(newGameObject);
                 }
-                return (T)node.WithChildren(children.ToImmutable());
             }
+            return (T)node.WithChildren(children.ToImmutable());
         }
 
         public static T RemoveGameObject<T>(this T node, Guid guid) where T : IRszSceneNode
@@ -129,11 +71,43 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return (T)node.WithChildren(children.ToImmutable());
         }
 
+        public static void Visit<T>(this T node, Action<IRszNode> cb) where T : IRszNodeContainer
+        {
+            VisitInternal(node, cb);
+
+            static void VisitInternal(IRszNode node, Action<IRszNode> cb)
+            {
+                cb(node);
+                if (node is RszGameObject gameObject)
+                {
+                    var components = gameObject.Components.ToBuilder();
+                    for (var i = 0; i < components.Count; i++)
+                    {
+                        VisitInternal(components[i], cb);
+                    }
+
+                    var children = gameObject.Children.ToBuilder();
+                    for (var i = 0; i < children.Count; i++)
+                    {
+                        VisitInternal(children[i], cb);
+                    }
+                }
+                if (node is IRszNodeContainer container)
+                {
+                    var children = container.Children.ToBuilder();
+                    for (var i = 0; i < children.Count; i++)
+                    {
+                        VisitInternal(children[i], cb);
+                    }
+                }
+            }
+        }
+
         public static T Visit<T>(this T node, Func<IRszNode, IRszNode> cb) where T : IRszNodeContainer
         {
-            return (T)UpdateAllInternal(node, cb);
+            return (T)VisitInternal(node, cb);
 
-            static IRszNode UpdateAllInternal(IRszNode node, Func<IRszNode, IRszNode> cb)
+            static IRszNode VisitInternal(IRszNode node, Func<IRszNode, IRszNode> cb)
             {
                 var newNode = cb(node);
                 if (newNode is RszGameObject gameObject)
@@ -141,13 +115,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     var components = gameObject.Components.ToBuilder();
                     for (var i = 0; i < components.Count; i++)
                     {
-                        components[i] = (RszStructNode)UpdateAllInternal(components[i], cb);
+                        components[i] = (RszStructNode)VisitInternal(components[i], cb);
                     }
 
                     var children = gameObject.Children.ToBuilder();
                     for (var i = 0; i < children.Count; i++)
                     {
-                        children[i] = (RszGameObject)UpdateAllInternal(children[i], cb);
+                        children[i] = (RszGameObject)VisitInternal(children[i], cb);
                     }
 
                     return gameObject
@@ -159,7 +133,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     var children = container.Children.ToBuilder();
                     for (var i = 0; i < children.Count; i++)
                     {
-                        children[i] = UpdateAllInternal(children[i], cb);
+                        children[i] = VisitInternal(children[i], cb);
                     }
                     return container.WithChildren(children.ToImmutable());
                 }
@@ -168,6 +142,30 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     return newNode;
                 }
             }
+        }
+
+        public static void VisitGameObjects<T>(this T node, Action<RszGameObject> cb) where T : IRszSceneNode
+        {
+            if (node is RszGameObject gameObject)
+            {
+                cb(gameObject);
+            }
+            var children = node.Children.ToBuilder();
+            for (var i = 0; i < node.Children.Length; i++)
+            {
+                VisitGameObjects(children[i], cb);
+            }
+        }
+
+        public static T VisitGameObjects<T>(this T node, Func<RszGameObject, RszGameObject> cb) where T : IRszSceneNode
+        {
+            IRszSceneNode newNode = node is RszGameObject gameObject ? cb(gameObject) : node;
+            var children = newNode.Children.ToBuilder();
+            for (var i = 0; i < newNode.Children.Length; i++)
+            {
+                children[i] = VisitGameObjects(children[i], cb);
+            }
+            return (T)newNode.WithChildren(children.ToImmutable());
         }
 
         public static T Get<T>(this IRszNode node, string path)
@@ -222,12 +220,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
             }
         }
 
-        public static T Set<T>(this T node, string path, object value) where T : IRszNode
+        public static T Set<T>(this T node, string path, object? value) where T : IRszNode
         {
             return (T)Set((IRszNode)node, path, value);
         }
 
-        private static object Set(this IRszNode node, string path, object value)
+        private static object Set(this IRszNode node, string path, object? value)
         {
             var cutIndex = path.IndexOfAny(['.', '['], 1);
             var left = path;

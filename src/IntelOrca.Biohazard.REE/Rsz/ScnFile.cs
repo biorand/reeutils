@@ -186,7 +186,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
                             Resources.Add(resourceValue);
                         }
                     }
-                    return node;
                 });
                 return this;
             }

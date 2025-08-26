@@ -62,7 +62,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return new RszStructNode(Type, Children.SetItem(index, value));
         }
 
-        public RszStructNode SetField(string name, object value)
+        public RszStructNode SetField(string name, object? value)
         {
             if (value is IRszNode node)
                 return SetField(name, node);

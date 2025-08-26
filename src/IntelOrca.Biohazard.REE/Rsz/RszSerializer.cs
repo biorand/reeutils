@@ -88,7 +88,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return targetClrType;
         }
 
-        public static IRszNode Serialize(RszType type, object obj)
+        public static IRszNode Serialize(RszType type, object? obj)
         {
             if (obj is null)
                 return new RszNullNode();
@@ -155,8 +155,20 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return new RszStructNode(type, children.ToImmutable());
         }
 
-        public static IRszNode Serialize(RszFieldType type, object obj)
+        public static IRszNode Serialize(RszFieldType type, object? obj)
         {
+            if (obj is null)
+            {
+                if (type == RszFieldType.Object)
+                {
+                    return new RszNullNode();
+                }
+                else
+                {
+                    throw new ArgumentNullException(nameof(obj));
+                }
+            }
+
             if (obj is IList list)
             {
                 var children = ImmutableArray.CreateBuilder<IRszNode>(list.Count);
