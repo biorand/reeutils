@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -19,6 +20,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
             var uncompressed = Gzip.DecompressData(compressed);
             return FromJson(uncompressed);
         }
+
+        public RszTypeRepository FromJsonFile(string path) => FromJson(File.ReadAllBytes(path));
 
         public RszTypeRepository FromJson(ReadOnlySpan<byte> utf8Json)
         {
