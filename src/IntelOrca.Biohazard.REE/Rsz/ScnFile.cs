@@ -155,7 +155,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public int Version { get; }
             public int RszVersion { get; }
             public List<string> Resources { get; } = [];
-            public List<string> Prefabs { get; } = [];
             public RszScene Scene { get; set; } = new RszScene();
 
             public Builder(RszTypeRepository repository, int version, int rszVersion)
@@ -171,7 +170,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 Version = instance.Version;
                 RszVersion = instance.Rsz.Version;
                 Resources = instance.Resources.ToList();
-                Prefabs = instance.Prefabs.ToList();
                 Scene = instance.ReadScene(repository);
             }
 

@@ -33,7 +33,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 var index = Type.FindFieldIndex(fieldName);
                 if (index == -1)
-                    throw new ArgumentException($"{0} is not a field of {Type.Name}.");
+                    throw new ArgumentException($"{fieldName} is not a field of {Type.Name}.");
 
                 return Children[index];
             }

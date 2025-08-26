@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using IntelOrca.Biohazard.REE.Rsz.Native;
@@ -19,8 +20,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             if (node is RszStructNode structNode)
             {
-                var obj = Activator.CreateInstance(targetClrType)!;
-                foreach (var property in targetClrType.GetProperties())
+                var clrType = FindClrType(structNode.Type, targetClrType);
+                var obj = Activator.CreateInstance(clrType)!;
+                foreach (var property in clrType.GetProperties())
                 {
                     var propertyClrType = property.PropertyType;
                     var value = structNode[property.Name];
@@ -69,10 +71,35 @@ namespace IntelOrca.Biohazard.REE.Rsz
             }
         }
 
+        private static Type FindClrType(RszType rszType, Type targetClrType)
+        {
+            if (rszType.Name != targetClrType.FullName.Replace('+', '.'))
+            {
+                // Look for inheritance
+                var foundClrType = targetClrType.Assembly.DefinedTypes.FirstOrDefault(x => x.FullName == rszType.Name);
+                if (foundClrType == null)
+                    throw new Exception($"Expected to deserialize {targetClrType.FullName} but got {rszType.Name}.");
+
+                if (!foundClrType.IsSubclassOf(targetClrType))
+                    throw new Exception($"{foundClrType} is not a sub class of {targetClrType}.");
+
+                return foundClrType;
+            }
+            return targetClrType;
+        }
+
         public static IRszNode Serialize(RszType type, object obj)
         {
             if (obj is null)
                 return new RszNullNode();
+
+            var clrName = obj.GetType().FullName.Replace('+', '.');
+            if (clrName != type.Name)
+            {
+                var subRszType = type.Repository.FromName(clrName);
+                if (subRszType != null)
+                    type = subRszType;
+            }
 
             if (obj is IList objList)
             {

@@ -19,7 +19,7 @@ namespace IntelOrca.Biohazard.REE.Tests
             var repo = GetTypeRepository();
             var input = new UserFile(_pakHelper.GetFileData(GameNames.RE4, path)).ToBuilder(repo);
 
-            var userData = RszSerializer.Deserialize<WeaponPartsCombineDefinitionUserdata>(input.Objects[0])!;
+            var userData = RszSerializer.Deserialize<chainsaw.WeaponPartsCombineDefinitionUserdata>(input.Objects[0])!;
 
             Assert.Equal(116000000, userData._Datas[0]._ItemId);
             Assert.Equal(275475456, userData._Datas[0]._TargetItemIds[0]);
@@ -39,11 +39,11 @@ namespace IntelOrca.Biohazard.REE.Tests
             var rszType = repo.FromName("chainsaw.WeaponPartsCombineDefinitionUserdata");
             Assert.NotNull(rszType);
 
-            var node = RszSerializer.Serialize(rszType, new WeaponPartsCombineDefinitionUserdata()
+            var node = RszSerializer.Serialize(rszType, new chainsaw.WeaponPartsCombineDefinitionUserdata()
             {
                 _Datas =
                 {
-                    new WeaponPartsCombineDefinition()
+                    new chainsaw.WeaponPartsCombineDefinition()
                     {
                         _ItemId = 116008000,
                         _TargetItemIds =
@@ -81,16 +81,19 @@ namespace IntelOrca.Biohazard.REE.Tests
             var repo = RszRepositorySerializer.Default.FromJson(json);
             return repo;
         }
+    }
+}
 
-        public class WeaponPartsCombineDefinitionUserdata
-        {
-            public List<WeaponPartsCombineDefinition> _Datas { get; set; } = [];
-        }
+namespace chainsaw
+{
+    public class WeaponPartsCombineDefinitionUserdata
+    {
+        public List<WeaponPartsCombineDefinition> _Datas { get; set; } = [];
+    }
 
-        public class WeaponPartsCombineDefinition
-        {
-            public int _ItemId { get; set; }
-            public List<int> _TargetItemIds { get; set; } = [];
-        }
+    public class WeaponPartsCombineDefinition
+    {
+        public int _ItemId { get; set; }
+        public List<int> _TargetItemIds { get; set; } = [];
     }
 }
