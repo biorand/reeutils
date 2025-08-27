@@ -127,11 +127,11 @@ namespace IntelOrca.Biohazard.REE.Variables
                 var bw = new BinaryWriter(ms);
 
                 // First pass
-                bw.Skip<UvarHeader>();
+                bw.WriteZeros<UvarHeader>();
                 bw.Align(16);
 
                 header.DataOffset = (ulong)ms.Position;
-                bw.Skip<UvarVariable>(Variables.Count);
+                bw.WriteZeros<UvarVariable>(Variables.Count);
                 for (var i = 0; i < Variables.Count; i++)
                 {
                     variables[i].FloatOffset = (ulong)ms.Position;
@@ -149,7 +149,7 @@ namespace IntelOrca.Biohazard.REE.Variables
                 bw.Align(16);
 
                 header.EmbedsInfoOffset = (ulong)ms.Position;
-                bw.Skip<ulong>(Children.Count);
+                bw.WriteZeros<ulong>(Children.Count);
 
                 for (var i = 0; i < Children.Count; i++)
                 {

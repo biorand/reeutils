@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 
 namespace IntelOrca.Biohazard.REE.Package
@@ -167,17 +168,17 @@ namespace IntelOrca.Biohazard.REE.Package
             [0x3267656C] = ".leg2",
         };
 
-        public static string? DetectExtension(byte[] buffer)
+        public static string? DetectExtension(ReadOnlySpan<byte> buffer)
         {
             if (buffer.Length >= 4)
             {
-                var magic = BitConverter.ToUInt32(buffer, 0);
+                var magic = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(0, 4));
                 if (g_ext4.TryGetValue(magic, out var result))
                     return result;
             }
             if (buffer.Length >= 8)
             {
-                var magic = BitConverter.ToUInt64(buffer, 0);
+                var magic = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(4, 4));
                 if (g_ext8.TryGetValue(magic, out var result))
                     return result;
             }

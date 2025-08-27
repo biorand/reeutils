@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,15 +11,15 @@ using IntelOrca.Biohazard.REE.Cryptography;
 
 namespace IntelOrca.Biohazard.REE.Package
 {
-    public class PakFile : IDisposable
+    public class PakFile : IPakFile, IDisposable
     {
         internal const uint g_magic = 0x414B504B;
         internal const uint g_zstd = 0xFD2FB528;
 
         private readonly Stream _stream;
         private Header _header;
-        private ImmutableArray<Entry> _entries;
-        private ImmutableDictionary<ulong, int> _hashToEntry;
+        private ImmutableArray<Entry> _entries = [];
+        private ImmutableDictionary<ulong, int> _hashToEntry = ImmutableDictionary<ulong, int>.Empty;
 
         public PakFile(string path) : this(File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
@@ -31,6 +32,8 @@ namespace IntelOrca.Biohazard.REE.Package
         public PakFile(Stream stream)
         {
             _stream = stream;
+            if (stream.Length == 0)
+                return;
 
             var br = new BinaryReader(stream);
             _header = ReadHeader(br);
@@ -98,6 +101,10 @@ namespace IntelOrca.Biohazard.REE.Package
 
         public int EntryCount => _entries.Length;
 
+        public ImmutableArray<ulong> FileHashes => _hashToEntry.Keys
+            .OrderBy(x => x)
+            .ToImmutableArray();
+
         public ulong GetEntryHash(int index)
         {
             return _entries[index].HashName;
@@ -113,6 +120,13 @@ namespace IntelOrca.Biohazard.REE.Package
         {
             var hash = GetNormalizedPathHash(path);
             return !_hashToEntry.TryGetValue(hash, out var index) ? -1 : index;
+        }
+
+        public byte[]? GetEntryData(ulong hash)
+        {
+            if (_hashToEntry.TryGetValue(hash, out var index))
+                return GetEntryData(index);
+            return null;
         }
 
         public byte[]? GetEntryData(string path)

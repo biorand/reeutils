@@ -434,6 +434,10 @@ namespace IntelOrca.Biohazard.REE.Messages
                         var attribute = message.Attributes[i];
                         if (attribute.Type == MsgAttributeType.Wstring)
                             bw.Write(stringDataBuilder.AddString((string)attribute.Value));
+                        else if (attribute.Type == MsgAttributeType.Int64)
+                            bw.Write((long)attribute.Value);
+                        else if (attribute.Type == MsgAttributeType.Double)
+                            bw.Write((double)attribute.Value);
                         else
                             bw.Write((ulong)attribute.Value);
                     }
