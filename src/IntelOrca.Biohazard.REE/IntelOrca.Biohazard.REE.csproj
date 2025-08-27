@@ -3,9 +3,10 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>12.0</LangVersion>
     <Nullable>enable</Nullable>
-    <Version>1.2.0-dev$([System.DateTime]::UtcNow.ToString("yyyyMMddTHHmmss"))</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <VersionPostfix Condition="'$(REE_DEV)'=='true'">-dev$([System.DateTime]::UtcNow.ToString("yyyyMMddTHHmmss"))</VersionPostfix>
+    <Version>1.2.0$(VersionPostfix)</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
