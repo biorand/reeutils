@@ -60,32 +60,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
             }
             else if (node is RszValueNode valueNode)
             {
-                var result = valueNode.Decode();
-                if (result?.GetType() == targetClrType)
-                    return result;
-                return Convert.ChangeType(valueNode.Decode(), targetClrType);
+                return Deserialize(valueNode);
             }
             else
             {
                 throw new NotSupportedException("This node can't be deserialized.");
             }
-        }
-
-        private static Type FindClrType(RszType rszType, Type targetClrType)
-        {
-            if (rszType.Name != targetClrType.FullName.Replace('+', '.'))
-            {
-                // Look for inheritance
-                var foundClrType = targetClrType.Assembly.DefinedTypes.FirstOrDefault(x => x.FullName == rszType.Name);
-                if (foundClrType == null)
-                    throw new Exception($"Expected to deserialize {targetClrType.FullName} but got {rszType.Name}.");
-
-                if (!foundClrType.IsSubclassOf(targetClrType))
-                    throw new Exception($"{foundClrType} is not a sub class of {targetClrType}.");
-
-                return foundClrType;
-            }
-            return targetClrType;
         }
 
         public static IRszNode Serialize(RszType type, object? obj)
@@ -155,6 +135,32 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return new RszObjectNode(type, children.ToImmutable());
         }
 
+        public static object Deserialize(RszValueNode node)
+        {
+            return node.Type switch
+            {
+                RszFieldType.Bool => MemoryMarshal.Read<bool>(node.Data.Span),
+                RszFieldType.S8 => MemoryMarshal.Read<sbyte>(node.Data.Span),
+                RszFieldType.U8 => MemoryMarshal.Read<byte>(node.Data.Span),
+                RszFieldType.S16 => MemoryMarshal.Read<short>(node.Data.Span),
+                RszFieldType.U16 => MemoryMarshal.Read<ushort>(node.Data.Span),
+                RszFieldType.S32 => MemoryMarshal.Read<int>(node.Data.Span),
+                RszFieldType.U32 => MemoryMarshal.Read<uint>(node.Data.Span),
+                RszFieldType.S64 => MemoryMarshal.Read<long>(node.Data.Span),
+                RszFieldType.U64 => MemoryMarshal.Read<ulong>(node.Data.Span),
+                RszFieldType.F32 => MemoryMarshal.Read<float>(node.Data.Span),
+                RszFieldType.F64 => MemoryMarshal.Read<double>(node.Data.Span),
+                RszFieldType.Vec2 => MemoryMarshal.Read<Vector2>(node.Data.Span),
+                RszFieldType.Vec3 => MemoryMarshal.Read<Vector3>(node.Data.Span),
+                RszFieldType.Vec4 => MemoryMarshal.Read<Vector4>(node.Data.Span),
+                RszFieldType.Quaternion => MemoryMarshal.Read<Quaternion>(node.Data.Span),
+                RszFieldType.Guid or RszFieldType.GameObjectRef => MemoryMarshal.Read<Guid>(node.Data.Span),
+                RszFieldType.Range => MemoryMarshal.Read<Native.Range>(node.Data.Span),
+                RszFieldType.KeyFrame => MemoryMarshal.Read<KeyFrame>(node.Data.Span),
+                _ => throw new NotSupportedException()
+            };
+        }
+
         public static IRszNode Serialize(RszFieldType type, object? obj)
         {
             if (obj is null)
@@ -200,6 +206,23 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.String => new RszStringNode((string)obj),
                 _ => throw new NotSupportedException()
             };
+        }
+
+        private static Type FindClrType(RszType rszType, Type targetClrType)
+        {
+            if (rszType.Name != targetClrType.FullName.Replace('+', '.'))
+            {
+                // Look for inheritance
+                var foundClrType = targetClrType.Assembly.DefinedTypes.FirstOrDefault(x => x.FullName == rszType.Name);
+                if (foundClrType == null)
+                    throw new Exception($"Expected to deserialize {targetClrType.FullName} but got {rszType.Name}.");
+
+                if (!foundClrType.IsSubclassOf(targetClrType))
+                    throw new Exception($"{foundClrType} is not a sub class of {targetClrType}.");
+
+                return foundClrType;
+            }
+            return targetClrType;
         }
 
         private static ReadOnlyMemory<byte> ToMemory<T>(object value) where T : struct

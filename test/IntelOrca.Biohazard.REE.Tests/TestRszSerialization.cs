@@ -68,10 +68,10 @@ namespace IntelOrca.Biohazard.REE.Tests
             Assert.Equal("chainsaw.WeaponPartsCombineDefinitionUserdata", userData.Type.Name);
             Assert.Equal("chainsaw.WeaponPartsCombineDefinition", def.Type.Name);
 
-            Assert.Equal(116008000, defItemId.AsInt32());
-            Assert.Equal(274835456, defTargetItemIds0.AsInt32());
-            Assert.Equal(274837056, defTargetItemIds1.AsInt32());
-            Assert.Equal(278035456, defTargetItemIds2.AsInt32());
+            Assert.Equal(116008000, defItemId.Get<int>());
+            Assert.Equal(274835456, defTargetItemIds0.Get<int>());
+            Assert.Equal(274837056, defTargetItemIds1.Get<int>());
+            Assert.Equal(278035456, defTargetItemIds2.Get<int>());
         }
 
         private static RszTypeRepository GetTypeRepository()

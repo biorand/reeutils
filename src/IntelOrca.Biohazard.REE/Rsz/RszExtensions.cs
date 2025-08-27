@@ -168,6 +168,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return (T)newNode.WithChildren(children.ToImmutable());
         }
 
+        public static T Get<T>(this IRszNode node) => Get<T>(node, "");
+
         public static T Get<T>(this IRszNode node, string path)
         {
             var result = Get(node, path);
@@ -178,6 +180,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         private static object Get(this IRszNode node, string path)
         {
+            if (string.IsNullOrEmpty(path))
+                return node;
+
             var cutIndex = path.IndexOfAny(['.', '['], 1);
             var left = path;
             var right = "";
@@ -296,7 +301,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 if (node is RszValueNode valueNode && valueNode.Type == RszFieldType.GameObjectRef)
                 {
-                    var refGuid = (Guid)valueNode.Decode();
+                    var refGuid = RszSerializer.Deserialize<Guid>(valueNode);
                     if (map.TryGetValue(refGuid, out var newGuid))
                     {
                         return RszSerializer.Serialize(RszFieldType.GameObjectRef, newGuid);
