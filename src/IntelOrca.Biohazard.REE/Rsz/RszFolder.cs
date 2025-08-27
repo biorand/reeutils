@@ -6,16 +6,16 @@ namespace IntelOrca.Biohazard.REE.Rsz
 {
     public sealed class RszFolder : IRszSceneNode
     {
-        private RszStructNode _settings;
+        private RszObjectNode _settings;
         public ImmutableArray<IRszSceneNode> Children { get; } = [];
 
-        public RszFolder(RszStructNode settings, ImmutableArray<IRszSceneNode> children)
+        public RszFolder(RszObjectNode settings, ImmutableArray<IRszSceneNode> children)
         {
             _settings = settings;
             Children = children;
         }
 
-        public RszStructNode Settings
+        public RszObjectNode Settings
         {
             get => _settings;
             set

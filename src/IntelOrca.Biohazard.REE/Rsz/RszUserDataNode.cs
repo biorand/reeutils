@@ -21,7 +21,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public override string ToString() => $"Userdata({Path}): {Type.Name}";
     }
 
-    public class RszEmbeddedUserDataNode(RszType type, int hash, RszFile embedded) : IRszNode
+    public class RszEmbeddedUserValueNode(RszType type, int hash, RszFile embedded) : IRszNode
     {
         public RszType Type => type;
         public int Hash => hash;

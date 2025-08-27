@@ -115,7 +115,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     var components = gameObject.Components.ToBuilder();
                     for (var i = 0; i < components.Count; i++)
                     {
-                        components[i] = (RszStructNode)VisitInternal(components[i], cb);
+                        components[i] = (RszObjectNode)VisitInternal(components[i], cb);
                     }
 
                     var children = gameObject.Children.ToBuilder();
@@ -189,15 +189,15 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 right = path[cutIndex..];
             }
 
-            if (node is RszStructNode structNode)
+            if (node is RszObjectNode objectNode)
             {
                 if (string.IsNullOrEmpty(right))
                 {
-                    return structNode[left];
+                    return objectNode[left];
                 }
                 else
                 {
-                    return Get(structNode[left], right);
+                    return Get(objectNode[left], right);
                 }
             }
             else if (node is RszArrayNode arrayNode)
@@ -238,17 +238,17 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 right = path[cutIndex..];
             }
 
-            if (node is RszStructNode structNode)
+            if (node is RszObjectNode objectNode)
             {
                 if (string.IsNullOrEmpty(right))
                 {
                     return value is IRszNode valueNode
-                        ? structNode.SetField(left, valueNode)
-                        : structNode.SetField(left, value);
+                        ? objectNode.SetField(left, valueNode)
+                        : objectNode.SetField(left, value);
                 }
                 else
                 {
-                    return structNode.SetField(left, Set(structNode[left], right, value));
+                    return objectNode.SetField(left, Set(objectNode[left], right, value));
                 }
             }
             else if (node is RszArrayNode arrayNode)
@@ -294,9 +294,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
             // Fix references
             return root.Visit(node =>
             {
-                if (node is RszDataNode dataNode && dataNode.Type == RszFieldType.GameObjectRef)
+                if (node is RszValueNode valueNode && valueNode.Type == RszFieldType.GameObjectRef)
                 {
-                    var refGuid = (Guid)dataNode.Decode();
+                    var refGuid = (Guid)valueNode.Decode();
                     if (map.TryGetValue(refGuid, out var newGuid))
                     {
                         return RszSerializer.Serialize(RszFieldType.GameObjectRef, newGuid);

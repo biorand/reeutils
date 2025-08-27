@@ -40,7 +40,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             _nameToTypeMap.Add(type.Name, type);
         }
 
-        public RszStructNode Create(string name)
+        public RszObjectNode Create(string name)
         {
             return FromName(name)!.Create();
         }

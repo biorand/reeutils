@@ -7,7 +7,7 @@ using IntelOrca.Biohazard.REE.Rsz.Native;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
-    public readonly struct RszDataNode : IRszNode
+    public readonly struct RszValueNode : IRszNode
     {
         public RszFieldType Type { get; }
         public ReadOnlyMemory<byte> Data { get; }
@@ -18,7 +18,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             set => throw new InvalidOperationException();
         }
 
-        public RszDataNode(RszFieldType type, ReadOnlyMemory<byte> data)
+        public RszValueNode(RszFieldType type, ReadOnlyMemory<byte> data)
         {
             Type = type;
             Data = data;

@@ -6,9 +6,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
 {
     public sealed class RszGameObject : IRszSceneNode
     {
-        private RszStructNode _settings;
+        private RszObjectNode _settings;
 
-        public RszGameObject(Guid guid, string? prefab, RszStructNode settings, ImmutableArray<RszStructNode> components, ImmutableArray<RszGameObject> children)
+        public RszGameObject(Guid guid, string? prefab, RszObjectNode settings, ImmutableArray<RszObjectNode> components, ImmutableArray<RszGameObject> children)
         {
             Guid = guid;
             Prefab = prefab;
@@ -20,7 +20,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public Guid Guid { get; set; }
         public string? Prefab { get; set; }
 
-        public RszStructNode Settings
+        public RszObjectNode Settings
         {
             get => _settings;
             set
@@ -33,7 +33,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             }
         }
 
-        public ImmutableArray<RszStructNode> Components { get; set; }
+        public ImmutableArray<RszObjectNode> Components { get; set; }
 
         public ImmutableArray<RszGameObject> Children { get; set; }
 
@@ -47,12 +47,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return WithSettings(_settings.Set("Name", name));
         }
 
-        public RszStructNode? FindComponent(string type)
+        public RszObjectNode? FindComponent(string type)
         {
             return Components.FirstOrDefault(x => x.Type.Name == type);
         }
 
-        public RszGameObject WithSettings(RszStructNode settings)
+        public RszGameObject WithSettings(RszObjectNode settings)
         {
             if (settings?.Type.Name != "via.GameObject")
             {
@@ -66,7 +66,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 Children);
         }
 
-        public RszGameObject WithComponents(ImmutableArray<RszStructNode> components)
+        public RszGameObject WithComponents(ImmutableArray<RszObjectNode> components)
         {
             return new RszGameObject(
                 Guid,
@@ -86,7 +86,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 children);
         }
 
-        public RszGameObject AddOrUpdateComponent(RszStructNode component)
+        public RszGameObject AddOrUpdateComponent(RszObjectNode component)
         {
             for (var i = 0; i < Components.Length; i++)
             {

@@ -57,7 +57,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return -1;
         }
 
-        public RszStructNode Create()
+        public RszObjectNode Create()
         {
             var children = ImmutableArray.CreateBuilder<IRszNode>();
             foreach (var field in Fields)
@@ -89,11 +89,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     else
                     {
-                        children.Add(new RszDataNode(field.Type, new byte[field.Size]));
+                        children.Add(new RszValueNode(field.Type, new byte[field.Size]));
                     }
                 }
             }
-            return new RszStructNode(this, children.ToImmutable());
+            return new RszObjectNode(this, children.ToImmutable());
         }
     }
 }

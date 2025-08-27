@@ -18,14 +18,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public static object? Deserialize(IRszNode node, Type targetClrType)
         {
-            if (node is RszStructNode structNode)
+            if (node is RszObjectNode objectNode)
             {
-                var clrType = FindClrType(structNode.Type, targetClrType);
+                var clrType = FindClrType(objectNode.Type, targetClrType);
                 var obj = Activator.CreateInstance(clrType)!;
                 foreach (var property in clrType.GetProperties())
                 {
                     var propertyClrType = property.PropertyType;
-                    var value = structNode[property.Name];
+                    var value = objectNode[property.Name];
                     property.SetValue(obj, Deserialize(value, propertyClrType));
                 }
                 return obj;
@@ -58,12 +58,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 return null;
             }
-            else if (node is RszDataNode dataNode)
+            else if (node is RszValueNode valueNode)
             {
-                var result = dataNode.Decode();
+                var result = valueNode.Decode();
                 if (result?.GetType() == targetClrType)
                     return result;
-                return Convert.ChangeType(dataNode.Decode(), targetClrType);
+                return Convert.ChangeType(valueNode.Decode(), targetClrType);
             }
             else
             {
@@ -152,7 +152,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                 }
             }
-            return new RszStructNode(type, children.ToImmutable());
+            return new RszObjectNode(type, children.ToImmutable());
         }
 
         public static IRszNode Serialize(RszFieldType type, object? obj)
@@ -181,22 +181,22 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             return type switch
             {
-                RszFieldType.Bool => new RszDataNode(type, ToMemory<bool>(obj)),
-                RszFieldType.S8 => new RszDataNode(type, ToMemory<sbyte>(obj)),
-                RszFieldType.U8 => new RszDataNode(type, ToMemory<byte>(obj)),
-                RszFieldType.S16 => new RszDataNode(type, ToMemory<short>(obj)),
-                RszFieldType.U16 => new RszDataNode(type, ToMemory<ushort>(obj)),
-                RszFieldType.S32 => new RszDataNode(type, ToMemory<int>(obj)),
-                RszFieldType.U32 => new RszDataNode(type, ToMemory<uint>(obj)),
-                RszFieldType.F32 => new RszDataNode(type, ToMemory<float>(obj)),
-                RszFieldType.F64 => new RszDataNode(type, ToMemory<double>(obj)),
-                RszFieldType.Vec2 => new RszDataNode(type, ToMemory<Vector2>(obj)),
-                RszFieldType.Vec3 => new RszDataNode(type, ToMemory<Vector3>(obj)),
-                RszFieldType.Vec4 => new RszDataNode(type, ToMemory<Vector4>(obj)),
-                RszFieldType.Quaternion => new RszDataNode(type, ToMemory<Quaternion>(obj)),
-                RszFieldType.Guid or RszFieldType.GameObjectRef => new RszDataNode(type, ToMemory<Guid>(obj)),
-                RszFieldType.Range => new RszDataNode(type, ToMemory<Native.Range>(obj)),
-                RszFieldType.KeyFrame => new RszDataNode(type, ToMemory<KeyFrame>(obj)),
+                RszFieldType.Bool => new RszValueNode(type, ToMemory<bool>(obj)),
+                RszFieldType.S8 => new RszValueNode(type, ToMemory<sbyte>(obj)),
+                RszFieldType.U8 => new RszValueNode(type, ToMemory<byte>(obj)),
+                RszFieldType.S16 => new RszValueNode(type, ToMemory<short>(obj)),
+                RszFieldType.U16 => new RszValueNode(type, ToMemory<ushort>(obj)),
+                RszFieldType.S32 => new RszValueNode(type, ToMemory<int>(obj)),
+                RszFieldType.U32 => new RszValueNode(type, ToMemory<uint>(obj)),
+                RszFieldType.F32 => new RszValueNode(type, ToMemory<float>(obj)),
+                RszFieldType.F64 => new RszValueNode(type, ToMemory<double>(obj)),
+                RszFieldType.Vec2 => new RszValueNode(type, ToMemory<Vector2>(obj)),
+                RszFieldType.Vec3 => new RszValueNode(type, ToMemory<Vector3>(obj)),
+                RszFieldType.Vec4 => new RszValueNode(type, ToMemory<Vector4>(obj)),
+                RszFieldType.Quaternion => new RszValueNode(type, ToMemory<Quaternion>(obj)),
+                RszFieldType.Guid or RszFieldType.GameObjectRef => new RszValueNode(type, ToMemory<Guid>(obj)),
+                RszFieldType.Range => new RszValueNode(type, ToMemory<Native.Range>(obj)),
+                RszFieldType.KeyFrame => new RszValueNode(type, ToMemory<KeyFrame>(obj)),
                 RszFieldType.String => new RszStringNode((string)obj),
                 _ => throw new NotSupportedException()
             };

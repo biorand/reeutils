@@ -34,15 +34,15 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public void Write(IRszNode node)
         {
-            if (node is RszStructNode structNode)
+            if (node is RszObjectNode objectNode)
             {
-                var rszType = structNode.Type;
+                var rszType = objectNode.Type;
                 for (var i = 0; i < rszType.Fields.Length; i++)
                 {
                     var field = rszType.Fields[i];
                     if (field.IsArray)
                     {
-                        var arrayNode = (RszArrayNode)structNode.Children[i];
+                        var arrayNode = (RszArrayNode)objectNode.Children[i];
                         Align(4);
                         _bw.Write(arrayNode.Children.Length);
                         if (arrayNode.Children.Length > 0)
@@ -57,7 +57,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     else
                     {
                         Align(field.Align);
-                        WriteField(field, structNode.Children[i]);
+                        WriteField(field, objectNode.Children[i]);
                     }
                 }
             }
@@ -88,9 +88,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     _bw.Write((short)0);
                 }
             }
-            else if (node is RszDataNode dataNode)
+            else if (node is RszValueNode valueNode)
             {
-                _bw.Write(dataNode.Data.Span);
+                _bw.Write(valueNode.Data.Span);
             }
         }
 

@@ -15,14 +15,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
             _reader = reader;
         }
 
-        public RszStructNode ReadStruct(RszType type)
+        public RszObjectNode ReadStruct(RszType type)
         {
             var fieldValues = ImmutableArray.CreateBuilder<IRszNode>(type.Fields.Length);
             foreach (var f in type.Fields)
             {
                 fieldValues.Add(ReadField(f));
             }
-            return new RszStructNode(type, fieldValues.ToImmutable());
+            return new RszObjectNode(type, fieldValues.ToImmutable());
         }
 
         public IRszNode ReadField(RszTypeField field)
@@ -66,7 +66,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             else
             {
                 var data = _reader.ReadBytes(field.Size);
-                return new RszDataNode(field.Type, data);
+                return new RszValueNode(field.Type, data);
             }
         }
     }

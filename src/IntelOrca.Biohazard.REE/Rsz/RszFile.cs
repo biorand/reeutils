@@ -96,7 +96,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     var rszFile = new RszFile(Data.Slice((int)userDataInfoList[i].Offset, (int)userDataInfoList[i].Size));
                     result[instanceIndex] = new RszInstance(
                         new RszInstanceId(instanceIndex),
-                        new RszEmbeddedUserDataNode(rszType, (int)userDataInfoList[i].JsonPathHash, rszFile));
+                        new RszEmbeddedUserValueNode(rszType, (int)userDataInfoList[i].JsonPathHash, rszFile));
                 }
             }
             else
@@ -129,12 +129,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 {
                     result[i] = new RszInstance(result[i].Id, container.Visit(node =>
                     {
-                        if (node is RszDataNode dataNode)
+                        if (node is RszValueNode valueNode)
                         {
-                            if (dataNode.Type == RszFieldType.Object ||
-                                dataNode.Type == RszFieldType.UserData)
+                            if (valueNode.Type == RszFieldType.Object ||
+                                valueNode.Type == RszFieldType.UserData)
                             {
-                                var instanceId = dataNode.AsInt32();
+                                var instanceId = valueNode.AsInt32();
                                 return result[instanceId].Value;
                             }
                         }
@@ -231,17 +231,17 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         bw.Write(userDataNode.Type.Id);
                         bw.Write(userDataNode.Type.Crc);
                     }
-                    else if (instance.Value is RszEmbeddedUserDataNode embeddedUserDataNode)
+                    else if (instance.Value is RszEmbeddedUserValueNode embeddedUserValueNode)
                     {
                         if (Version >= 16)
                             throw new NotSupportedException();
 
-                        bw.Write(embeddedUserDataNode.Type.Id);
-                        bw.Write(embeddedUserDataNode.Type.Crc);
+                        bw.Write(embeddedUserValueNode.Type.Id);
+                        bw.Write(embeddedUserValueNode.Type.Crc);
                     }
                     else
                     {
-                        var rszStruct = (RszStructNode)instance.Value!;
+                        var rszStruct = (RszObjectNode)instance.Value!;
                         bw.Write(rszStruct.Type.Id);
                         bw.Write(rszStruct.Type.Crc);
                     }
@@ -262,13 +262,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         stringPool.WriteStringOffset64(userDataNode.Path);
                         userDataCount++;
                     }
-                    else if (instanceList[i].Value is RszEmbeddedUserDataNode embeddedUserDataNode)
+                    else if (instanceList[i].Value is RszEmbeddedUserValueNode embeddedUserValueNode)
                     {
                         bw.Write(i);
-                        bw.Write(embeddedUserDataNode.Type.Id);
-                        bw.Write(embeddedUserDataNode.Hash);
-                        bw.Write(embeddedUserDataNode.Embedded.Data.Length);
-                        embeddedUserData.Add((embeddedUserDataNode.Embedded, ms.Position));
+                        bw.Write(embeddedUserValueNode.Type.Id);
+                        bw.Write(embeddedUserValueNode.Hash);
+                        bw.Write(embeddedUserValueNode.Embedded.Data.Length);
+                        embeddedUserData.Add((embeddedUserValueNode.Embedded, ms.Position));
                         bw.Write(0L);
                         userDataCount++;
                     }
@@ -332,17 +332,17 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             private static RszInstance CreateInstanceTree(IRszNode node, ImmutableArray<RszInstance>.Builder builder)
             {
-                if (node is RszStructNode structNode)
+                if (node is RszObjectNode objectNode)
                 {
-                    AddInstances(structNode);
-                    return AddInstance(structNode);
+                    AddInstances(objectNode);
+                    return AddInstance(objectNode);
                 }
                 else
                 {
                     throw new NotSupportedException("Non struct node added to object list.");
                 }
 
-                void AddInstances(RszStructNode node)
+                void AddInstances(RszObjectNode node)
                 {
                     var rszType = node.Type;
                     for (var i = 0; i < rszType.Fields.Length; i++)
@@ -354,26 +354,26 @@ namespace IntelOrca.Biohazard.REE.Rsz
                             var childArray = (RszArrayNode)child;
                             for (var j = 0; j < childArray.Children.Length; j++)
                             {
-                                if (childArray.Children[j] is RszStructNode childStructNode)
+                                if (childArray.Children[j] is RszObjectNode childobjectNode)
                                 {
-                                    AddInstances(childStructNode);
-                                    AddInstance(childStructNode);
+                                    AddInstances(childobjectNode);
+                                    AddInstance(childobjectNode);
                                 }
                                 else if (childArray.Children[j] is RszUserDataNode userDataNode)
                                 {
                                     AddInstance(userDataNode);
                                 }
-                                else if (childArray.Children[j] is RszEmbeddedUserDataNode embeddedUserDataNode)
+                                else if (childArray.Children[j] is RszEmbeddedUserValueNode embeddedUserValueNode)
                                 {
-                                    AddInstance(embeddedUserDataNode);
+                                    AddInstance(embeddedUserValueNode);
                                 }
                             }
                         }
                         else
                         {
-                            if (child is RszStructNode childStructNode)
+                            if (child is RszObjectNode childobjectNode)
                             {
-                                AddInstances(childStructNode);
+                                AddInstances(childobjectNode);
                                 if (rszField.Type == RszFieldType.Object ||
                                     rszField.Type == RszFieldType.UserData)
                                 {
@@ -384,9 +384,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                             {
                                 AddInstance(userDataNode);
                             }
-                            else if (child is RszEmbeddedUserDataNode embeddedUserDataNode)
+                            else if (child is RszEmbeddedUserValueNode embeddedUserValueNode)
                             {
-                                AddInstance(embeddedUserDataNode);
+                                AddInstance(embeddedUserValueNode);
                             }
                         }
                     }
@@ -404,9 +404,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         var path = userDataNode.Path;
                         foreach (var b in builder)
                         {
-                            if (b.Value is RszUserDataNode otherUserDataNode && otherUserDataNode.Path == userDataNode.Path)
+                            if (b.Value is RszUserDataNode otherUserValueNode && otherUserValueNode.Path == userDataNode.Path)
                             {
-                                if (otherUserDataNode.Type != userDataNode.Type)
+                                if (otherUserValueNode.Type != userDataNode.Type)
                                 {
                                     throw new Exception($"Mismatch of RSZ type for user data: {path}");
                                 }

@@ -56,14 +56,14 @@ namespace IntelOrca.Biohazard.REE.Tests
                 }
             });
 
-            var userData = Assert.IsType<RszStructNode>(node);
+            var userData = Assert.IsType<RszObjectNode>(node);
             var userDataDatas = Assert.IsType<RszArrayNode>(userData.Children[0]);
-            var def = Assert.IsType<RszStructNode>(userDataDatas.Children[0]);
-            var defItemId = Assert.IsType<RszDataNode>(def.Children[0]);
+            var def = Assert.IsType<RszObjectNode>(userDataDatas.Children[0]);
+            var defItemId = Assert.IsType<RszValueNode>(def.Children[0]);
             var defTargetItemIds = Assert.IsType<RszArrayNode>(def.Children[1]);
-            var defTargetItemIds0 = Assert.IsType<RszDataNode>(defTargetItemIds.Children[0]);
-            var defTargetItemIds1 = Assert.IsType<RszDataNode>(defTargetItemIds.Children[1]);
-            var defTargetItemIds2 = Assert.IsType<RszDataNode>(defTargetItemIds.Children[2]);
+            var defTargetItemIds0 = Assert.IsType<RszValueNode>(defTargetItemIds.Children[0]);
+            var defTargetItemIds1 = Assert.IsType<RszValueNode>(defTargetItemIds.Children[1]);
+            var defTargetItemIds2 = Assert.IsType<RszValueNode>(defTargetItemIds.Children[2]);
 
             Assert.Equal("chainsaw.WeaponPartsCombineDefinitionUserdata", userData.Type.Name);
             Assert.Equal("chainsaw.WeaponPartsCombineDefinition", def.Type.Name);

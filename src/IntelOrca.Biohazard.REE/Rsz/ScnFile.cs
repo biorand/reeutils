@@ -98,7 +98,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             RszFolder BuildFolder(int id)
             {
                 var info = folderInfoList[id];
-                var settings = (RszStructNode)objectList[info.ObjectId];
+                var settings = (RszObjectNode)objectList[info.ObjectId];
                 var children = ImmutableArray.CreateBuilder<IRszSceneNode>();
                 for (var i = 0; i < folderInfoList.Length; i++)
                 {
@@ -120,12 +120,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
             RszGameObject BuildGameObject(int id)
             {
                 var info = gameObjectInfoList[id];
-                var settings = (RszStructNode)objectList[info.ObjectId];
+                var settings = (RszObjectNode)objectList[info.ObjectId];
 
-                var components = ImmutableArray.CreateBuilder<RszStructNode>();
+                var components = ImmutableArray.CreateBuilder<RszObjectNode>();
                 for (var i = 0; i < info.ComponentCount; i++)
                 {
-                    components.Add((RszStructNode)objectList[info.ObjectId + 1 + i]);
+                    components.Add((RszObjectNode)objectList[info.ObjectId + 1 + i]);
                 }
 
                 var prefab = info.PrefabId >= 0 && info.PrefabId < prefabs.Length
