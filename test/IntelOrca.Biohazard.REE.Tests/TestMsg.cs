@@ -32,15 +32,21 @@ namespace IntelOrca.Biohazard.REE.Tests
         }
 
         [Fact]
+        public void Rebuild_RE8_UI_MENU_MES()
+        {
+            AssertRebuild(GameNames.RE8, "natives/stm/message/gui/ui_menu_mes.msg.33685777");
+        }
+
+        [Fact]
         public void Rebuild_RE4_CH_MES_MAIN_ITEM_CAPTION()
         {
-            AssertRebuild("natives/stm/_chainsaw/message/mes_main_item/ch_mes_main_item_caption.msg.22");
+            AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/message/mes_main_item/ch_mes_main_item_caption.msg.22");
         }
 
         [Fact]
         public void Rebuild_RE4_CH_MES_QUESTFILE_001()
         {
-            AssertRebuild("natives/stm/_chainsaw/message/mes_main_questfile/ch_mes_main_questfile_001.msg.22");
+            AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/message/mes_main_questfile/ch_mes_main_questfile_001.msg.22");
         }
 
         [Fact]
@@ -88,9 +94,9 @@ namespace IntelOrca.Biohazard.REE.Tests
             Assert.Equal(newText, newMessage[LanguageId.English]);
         }
 
-        private void AssertRebuild(string path)
+        private void AssertRebuild(string gameName, string path)
         {
-            var input = new MsgFile(_pakHelper.GetFileData(GameNames.RE4, path));
+            var input = new MsgFile(_pakHelper.GetFileData(gameName, path));
             var inputBuilder = input.ToBuilder();
             var output = inputBuilder.Build();
             var outputBuilder = output.ToBuilder();

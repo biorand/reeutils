@@ -47,6 +47,8 @@ namespace IntelOrca.Biohazard.REE.Tests
                     @"F:\games\steamapps\common\RESIDENT EVIL 2  BIOHAZARD RE2"),
                 GameNames.RE4 => FindFirstExisting(
                     @"G:\re4r\vanilla"),
+                GameNames.RE8 => FindFirstExisting(
+                    @"F:\games\steamapps\common\Resident Evil Village BIOHAZARD VILLAGE"),
                 _ => throw new NotSupportedException()
             };
         }
@@ -69,6 +71,7 @@ namespace IntelOrca.Biohazard.REE.Tests
             {
                 GameNames.RE2 => @"G:\apps\reasy\rszre2.json",
                 GameNames.RE4 => @"G:\apps\reasy\rszre4_reasy.json",
+                GameNames.RE8 => @"G:\apps\reasy\rszre8.json",
                 _ => throw new NotImplementedException()
             };
             var json = File.ReadAllBytes(jsonPath);
