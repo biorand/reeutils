@@ -46,7 +46,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var stringPool = new StringPoolBuilder(ms);
 
                 // Reserve space for header
-                bw.Skip(48);
+                bw.WriteZeros(48);
 
                 // Resources
                 bw.Align(16);

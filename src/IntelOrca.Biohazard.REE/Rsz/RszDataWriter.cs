@@ -28,7 +28,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             var rem = (int)(address & mask);
             if (rem != 0)
             {
-                _bw.Skip(align - rem);
+                _bw.WriteZeros(align - rem);
             }
         }
 
@@ -113,7 +113,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var bytesWritten = (int)(newPosition - oldPosition);
                 if (bytesWritten < field.Size)
                 {
-                    _bw.Seek(field.Size - bytesWritten, SeekOrigin.Current);
+                    _bw.WriteZeros(field.Size - bytesWritten);
                 }
                 else if (bytesWritten > field.Size)
                 {

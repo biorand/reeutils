@@ -69,7 +69,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             var index = Type.FindFieldIndex(name);
             if (index == -1)
-                throw new ArgumentException($"{0} is not a field of {Type.Name}.");
+                throw new ArgumentException($"{name} is not a field of {Type.Name}.");
 
             var field = Type.Fields[index];
             if (value is IList list)

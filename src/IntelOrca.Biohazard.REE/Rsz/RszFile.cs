@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
 using IntelOrca.Biohazard.REE.Extensions;
 
@@ -207,7 +206,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var stringPool = new StringPoolBuilder(ms);
 
                 // Reserve space for header
-                bw.Skip(Version < 4 ? 32 : 48);
+                bw.WriteZeros(Version < 4 ? 32 : 48);
 
                 // Object list
                 foreach (var obj in objectList)

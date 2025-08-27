@@ -23,7 +23,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         ImmutableArray<IRszNode> IRszNodeContainer.Children => Children.CastArray<IRszNode>();
 
-        public IRszSceneNode WithChildren(ImmutableArray<IRszSceneNode> children) => new RszScene(children);
+        public RszScene WithChildren(ImmutableArray<IRszSceneNode> children) => new RszScene(children);
         IRszSceneNode IRszSceneNode.WithChildren(ImmutableArray<IRszSceneNode> children) => WithChildren(children);
         IRszNodeContainer IRszNodeContainer.WithChildren(ImmutableArray<IRszNode> children) => WithChildren(children.Cast<IRszSceneNode>().ToImmutableArray());
     }

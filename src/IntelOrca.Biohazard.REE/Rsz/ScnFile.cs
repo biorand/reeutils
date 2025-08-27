@@ -214,7 +214,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var stringPool = new StringPoolBuilder(ms);
 
                 // Reserve space for header
-                bw.Skip(Version >= 19 ? 64 : 56);
+                bw.WriteZeros(Version >= 19 ? 64 : 56);
 
                 // Game objects
                 foreach (var gameObject in gameObjects)

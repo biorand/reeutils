@@ -23,6 +23,12 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/leveldesign/chapter/cp10_chp1_1/level_cp10_chp1_1_010.scn.20", 71148);
         }
 
+        [Fact]
+        public void Rebuild_RE4_LEVEL_LOC40_900()
+        {
+            AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/leveldesign/location/loc40/level_loc40_900.scn.20", 128);
+        }
+
         private void AssertRebuild(string gameName, string path, int expectedLength)
         {
             var repo = _pakHelper.GetTypeRepository(gameName);

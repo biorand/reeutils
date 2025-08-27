@@ -28,6 +28,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
             }
         }
 
+        public RszFolder Add(IRszSceneNode node) => WithChildren(Children.Add(node));
+
         public RszFolder WithChildren(ImmutableArray<IRszSceneNode> children)
         {
             return new RszFolder(Settings, children);

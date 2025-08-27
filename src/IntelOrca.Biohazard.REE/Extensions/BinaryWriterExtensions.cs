@@ -13,21 +13,24 @@ namespace IntelOrca.Biohazard.REE.Extensions
             if (remainder != 0)
             {
                 var skip = alignment - remainder;
-                bw.Skip(skip);
+                bw.WriteZeros(skip);
             }
         }
 
-        public static void Skip(this BinaryWriter bw, int size)
+        public static void WriteZeros(this BinaryWriter bw, int size)
         {
-            bw.BaseStream.Position += size;
+            for (var i = 0; i < size; i++)
+            {
+                bw.Write((byte)0);
+            }
         }
 
-        public static void Skip<T>(this BinaryWriter bw) where T : unmanaged
+        public static void WriteZeros<T>(this BinaryWriter bw) where T : unmanaged
         {
-            Skip<T>(bw, 1);
+            WriteZeros<T>(bw, 1);
         }
 
-        public static void Skip<T>(this BinaryWriter bw, int count) where T : unmanaged
+        public static void WriteZeros<T>(this BinaryWriter bw, int count) where T : unmanaged
         {
             bw.BaseStream.Position += count * sizeof(T);
         }
