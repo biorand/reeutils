@@ -78,18 +78,18 @@ namespace IntelOrca.Biohazard.REE.Rsz
             RszScene BuildRoot()
             {
                 var children = ImmutableArray.CreateBuilder<IRszSceneNode>();
-                for (var i = 0; i < folderInfoList.Length; i++)
-                {
-                    if (folderInfoList[i].ParentId == -1)
-                    {
-                        children.Add(BuildFolder(i));
-                    }
-                }
                 for (var i = 0; i < gameObjectInfoList.Length; i++)
                 {
                     if (gameObjectInfoList[i].ParentId == -1)
                     {
                         children.Add(BuildGameObject(i));
+                    }
+                }
+                for (var i = 0; i < folderInfoList.Length; i++)
+                {
+                    if (folderInfoList[i].ParentId == -1)
+                    {
+                        children.Add(BuildFolder(i));
                     }
                 }
                 return new RszScene(children.ToImmutable());

@@ -29,6 +29,12 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/leveldesign/location/loc40/level_loc40_900.scn.20", 128);
         }
 
+        [Fact]
+        public void Rebuild_RE8_C02_1_C02_1_FARM()
+        {
+            AssertRebuild(GameNames.RE8, "natives/stm/spawn/enemy/scene/c02_1/c02_1_c02_1_farm.scn.20", 39904);
+        }
+
         private void AssertRebuild(string gameName, string path, int expectedLength)
         {
             var repo = _pakHelper.GetTypeRepository(gameName);
