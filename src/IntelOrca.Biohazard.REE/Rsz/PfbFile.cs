@@ -17,6 +17,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public int Version => version;
         private PfbHeader Header => new PfbHeader(Version, version < 17 ? data[..48] : data[..56]);
         private ReadOnlySpan<GameObjectInfo> GameObjectInfoList => data.Get<GameObjectInfo>((ulong)Header.Size, Header.GameObjectCount);
+        private ReadOnlySpan<GameObjectRefInfo> GameObjectRefInfoList => data.Get<GameObjectRefInfo>(Header.GameObjectRefOffset, Header.GameObjectRefCount);
         private ReadOnlySpan<ResourceInfo> ResourceInfoList => data.Get<ResourceInfo>(Header.ResourceOffset, Header.ResourceCount);
         private ReadOnlySpan<UserDataInfo> UserDataInfoList => data.Get<UserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
         private RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
@@ -55,6 +56,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             var objectList = Rsz.ReadObjectList(repository);
             var gameObjectInfoList = GameObjectInfoList.ToImmutableArray();
+            var gameObjectRefs = GameObjectRefInfoList.ToArray();
             return BuildRoot();
 
             RszScene BuildRoot()
@@ -90,7 +92,39 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                 }
 
-                return new RszGameObject(default, null, settings, components.ToImmutable(), children.ToImmutable());
+                var gameObjectGuid = default(Guid);
+                var gameObjectRefInfoIndex = Array.FindIndex(gameObjectRefs, x => x.TargetId == info.ObjectId);
+                if (gameObjectRefInfoIndex != -1)
+                {
+                    var gameObjectRefInfo = gameObjectRefs[gameObjectRefInfoIndex];
+                    var sourceObjectId = gameObjectRefInfo.ObjectId;
+                    var sourceObject = (RszObjectNode)objectList[sourceObjectId];
+                    var sourceObjectFields = sourceObject.Type.Fields;
+                    for (var i = 0; i < sourceObjectFields.Length; i++)
+                    {
+                        var field = sourceObjectFields[i];
+                        if (field.Type != RszFieldType.GameObjectRef)
+                            continue;
+
+                        // HACK: Since the RSZ dumps don't contain property IDs, we set the property ID of
+                        // the relevant fields based on the order of game object refs in the file.
+                        // This is a very rough work around.
+                        if (field.Id is int fieldId)
+                        {
+                            if (fieldId != gameObjectRefInfo.PropertyId)
+                            {
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            field.Id = gameObjectRefInfo.PropertyId;
+                        }
+                        gameObjectGuid = RszSerializer.Deserialize<Guid>(sourceObject[i]);
+                    }
+                }
+
+                return new RszGameObject(gameObjectGuid, null, settings, components.ToImmutable(), children.ToImmutable());
             }
         }
 
@@ -148,6 +182,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             public PfbFile Build()
             {
+                var gameObjectsGuid = new List<Guid>();
                 var gameObjects = new List<GameObjectInfo>();
                 var objectList = ImmutableArray.CreateBuilder<IRszNode>();
                 Traverse(-1, Scene);
@@ -169,8 +204,58 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     bw.Write(gameObject);
                 }
 
-                bw.Align(16);
+                // Game object refs
                 var gameObjectRefOffset = ms.Position;
+                var gameObjectRefCount = 0;
+                for (var i = 0; i < objectList.Count; i++)
+                {
+                    var sourceObject = (RszObjectNode)objectList[i];
+                    for (var j = 0; j < sourceObject.Children.Length; j++)
+                    {
+                        var rszType = sourceObject.Type;
+                        var fieldType = rszType.Fields[j];
+                        if (fieldType.Type == RszFieldType.GameObjectRef)
+                        {
+                            var fieldValue = sourceObject.Children[j];
+                            var fieldArrayValues = new List<Guid>();
+                            if (fieldType.IsArray)
+                            {
+                                var arrayValue = (RszArrayNode)fieldValue;
+                                foreach (var arrayElementValue in arrayValue)
+                                {
+                                    var guid = RszSerializer.Deserialize<Guid>(arrayElementValue);
+                                    fieldArrayValues.Add(guid);
+                                }
+                            }
+                            else
+                            {
+                                var guid = RszSerializer.Deserialize<Guid>(fieldValue);
+                                fieldArrayValues.Add(guid);
+                            }
+
+                            var arrayIndex = 0;
+                            foreach (var guid in fieldArrayValues)
+                            {
+                                if (guid == default)
+                                    continue;
+
+                                var gameObjectIndex = gameObjectsGuid.IndexOf(guid);
+                                if (gameObjectIndex == -1)
+                                    continue;
+
+                                bw.Write(new GameObjectRefInfo()
+                                {
+                                    ObjectId = i,
+                                    TargetId = gameObjects[gameObjectIndex].ObjectId,
+                                    PropertyId = fieldType.Id ?? throw new Exception($"Id not set on field: {rszType.Name}.{fieldType.Name}."),
+                                    ArrayIndex = arrayIndex
+                                });
+                                arrayIndex++;
+                                gameObjectRefCount++;
+                            }
+                        }
+                    }
+                }
 
                 // Resources
                 bw.Align(16);
@@ -213,7 +298,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 bw.Write(MAGIC);
                 bw.Write(gameObjects.Count);
                 bw.Write(Resources.Count);
-                bw.Write(0);
+                bw.Write(gameObjectRefCount);
                 if (Version >= 17)
                 {
                     bw.Write(userDataCount);
@@ -242,6 +327,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     if (node is RszGameObject gameObjectNode)
                     {
                         id = AddObject(gameObjectNode.Settings);
+                        gameObjectsGuid.Add(gameObjectNode.Guid);
                         gameObjects.Add(new GameObjectInfo()
                         {
                             ObjectId = id,
@@ -279,6 +365,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public int ComponentCount;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
         private struct GameObjectRefInfo
         {
             public int ObjectId;

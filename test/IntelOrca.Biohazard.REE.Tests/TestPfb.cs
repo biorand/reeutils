@@ -17,6 +17,18 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/appsystem/prefab/weapon/wp4100.pfb.17", 5136);
         }
 
+        [Fact]
+        public void Rebuild_RE4_WP4202()
+        {
+            AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/appsystem/prefab/weapon/wp4202.pfb.17", 12148);
+        }
+
+        [Fact]
+        public void Rebuild_RE4_ARROWSHELL()
+        {
+            AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/appsystem/prefab/shell/arrowshell.pfb.17", 4256);
+        }
+
         private void AssertRebuild(string gameName, string path, int expectedLength)
         {
             var repo = _pakHelper.GetTypeRepository(gameName);

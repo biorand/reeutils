@@ -11,5 +11,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public bool IsArray { get; set; }
         public RszFieldType Type { get; set; }
         public RszType? ObjectType { get; set; }
+
+        /// <summary>
+        /// This is used for PFB GameObjectRef linking.
+        /// Since the RSZ dumps don't contain the ID, we find it when loading a file
+        /// and keep note of it.
+        /// </summary>
+        public int? Id { get; set; }
     }
 }
