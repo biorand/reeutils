@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using IntelOrca.Biohazard.REE.Compression;
 using IntelOrca.Biohazard.REE.Cryptography;
@@ -45,6 +46,27 @@ namespace IntelOrca.Biohazard.REE.Package
             {
                 var pakPath = pakRootPath + Path.GetFileName(directory);
                 AddDirectory(directory, pakPath);
+            }
+        }
+
+        public void AddZip(string path)
+        {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            AddZip(fs);
+        }
+
+        public void AddZip(Stream stream)
+        {
+            using var zipFile = new ZipArchive(stream, ZipArchiveMode.Read, true);
+            foreach (var entry in zipFile.Entries)
+            {
+                if (entry.Length != 0)
+                {
+                    using var ms = new MemoryStream();
+                    using var entryStream = entry.Open();
+                    entryStream.CopyTo(ms);
+                    AddEntry(entry.FullName, ms.ToArray());
+                }
             }
         }
 
