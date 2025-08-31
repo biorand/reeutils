@@ -54,7 +54,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             if (field.Type == RszFieldType.String)
             {
                 _reader.Align(4);
-                var value = _reader.ReadString();
+                var value = _reader.ReadString() ?? "";
                 return new RszStringNode(value);
             }
             else if (field.Type == RszFieldType.Resource)

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using IntelOrca.Biohazard.REE.Extensions;
@@ -422,6 +423,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             }
         }
 
+        [DebuggerDisplay("TypeId = {TypeId,h} Crc = {Crc,h}")]
         [StructLayout(LayoutKind.Sequential)]
         private struct RszInstanceInfo
         {

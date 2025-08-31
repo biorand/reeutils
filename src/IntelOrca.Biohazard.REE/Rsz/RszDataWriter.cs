@@ -74,7 +74,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             else if (node is RszResourceNode resourceNode)
             {
                 Align(4);
-                if (string.IsNullOrEmpty(resourceNode.Value))
+                if (resourceNode.Value == null)
                 {
                     _bw.Write(0);
                 }

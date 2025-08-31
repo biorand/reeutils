@@ -10,13 +10,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
             get => [];
             set => throw new InvalidOperationException();
         }
-        public string Value { get; }
+        public string? Value { get; }
 
-        public RszResourceNode(string value)
+        public RszResourceNode(string? value)
         {
             Value = value;
         }
 
-        public override string ToString() => Value;
+        public override string? ToString() => Value;
     }
 }

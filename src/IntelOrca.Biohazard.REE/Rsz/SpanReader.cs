@@ -40,11 +40,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return result;
         }
 
-        public string ReadString()
+        public string? ReadString()
         {
             var length = ReadInt32();
             if (length == 0)
-                return "";
+                return null;
 
             // Assume null terminator
             var wstrSpan = MemoryMarshal.Cast<byte, char>(_data).Slice(0, length - 1);
