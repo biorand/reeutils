@@ -168,6 +168,54 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return (T)newNode.WithChildren(children.ToImmutable());
         }
 
+        public static void VisitComponents<T>(this T sceneNode, Action<RszObjectNode> cb) where T : IRszSceneNode
+        {
+            sceneNode.VisitGameObjects(go =>
+            {
+                foreach (var component in go.Components)
+                {
+                    cb(component);
+                }
+            });
+        }
+
+        public static void VisitComponents<T>(this T sceneNode, Action<RszGameObject, RszObjectNode> cb) where T : IRszSceneNode
+        {
+            sceneNode.VisitGameObjects(go =>
+            {
+                foreach (var component in go.Components)
+                {
+                    cb(go, component);
+                }
+            });
+        }
+
+        public static T VisitComponents<T>(this T sceneNode, Func<RszObjectNode, RszObjectNode> cb) where T : IRszSceneNode
+        {
+            return sceneNode.VisitGameObjects(go =>
+            {
+                var builder = go.Components.ToBuilder();
+                for (var i = 0; i < builder.Count; i++)
+                {
+                    builder[i] = cb(builder[i]);
+                }
+                return go.WithComponents(builder.ToImmutable());
+            });
+        }
+
+        public static T VisitComponents<T>(this T sceneNode, Func<RszGameObject, RszObjectNode, RszObjectNode> cb) where T : IRszSceneNode
+        {
+            return sceneNode.VisitGameObjects(go =>
+            {
+                var builder = go.Components.ToBuilder();
+                for (var i = 0; i < builder.Count; i++)
+                {
+                    builder[i] = cb(go, builder[i]);
+                }
+                return go.WithComponents(builder.ToImmutable());
+            });
+        }
+
         public static T Get<T>(this IRszNode node) => Get<T>(node, "");
 
         public static T Get<T>(this IRszNode node, string path)
