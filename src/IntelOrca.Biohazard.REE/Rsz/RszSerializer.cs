@@ -18,7 +18,15 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public static object? Deserialize(IRszNode node, Type targetClrType)
         {
-            if (node is RszObjectNode objectNode)
+            if (node is null)
+            {
+                return null;
+            }
+            else if (node.GetType() == targetClrType)
+            {
+                return node;
+            }
+            else if (node is RszObjectNode objectNode)
             {
                 var clrType = FindClrType(objectNode.Type, targetClrType);
                 var obj = Activator.CreateInstance(clrType)!;
@@ -185,6 +193,15 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 return new RszArrayNode(type, children.ToImmutable());
             }
 
+            if (obj is RszValueNode valueNode)
+            {
+                if (valueNode.Type != type)
+                {
+                    throw new Exception($"Cannot serialize RszValueNode({valueNode.Type}) to {type}.");
+                }
+                return valueNode;
+            }
+
             return type switch
             {
                 RszFieldType.Bool => new RszValueNode(type, ToMemory<bool>(obj)),
@@ -194,6 +211,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.U16 => new RszValueNode(type, ToMemory<ushort>(obj)),
                 RszFieldType.S32 => new RszValueNode(type, ToMemory<int>(obj)),
                 RszFieldType.U32 => new RszValueNode(type, ToMemory<uint>(obj)),
+                RszFieldType.S64 => new RszValueNode(type, ToMemory<long>(obj)),
+                RszFieldType.U64 => new RszValueNode(type, ToMemory<ulong>(obj)),
                 RszFieldType.F32 => new RszValueNode(type, ToMemory<float>(obj)),
                 RszFieldType.F64 => new RszValueNode(type, ToMemory<double>(obj)),
                 RszFieldType.Vec2 => new RszValueNode(type, ToMemory<Vector2>(obj)),
@@ -203,7 +222,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.Guid or RszFieldType.GameObjectRef => new RszValueNode(type, ToMemory<Guid>(obj)),
                 RszFieldType.Range => new RszValueNode(type, ToMemory<Native.Range>(obj)),
                 RszFieldType.KeyFrame => new RszValueNode(type, ToMemory<KeyFrame>(obj)),
-                RszFieldType.String => new RszStringNode((string)obj),
+                RszFieldType.String => obj is RszStringNode stringNode
+                    ? stringNode
+                    : new RszStringNode((string)obj),
+                RszFieldType.Resource => obj is RszResourceNode resourceNode
+                    ? resourceNode
+                    : new RszResourceNode((string)obj),
+                RszFieldType.UserData => (RszUserDataNode)obj,
                 _ => throw new NotSupportedException()
             };
         }

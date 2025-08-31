@@ -1,4 +1,5 @@
-﻿using IntelOrca.Biohazard.REE.Rsz;
+﻿using System.Numerics;
+using IntelOrca.Biohazard.REE.Rsz;
 
 namespace IntelOrca.Biohazard.REE.Tests
 {
@@ -9,6 +10,56 @@ namespace IntelOrca.Biohazard.REE.Tests
         public void Dispose()
         {
             _pakHelper.Dispose();
+        }
+
+        [Fact]
+        public void Serialize_FieldType()
+        {
+            var repo = _pakHelper.GetTypeRepository(GameNames.RE4);
+            var rszType = repo.FromName("chainsaw.EnemyBurnParamUserData")!;
+
+            AssertSerialize(new RszValueNode(RszFieldType.S32, new byte[] { 4, 0, 0, 0 }), RszFieldType.S32, new RszValueNode(RszFieldType.S32, new byte[] { 4, 0, 0, 0 }));
+            AssertSerialize(new RszStringNode("Resident Evil"), RszFieldType.String, "Resident Evil");
+            AssertSerialize(new RszStringNode("Resident Evil"), RszFieldType.String, new RszStringNode("Resident Evil"));
+            AssertSerialize(new RszResourceNode("prefabs/test.pfb"), RszFieldType.Resource, "prefabs/test.pfb");
+            AssertSerialize(new RszResourceNode("prefabs/test.pfb"), RszFieldType.Resource, new RszResourceNode("prefabs/test.pfb"));
+            AssertSerialize(new RszUserDataNode(rszType, "userdata/burn.user"), RszFieldType.UserData, new RszUserDataNode(rszType, "userdata/burn.user"));
+
+            static void AssertSerialize(object expected, RszFieldType type, object value)
+            {
+                var actual = RszSerializer.Serialize(type, value);
+                Assert.StrictEqual(expected, actual);
+            }
+        }
+
+        [Fact]
+        public void Reserialize_FieldType()
+        {
+            AssertReserialize<bool>(RszFieldType.Bool, false);
+            AssertReserialize<bool>(RszFieldType.Bool, true);
+            AssertReserialize<sbyte>(RszFieldType.S8, -30);
+            AssertReserialize<byte>(RszFieldType.U8, 250);
+            AssertReserialize<short>(RszFieldType.S16, 20000);
+            AssertReserialize<ushort>(RszFieldType.U16, 0xFFFF);
+            AssertReserialize<int>(RszFieldType.S32, 123456);
+            AssertReserialize<uint>(RszFieldType.U32, 0xC4FB4A12);
+            AssertReserialize<long>(RszFieldType.S64, -83785375383123456);
+            AssertReserialize<ulong>(RszFieldType.U64, 0xFFFFFFFFC4FB4A12);
+            AssertReserialize<float>(RszFieldType.F32, 0.42445f);
+            AssertReserialize<double>(RszFieldType.F64, 0.42445222635);
+            AssertReserialize<Vector2>(RszFieldType.Vec2, new Vector2(10, 22));
+            AssertReserialize<Vector3>(RszFieldType.Vec3, new Vector3(10, 22, 33));
+            AssertReserialize<Vector4>(RszFieldType.Vec4, new Vector4(10, 22, 33, 44));
+            AssertReserialize<Quaternion>(RszFieldType.Quaternion, Quaternion.Identity);
+            AssertReserialize<Guid>(RszFieldType.Guid, new Guid("63680a70-f2ce-4a41-83f3-485a22717d12"));
+            AssertReserialize<Guid>(RszFieldType.GameObjectRef, new Guid("63680a70-f2ce-4a41-83f3-485a22717d12"));
+
+            static void AssertReserialize<T>(RszFieldType type, T value)
+            {
+                var node = RszSerializer.Serialize(type, value);
+                var actual = RszSerializer.Deserialize<T>(node);
+                Assert.StrictEqual(value, actual);
+            }
         }
 
         [Fact]
