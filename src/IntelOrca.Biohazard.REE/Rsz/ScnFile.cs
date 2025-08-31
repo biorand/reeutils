@@ -202,7 +202,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var gameObjects = new List<GameObjectInfo>();
                 var prefabs = new List<string>();
                 var prefabToId = new Dictionary<string, int>();
-                var objectList = ImmutableArray.CreateBuilder<IRszNode>();
+                var objectList = ImmutableArray.CreateBuilder<RszObjectNode>();
                 Traverse(-1, Scene);
 
                 var rszBuilder = new RszFile.Builder(Repository, RszVersion);
@@ -290,7 +290,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                 return new ScnFile(Version, ms.ToArray());
 
-                int AddObject(IRszNode node)
+                int AddObject(RszObjectNode node)
                 {
                     var index = objectList.Count;
                     objectList.Add(node);

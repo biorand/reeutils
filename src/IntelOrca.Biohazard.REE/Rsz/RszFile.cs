@@ -147,13 +147,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return result.ToImmutable();
         }
 
-        public ImmutableArray<IRszNode> ReadObjectList(RszTypeRepository repository)
+        public ImmutableArray<RszObjectNode> ReadObjectList(RszTypeRepository repository)
         {
             var instanceList = ReadInstanceList(repository);
-            var objectList = ImmutableArray.CreateBuilder<IRszNode>();
+            var objectList = ImmutableArray.CreateBuilder<RszObjectNode>();
             foreach (var instanceId in ObjectInstanceIds)
             {
-                objectList.Add(instanceList[instanceId.Index].Value);
+                objectList.Add((RszObjectNode)instanceList[instanceId.Index].Value);
             }
             return objectList.ToImmutable();
         }
@@ -167,7 +167,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             public RszTypeRepository Repository { get; }
             public int Version { get; }
-            public ImmutableArray<IRszNode> Objects { get; set; } = [];
+            public ImmutableArray<RszObjectNode> Objects { get; set; } = [];
             public long AlignOffset { get; set; }
 
             public Builder(RszTypeRepository repository, int version)

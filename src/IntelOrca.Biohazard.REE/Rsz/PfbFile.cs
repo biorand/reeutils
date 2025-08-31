@@ -184,7 +184,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 var gameObjectsGuid = new List<Guid>();
                 var gameObjects = new List<GameObjectInfo>();
-                var objectList = ImmutableArray.CreateBuilder<IRszNode>();
+                var objectList = ImmutableArray.CreateBuilder<RszObjectNode>();
                 Traverse(-1, Scene);
 
                 var rszBuilder = new RszFile.Builder(Repository, RszVersion);
@@ -314,7 +314,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                 return new PfbFile(Version, ms.ToArray());
 
-                int AddObject(IRszNode node)
+                int AddObject(RszObjectNode node)
                 {
                     var index = objectList.Count;
                     objectList.Add(node);

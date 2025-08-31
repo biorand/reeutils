@@ -15,7 +15,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         private UserHeader Header => MemoryMarshal.Read<UserHeader>(data.Span);
         private RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
 
-        public ImmutableArray<IRszNode> GetObjects(RszTypeRepository repository) => Rsz.ReadObjectList(repository);
+        public ImmutableArray<RszObjectNode> GetObjects(RszTypeRepository repository) => Rsz.ReadObjectList(repository);
 
         public Builder ToBuilder(RszTypeRepository repository)
         {
@@ -26,7 +26,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             public RszTypeRepository Repository { get; }
             public int RszVersion { get; }
-            public ImmutableArray<IRszNode> Objects { get; set; }
+            public ImmutableArray<RszObjectNode> Objects { get; set; }
 
             public Builder(RszTypeRepository repository, UserFile instance)
             {
