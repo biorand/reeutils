@@ -35,6 +35,12 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertRebuild(GameNames.RE8, "natives/stm/spawn/enemy/scene/c02_1/c02_1_c02_1_farm.scn.20", 39904);
         }
 
+        [Fact]
+        public void Rebuild_RE8_ST03_EVENTPROPS()
+        {
+            AssertRebuild(GameNames.RE8, "natives/stm/spawn/item/scene/st03/st03_eventprops.scn.20", 4709);
+        }
+
         private void AssertRebuild(string gameName, string path, int expectedLength)
         {
             var repo = _pakHelper.GetTypeRepository(gameName);

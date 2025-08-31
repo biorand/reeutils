@@ -70,7 +70,7 @@ namespace IntelOrca.Biohazard.REE.Tests
             var jsonPath = gameName switch
             {
                 GameNames.RE2 => @"M:\git\reasy\resources\data\dumps\rszre2.json",
-                GameNames.RE4 => @"M:\git\reasy\resources\data\dumps\rszre4_reasy.json",
+                GameNames.RE4 => @"M:\git\reasy\resources\data\dumps\rszre4.json",
                 GameNames.RE8 => @"M:\git\reasy\resources\data\dumps\rszre8.json",
                 _ => throw new NotImplementedException()
             };
