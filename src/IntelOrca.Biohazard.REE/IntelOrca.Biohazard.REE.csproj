@@ -6,7 +6,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GeneratePackageOnBuild Condition="'$(REE_DEV)'=='true'">True</GeneratePackageOnBuild>
     <VersionPostfix Condition="'$(REE_DEV)'=='true'">-dev$([System.DateTime]::UtcNow.ToString("yyyyMMddTHHmmss"))</VersionPostfix>
-    <Version>1.2.0$(VersionPostfix)</Version>
+    <Version>1.2.1$(VersionPostfix)</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
