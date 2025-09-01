@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Numerics;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using IntelOrca.Biohazard.REE.Rsz.Native;
 
@@ -22,7 +23,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 return null;
             }
-            else if (node.GetType() == targetClrType)
+            else if (targetClrType.IsAssignableFrom(node.GetType()))
             {
                 return node;
             }
@@ -55,6 +56,26 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         }
                         return list;
                     }
+                    else if (genericType == typeof(ImmutableArray<>))
+                    {
+                        var elementType = targetClrType.GetGenericArguments()[0];
+                        var array = (Array)Activator.CreateInstance(elementType.MakeArrayType(), children.Length);
+                        for (var i = 0; i < children.Length; i++)
+                        {
+                            array.SetValue(Deserialize(children[i], elementType), i);
+                        }
+                        return CreateImmutableArray(array);
+                    }
+                }
+                else if (targetClrType.IsArray)
+                {
+                    var elementType = targetClrType.GetElementType();
+                    var array = (Array)Activator.CreateInstance(targetClrType, children.Length);
+                    for (var i = 0; i < children.Length; i++)
+                    {
+                        array.SetValue(Deserialize(children[i], elementType), i);
+                    }
+                    return array;
                 }
                 throw new NotSupportedException("Unsupport collection type");
             }
@@ -107,37 +128,45 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var propertyValue = property.GetValue(obj);
                 if (field.IsArray)
                 {
-                    var arrayChildren = ImmutableArray.CreateBuilder<IRszNode>();
-                    var list = (IList)propertyValue;
-                    var listCount = list.Count;
-                    for (var i = 0; i < listCount; i++)
+                    if (propertyValue is not RszArrayNode arrayNode)
                     {
-                        var listItem = list[i];
-                        if (field.Type == RszFieldType.Object)
+                        var arrayChildren = ImmutableArray.CreateBuilder<IRszNode>();
+                        var list = (IList)propertyValue;
+                        var listCount = list.Count;
+                        for (var i = 0; i < listCount; i++)
                         {
-                            var objectType = field.ObjectType ?? throw new Exception("Expected field to have an object type");
-                            arrayChildren.Add(Serialize(objectType, listItem));
+                            var listItem = list[i];
+                            if (field.Type == RszFieldType.Object)
+                            {
+                                var objectType = field.ObjectType ?? throw new Exception("Expected field to have an object type");
+                                arrayChildren.Add(Serialize(objectType, listItem));
+                            }
+                            else
+                            {
+                                arrayChildren.Add(Serialize(field.Type, listItem));
+                            }
                         }
-                        else
-                        {
-                            arrayChildren.Add(Serialize(field.Type, listItem));
-                        }
+                        arrayNode = new RszArrayNode(field.Type, arrayChildren.ToImmutableArray());
                     }
-                    children.Add(new RszArrayNode(field.Type, arrayChildren.ToImmutableArray()));
+                    children.Add(arrayNode);
                 }
                 else
                 {
-                    if (field.Type == RszFieldType.Object)
+                    if (propertyValue is not IRszNode node)
                     {
-                        var objectType = field.ObjectType ?? throw new Exception("Expected field to have an object type");
-                        if (propertyValue == null)
-                            throw new Exception($"{clrType.FullName}.{property.Name} was null.");
-                        children.Add(Serialize(objectType, propertyValue));
+                        if (field.Type == RszFieldType.Object)
+                        {
+                            var objectType = field.ObjectType ?? throw new Exception("Expected field to have an object type");
+                            if (propertyValue == null)
+                                throw new Exception($"{clrType.FullName}.{property.Name} was null.");
+                            node = Serialize(objectType, propertyValue);
+                        }
+                        else
+                        {
+                            node = Serialize(field.Type, propertyValue);
+                        }
                     }
-                    else
-                    {
-                        children.Add(Serialize(field.Type, propertyValue));
-                    }
+                    children.Add(node);
                 }
             }
             return new RszObjectNode(type, children.ToImmutable());
@@ -256,6 +285,19 @@ namespace IntelOrca.Biohazard.REE.Rsz
             var span = MemoryMarshal.CreateReadOnlySpan(ref result, 1);
             var bytes = MemoryMarshal.Cast<T, byte>(span);
             return new ReadOnlyMemory<byte>(bytes.ToArray());
+        }
+
+        public static object CreateImmutableArray(Array items)
+        {
+            var elementType = items.GetType().GetElementType();
+            var createWithArray = typeof(ImmutableArray)
+                .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Where(m => m.Name == nameof(ImmutableArray.Create) && m.IsGenericMethodDefinition)
+                .Select(m => new { Method = m, Params = m.GetParameters() })
+                .First(x => x.Params.Length == 1 && x.Params[0].ParameterType.IsArray)
+                .Method
+                .MakeGenericMethod(elementType);
+            return createWithArray.Invoke(null, [items])!;
         }
     }
 }

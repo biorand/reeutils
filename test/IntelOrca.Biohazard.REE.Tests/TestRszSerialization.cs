@@ -1,4 +1,6 @@
-﻿using System.Numerics;
+﻿using System.Collections.Immutable;
+using System.ComponentModel;
+using System.Numerics;
 using IntelOrca.Biohazard.REE.Rsz;
 
 namespace IntelOrca.Biohazard.REE.Tests
@@ -125,6 +127,23 @@ namespace IntelOrca.Biohazard.REE.Tests
             Assert.Equal(278035456, defTargetItemIds2.Get<int>());
         }
 
+        [Fact]
+        [Description("Test a range of different target types to serialize objects/collections to.")]
+        public void RE4_ITEMCRAFTSETTINGUSERDATA()
+        {
+            var path = "natives/stm/_chainsaw/appsystem/ui/userdata/itemcraftsettinguserdata.user.2";
+
+            var repo = GetTypeRepository();
+            var input = new UserFile(_pakHelper.GetFileData(GameNames.RE4, path));
+            var inputBuilder = input.ToBuilder(repo);
+            var root = inputBuilder.Objects[0];
+            var rootRszType = root.Type;
+            var userData = RszSerializer.Deserialize<chainsaw.ItemCraftSettingUserdata>(root)!;
+            inputBuilder.Objects = [(RszObjectNode)RszSerializer.Serialize(rootRszType, userData)];
+            var output = inputBuilder.Build();
+            Assert.True(input.Data.Span.SequenceEqual(output.Data.Span));
+        }
+
         private static RszTypeRepository GetTypeRepository()
         {
             var jsonPath = @"G:\apps\reasy\rszre4_reasy.json";
@@ -146,5 +165,29 @@ namespace chainsaw
     {
         public int _ItemId { get; set; }
         public List<int> _TargetItemIds { get; set; } = [];
+    }
+
+    public class ItemCraftSettingUserdata
+    {
+        public ImmutableArray<int> _MaterialItemIds { get; set; } = [];
+        public RszArrayNode _RecipeIdOrders { get; set; } = new RszArrayNode(RszFieldType.S32, []);
+        public ItemCraftRecipe[] _Datas { get; set; } = [];
+    }
+
+    public class ItemCraftRecipe
+    {
+        public ItemCraftResultSetting[] _ResultSettings { get; set; } = [];
+        public IRszNode? _RequiredItems { get; set; }
+        public IRszNodeContainer? _BonusSetting { get; set; }
+        public int _RecipeID { get; set; }
+        public int _Category { get; set; }
+        public IRszNode _CraftTime { get; set; } = RszSerializer.Serialize(RszFieldType.S32, 0);
+        public bool _DrawWave { get; set; }
+    }
+
+    public class ItemCraftResultSetting
+    {
+        public int _Difficulty { get; set; }
+        public RszObjectNode? _Result { get; set; }
     }
 }
