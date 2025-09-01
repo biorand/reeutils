@@ -49,13 +49,13 @@ namespace IntelOrca.Biohazard.REE.Package
             }
         }
 
-        public void AddZip(string path)
+        public void AddZipContents(string path)
         {
             using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-            AddZip(fs);
+            AddZipContents(fs);
         }
 
-        public void AddZip(Stream stream)
+        public void AddZipContents(Stream stream)
         {
             using var zipFile = new ZipArchive(stream, ZipArchiveMode.Read, true);
             foreach (var entry in zipFile.Entries)
