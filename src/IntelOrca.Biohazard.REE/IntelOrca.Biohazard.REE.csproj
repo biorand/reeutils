@@ -5,8 +5,8 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GeneratePackageOnBuild Condition="'$(REE_DEV)'=='true'">True</GeneratePackageOnBuild>
-    <VersionPostfix Condition="'$(REE_DEV)'=='true'">-dev$([System.DateTime]::UtcNow.ToString("yyyyMMddTHHmmss"))</VersionPostfix>
-    <Version>1.2.1$(VersionPostfix)</Version>
+    <Version>1.3.0</Version>
+    <Version Condition="'$(REE_DEV)'=='true'">$(Version)-dev$([System.DateTime]::UtcNow.ToString("yyyyMMddTHHmmss"))</Version>
   </PropertyGroup>
   <ItemGroup Condition="'$(TargetFramework)'=='netstandard2.1'">
     <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
