@@ -90,7 +90,7 @@ namespace IntelOrca.Biohazard.REE
             }
             else if (node is RszUserDataNode userDataNode)
             {
-                DiscoverString(userDataNode.Path);
+                DiscoverString(userDataNode.Path ?? "");
             }
 
             if (node is IRszNodeContainer container)

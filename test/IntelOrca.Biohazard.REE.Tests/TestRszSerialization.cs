@@ -21,13 +21,19 @@ namespace IntelOrca.Biohazard.REE.Tests
             var rszType = repo.FromName("chainsaw.EnemyBurnParamUserData")!;
 
             AssertSerialize(new RszValueNode(RszFieldType.S32, new byte[] { 4, 0, 0, 0 }), RszFieldType.S32, new RszValueNode(RszFieldType.S32, new byte[] { 4, 0, 0, 0 }));
+            AssertSerialize(new RszStringNode(), RszFieldType.String, null);
+            AssertSerialize(new RszStringNode(""), RszFieldType.String, "");
             AssertSerialize(new RszStringNode("Resident Evil"), RszFieldType.String, "Resident Evil");
             AssertSerialize(new RszStringNode("Resident Evil"), RszFieldType.String, new RszStringNode("Resident Evil"));
+            AssertSerialize(new RszResourceNode(), RszFieldType.Resource, null);
+            AssertSerialize(new RszResourceNode(""), RszFieldType.Resource, "");
             AssertSerialize(new RszResourceNode("prefabs/test.pfb"), RszFieldType.Resource, "prefabs/test.pfb");
             AssertSerialize(new RszResourceNode("prefabs/test.pfb"), RszFieldType.Resource, new RszResourceNode("prefabs/test.pfb"));
+            AssertSerialize(new RszUserDataNode(), RszFieldType.UserData, null);
+            AssertSerialize(new RszUserDataNode(), RszFieldType.UserData, new RszUserDataNode());
             AssertSerialize(new RszUserDataNode(rszType, "userdata/burn.user"), RszFieldType.UserData, new RszUserDataNode(rszType, "userdata/burn.user"));
 
-            static void AssertSerialize(object expected, RszFieldType type, object value)
+            static void AssertSerialize(object expected, RszFieldType type, object? value)
             {
                 var actual = RszSerializer.Serialize(type, value);
                 Assert.StrictEqual(expected, actual);

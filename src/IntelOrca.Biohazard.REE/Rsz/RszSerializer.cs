@@ -202,14 +202,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             if (obj is null)
             {
-                if (type == RszFieldType.Object)
+                return type switch
                 {
-                    return new RszNullNode();
-                }
-                else
-                {
-                    throw new ArgumentNullException(nameof(obj));
-                }
+                    RszFieldType.Object => new RszNullNode(),
+                    RszFieldType.String => new RszStringNode(),
+                    RszFieldType.Resource => new RszResourceNode(),
+                    RszFieldType.UserData => new RszUserDataNode(),
+                    _ => throw new ArgumentNullException(nameof(obj))
+                };
             }
 
             if (obj is IList list)

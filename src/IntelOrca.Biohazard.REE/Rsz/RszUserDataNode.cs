@@ -8,6 +8,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public RszType Type => type;
         public string Path => path;
 
+        public bool IsEmpty => string.IsNullOrEmpty(Path);
+
         public ImmutableArray<IRszNode> Children
         {
             get => [];

@@ -98,7 +98,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             if (field.Type == RszFieldType.Object || field.Type == RszFieldType.UserData)
             {
-                var instanceId = node is RszNullNode ? default : _getInstance(node);
+                var instanceId = node is RszNullNode || (node is RszUserDataNode userDataNode && userDataNode.IsEmpty) ? default : _getInstance(node);
                 _bw.Write(instanceId.Index);
             }
             else if (field.Type == RszFieldType.String || field.Type == RszFieldType.Resource)

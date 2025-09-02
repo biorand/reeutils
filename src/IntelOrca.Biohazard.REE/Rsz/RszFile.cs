@@ -132,11 +132,15 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     {
                         if (node is RszValueNode valueNode)
                         {
-                            if (valueNode.Type == RszFieldType.Object ||
-                                valueNode.Type == RszFieldType.UserData)
+                            if (valueNode.Type == RszFieldType.Object)
                             {
                                 var instanceId = valueNode.AsInt32();
                                 return result[instanceId].Value;
+                            }
+                            else if (valueNode.Type == RszFieldType.UserData)
+                            {
+                                var instanceId = valueNode.AsInt32();
+                                return instanceId == 0 ? new RszUserDataNode() : result[instanceId].Value;
                             }
                         }
                         return node;
@@ -226,11 +230,19 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     else if (instance.Value is RszUserDataNode userDataNode)
                     {
-                        if (Version < 16)
-                            throw new NotSupportedException();
+                        if (userDataNode.IsEmpty)
+                        {
+                            bw.Write(0);
+                            bw.Write(0);
+                        }
+                        else
+                        {
+                            if (Version < 16)
+                                throw new NotSupportedException();
 
-                        bw.Write(userDataNode.Type.Id);
-                        bw.Write(userDataNode.Type.Crc);
+                            bw.Write(userDataNode.Type.Id);
+                            bw.Write(userDataNode.Type.Crc);
+                        }
                     }
                     else if (instance.Value is RszEmbeddedUserValueNode embeddedUserValueNode)
                     {
@@ -258,10 +270,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 {
                     if (instanceList[i].Value is RszUserDataNode userDataNode)
                     {
-                        bw.Write(i);
-                        bw.Write(userDataNode.Type.Id);
-                        stringPool.WriteStringOffset64(userDataNode.Path);
-                        userDataCount++;
+                        if (!userDataNode.IsEmpty)
+                        {
+                            bw.Write(i);
+                            bw.Write(userDataNode.Type.Id);
+                            stringPool.WriteStringOffset64(userDataNode.Path);
+                            userDataCount++;
+                        }
                     }
                     else if (instanceList[i].Value is RszEmbeddedUserValueNode embeddedUserValueNode)
                     {
@@ -401,17 +416,24 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     else if (node is RszUserDataNode userDataNode)
                     {
-                        // Avoid duplicate user data entries
-                        var path = userDataNode.Path;
-                        foreach (var b in builder)
+                        if (userDataNode.IsEmpty)
                         {
-                            if (b.Value is RszUserDataNode otherUserValueNode && otherUserValueNode.Path == userDataNode.Path)
+                            return builder[0];
+                        }
+                        else
+                        {
+                            // Avoid duplicate user data entries
+                            var path = userDataNode.Path;
+                            foreach (var b in builder)
                             {
-                                if (otherUserValueNode.Type != userDataNode.Type)
+                                if (b.Value is RszUserDataNode otherUserValueNode && otherUserValueNode.Path == userDataNode.Path)
                                 {
-                                    throw new Exception($"Mismatch of RSZ type for user data: {path}");
+                                    if (otherUserValueNode.Type != userDataNode.Type)
+                                    {
+                                        throw new Exception($"Mismatch of RSZ type for user data: {path}");
+                                    }
+                                    return b;
                                 }
-                                return b;
                             }
                         }
                     }
