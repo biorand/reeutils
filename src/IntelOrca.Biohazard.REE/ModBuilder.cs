@@ -157,7 +157,10 @@ namespace IntelOrca.Biohazard.REE
             dict.Add(("name", Name));
             dict.Add(("version", Version));
             dict.Add(("description", Description));
-            dict.Add(("screenshot", ScreenshotFileName));
+            if (ScreenshotFileName != null && ScreenshotFileContent != null)
+            {
+                dict.Add(("screenshot", ScreenshotFileName));
+            }
             dict.Add(("author", Author));
             dict.Add(("category", Category));
 
@@ -168,6 +171,7 @@ namespace IntelOrca.Biohazard.REE
                     continue;
 
                 sb.Append(key);
+                sb.Append('=');
                 sb.Append(Sanitize(value));
                 sb.Append("\n");
             }
@@ -176,7 +180,10 @@ namespace IntelOrca.Biohazard.REE
 
         private static string Sanitize(string? s)
         {
-            return (s ?? "").Trim().Replace("\r\n", "\\n");
+            return (s ?? "")
+                .Trim()
+                .Replace("\r\n", "\n")
+                .Replace("\n", "\\n");
         }
     }
 }
