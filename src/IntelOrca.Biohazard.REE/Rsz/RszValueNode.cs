@@ -50,8 +50,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return hash.ToHashCode();
         }
 
-        public override bool Equals(object obj) => obj is RszValueNode value && Equals(value);
+        public override bool Equals(object? obj) => obj is RszValueNode value && Equals(value);
 
-        public override string ToString() => RszSerializer.Deserialize(this).ToString();
+        public override string? ToString() => RszSerializer.Deserialize(this).ToString();
     }
 }

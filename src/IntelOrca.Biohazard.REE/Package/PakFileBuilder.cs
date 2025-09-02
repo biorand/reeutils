@@ -19,7 +19,6 @@ namespace IntelOrca.Biohazard.REE.Package
         public void AddEntry(string path, ReadOnlySpan<byte> data)
         {
             if (path == null) throw new ArgumentNullException(nameof(path));
-            if (data == null) throw new ArgumentNullException(nameof(data));
 
             _entries[path] = data.ToArray();
         }

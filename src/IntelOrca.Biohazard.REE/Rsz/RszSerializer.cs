@@ -30,7 +30,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             else if (node is RszObjectNode objectNode)
             {
                 var clrType = FindClrType(objectNode.Type, targetClrType);
-                var obj = Activator.CreateInstance(clrType)!;
+                var obj = CreateClrInstance<object>(clrType)!;
                 foreach (var property in clrType.GetProperties())
                 {
                     var propertyClrType = property.PropertyType;
@@ -48,7 +48,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     if (genericType == typeof(List<>))
                     {
                         var elementType = targetClrType.GetGenericArguments()[0];
-                        var list = (IList)Activator.CreateInstance(targetClrType);
+                        var list = CreateClrInstance<IList>(targetClrType)!;
                         for (var i = 0; i < children.Length; i++)
                         {
                             var child = children[i];
@@ -59,7 +59,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     else if (genericType == typeof(ImmutableArray<>))
                     {
                         var elementType = targetClrType.GetGenericArguments()[0];
-                        var array = (Array)Activator.CreateInstance(elementType.MakeArrayType(), children.Length);
+                        var array = CreateClrInstance<Array>(elementType.MakeArrayType(), children.Length);
                         for (var i = 0; i < children.Length; i++)
                         {
                             array.SetValue(Deserialize(children[i], elementType), i);
@@ -69,8 +69,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
                 else if (targetClrType.IsArray)
                 {
-                    var elementType = targetClrType.GetElementType();
-                    var array = (Array)Activator.CreateInstance(targetClrType, children.Length);
+                    var elementType = targetClrType.GetElementType()!;
+                    var array = CreateClrInstance<Array>(targetClrType, children.Length)!;
                     for (var i = 0; i < children.Length; i++)
                     {
                         array.SetValue(Deserialize(children[i], elementType), i);
@@ -95,6 +95,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 throw new NotSupportedException("This node can't be deserialized.");
             }
+
+            static T CreateClrInstance<T>(Type type, params object[] args)
+            {
+                return (T)(Activator.CreateInstance(type, args) ?? throw new Exception($"Failed to create instance of {type}."));
+            }
         }
 
         public static IRszNode Serialize(RszType type, object? obj)
@@ -102,7 +107,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             if (obj is null)
                 return new RszNullNode();
 
-            var clrName = obj.GetType().FullName.Replace('+', '.');
+            var clrName = obj.GetType().FullName!.Replace('+', '.');
             if (clrName != type.Name)
             {
                 var subRszType = type.Repository.FromName(clrName);
@@ -131,7 +136,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     if (propertyValue is not RszArrayNode arrayNode)
                     {
                         var arrayChildren = ImmutableArray.CreateBuilder<IRszNode>();
-                        var list = (IList)propertyValue;
+                        var list = (IList)propertyValue!;
                         var listCount = list.Count;
                         for (var i = 0; i < listCount; i++)
                         {
@@ -264,7 +269,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         private static Type FindClrType(RszType rszType, Type targetClrType)
         {
-            if (rszType.Name != targetClrType.FullName.Replace('+', '.'))
+            if (rszType.Name != targetClrType.FullName!.Replace('+', '.'))
             {
                 // Look for inheritance
                 var foundClrType = targetClrType.Assembly.DefinedTypes.FirstOrDefault(x => x.FullName == rszType.Name);
@@ -289,7 +294,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public static object CreateImmutableArray(Array items)
         {
-            var elementType = items.GetType().GetElementType();
+            var elementType = items.GetType().GetElementType()!;
             var createWithArray = typeof(ImmutableArray)
                 .GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .Where(m => m.Name == nameof(ImmutableArray.Create) && m.IsGenericMethodDefinition)

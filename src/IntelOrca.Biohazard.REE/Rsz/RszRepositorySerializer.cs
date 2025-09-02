@@ -31,7 +31,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     new HexUIntJsonConverter()
                 },
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-            });
+            })!;
             var idMap = stringIdMap
                 .Where(x => x.Key != "metadata")
                 .ToDictionary(x => Convert.ToUInt32(x.Key, 16), x => x.Value);

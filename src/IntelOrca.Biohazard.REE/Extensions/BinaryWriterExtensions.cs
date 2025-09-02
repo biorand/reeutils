@@ -44,7 +44,11 @@ namespace IntelOrca.Biohazard.REE.Extensions
         private static void Write2<T>(this BinaryWriter bw, ref T value) where T : unmanaged
         {
             Span<byte> buffer = stackalloc byte[sizeof(T)];
+#if NETSTANDARD
             MemoryMarshal.Write(buffer, ref value);
+#else
+            MemoryMarshal.Write(buffer, in value);
+#endif
             for (var i = 0; i < buffer.Length; i++)
             {
                 bw.Write(buffer[i]);

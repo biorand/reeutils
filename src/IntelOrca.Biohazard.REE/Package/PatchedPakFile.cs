@@ -18,7 +18,7 @@ namespace IntelOrca.Biohazard.REE.Package
 
             var fileOrder = new List<string>() { basePakPath };
             var basePakFileName = Path.GetFileName(basePakPath);
-            var directory = Path.GetDirectoryName(basePakPath);
+            var directory = Path.GetDirectoryName(basePakPath)!;
             var files = Directory.GetFiles(directory);
             foreach (var f in files)
             {

@@ -17,6 +17,7 @@ namespace IntelOrca.Biohazard.REE.Package
         internal const uint g_zstd = 0xFD2FB528;
 
         private readonly Stream _stream;
+        private readonly BinaryReader _br;
         private Header _header;
         private ImmutableArray<Entry> _entries = [];
         private ImmutableDictionary<ulong, int> _hashToEntry = ImmutableDictionary<ulong, int>.Empty;
@@ -32,11 +33,11 @@ namespace IntelOrca.Biohazard.REE.Package
         public PakFile(Stream stream)
         {
             _stream = stream;
+            _br = new BinaryReader(stream);
             if (stream.Length == 0)
                 return;
 
-            var br = new BinaryReader(stream);
-            _header = ReadHeader(br);
+            _header = ReadHeader(_br);
 
             if (_header.wMagic != g_magic)
                 throw new InvalidDataException("Invalid PAK file");
@@ -47,7 +48,7 @@ namespace IntelOrca.Biohazard.REE.Package
             if (_header.Feature != 0 && _header.Feature != 8)
                 throw new InvalidDataException("Unsupported PAK encryption");
 
-            _entries = ReadEntries(in _header, br);
+            _entries = ReadEntries(in _header, _br);
 
             var dict = new Dictionary<ulong, int>();
             for (var i = 0; i < _entries.Length; i++)
@@ -175,7 +176,7 @@ namespace IntelOrca.Biohazard.REE.Package
         {
             var result = new byte[length];
             _stream.Seek(position, SeekOrigin.Begin);
-            _stream.Read(result, 0, (int)length);
+            _br.Read(result, 0, (int)length);
             return result;
         }
 
