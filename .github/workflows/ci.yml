@@ -7,6 +7,10 @@ jobs:
     permissions:
       contents: write
     steps:
+    - name: Setup .NET 9.0 Preview
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
     - name: Checkout
       uses: actions/checkout@v4
       with:
