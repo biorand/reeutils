@@ -45,6 +45,8 @@ namespace IntelOrca.Biohazard.REE
 
         public bool ContainsFile(string key) => _entries.ContainsKey(key);
 
+        public ModBuilder AddFile(string key, ReadOnlyMemory<byte> value) => AddFile(key, value.Span);
+        public ModBuilder AddFile(string key, ReadOnlySpan<byte> value) => AddFile(key, value.ToArray());
         public ModBuilder AddFile(string key, byte[] value)
         {
             this[key] = value;
@@ -74,6 +76,41 @@ namespace IntelOrca.Biohazard.REE
 
         public void SavePakFile(string path) => File.WriteAllBytes(path, BuildPakFile());
         public void SaveFluffyZipFile(string path) => File.WriteAllBytes(path, BuildFluffyZipFile());
+        public void SaveFluffyFolder(string path, bool deleteIfExists = false)
+        {
+            if (Directory.Exists(path))
+            {
+                if (deleteIfExists)
+                {
+                    Directory.Delete(path, recursive: true);
+                }
+                else
+                {
+                    throw new ArgumentException($"'{path}' already exists.");
+                }
+            }
+
+            Directory.CreateDirectory(path);
+
+            var extraFiles = GetExtraFluffyFiles();
+            foreach (var f in extraFiles)
+            {
+                WriteEntry(f);
+            }
+
+            foreach (var entry in _entries)
+            {
+                WriteEntry(entry);
+            }
+
+            void WriteEntry(KeyValuePair<string, byte[]> entry)
+            {
+                var fullPath = Path.Combine(path, entry.Key);
+                var directory = Path.GetDirectoryName(fullPath)!;
+                Directory.CreateDirectory(directory);
+                File.WriteAllBytes(fullPath, entry.Value);
+            }
+        }
 
         public byte[] BuildPakFile()
         {
@@ -88,21 +125,33 @@ namespace IntelOrca.Biohazard.REE
         public byte[] BuildFluffyZipFile()
         {
             var zipFileBuilder = new ZipFileBuilder();
+
+            var extraFiles = GetExtraFluffyFiles();
+            foreach (var f in extraFiles)
+            {
+                zipFileBuilder.AddEntry(f.Key, f.Value);
+            }
+
             foreach (var entry in _entries)
             {
                 zipFileBuilder.AddEntry(entry.Key, entry.Value);
             }
 
-            if (ScreenshotFileName != null && ScreenshotFileContent != null)
-            {
-                zipFileBuilder.AddEntry(ScreenshotFileName, ScreenshotFileContent);
-            }
-            zipFileBuilder.AddEntry("modinfo.ini", GetModInfo());
-
             return zipFileBuilder.Build();
         }
 
-        private byte[] GetModInfo()
+        public ImmutableDictionary<string, byte[]> GetExtraFluffyFiles()
+        {
+            var result = ImmutableDictionary.CreateBuilder<string, byte[]>();
+            if (ScreenshotFileName != null && ScreenshotFileContent != null)
+            {
+                result.Add(ScreenshotFileName, ScreenshotFileContent);
+            }
+            result.Add("modinfo.ini", GetFluffyModInfoIniContent());
+            return result.ToImmutable();
+        }
+
+        private byte[] GetFluffyModInfoIniContent()
         {
             var dict = new List<(string, string?)>();
             dict.Add(("name", Name));
