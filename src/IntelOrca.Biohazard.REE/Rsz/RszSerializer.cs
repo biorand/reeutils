@@ -199,7 +199,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.Guid or RszFieldType.GameObjectRef => MemoryMarshal.Read<Guid>(node.Data.Span),
                 RszFieldType.Range => MemoryMarshal.Read<Native.Range>(node.Data.Span),
                 RszFieldType.KeyFrame => MemoryMarshal.Read<KeyFrame>(node.Data.Span),
-                _ => throw new NotSupportedException()
+                _ => node.Data
             };
         }
 

@@ -17,6 +17,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
             Value = value;
         }
 
+        public bool IsEmpty => string.IsNullOrEmpty(Value);
+
         public override string? ToString() => Value;
     }
 }

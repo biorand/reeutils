@@ -1,4 +1,5 @@
-﻿using IntelOrca.Biohazard.REE.Rsz;
+﻿using System.Text.Json;
+using IntelOrca.Biohazard.REE.Rsz;
 
 namespace IntelOrca.Biohazard.REE.Tests
 {
@@ -20,34 +21,34 @@ namespace IntelOrca.Biohazard.REE.Tests
         [Fact]
         public void Rebuild_RE4_LEVEL_CP10_CHP1_1_010()
         {
-            AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/leveldesign/chapter/cp10_chp1_1/level_cp10_chp1_1_010.scn.20", 71148);
+            AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/leveldesign/chapter/cp10_chp1_1/level_cp10_chp1_1_010.scn.20");
         }
 
         [Fact]
         public void Rebuild_RE4_LEVEL_LOC40_900()
         {
-            AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/leveldesign/location/loc40/level_loc40_900.scn.20", 128);
+            AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/leveldesign/location/loc40/level_loc40_900.scn.20");
         }
 
         [Fact]
         public void Rebuild_RE8_C02_1_C02_1_FARM()
         {
-            AssertRebuild(GameNames.RE8, "natives/stm/spawn/enemy/scene/c02_1/c02_1_c02_1_farm.scn.20", 39904);
+            AssertRebuild(GameNames.RE8, "natives/stm/spawn/enemy/scene/c02_1/c02_1_c02_1_farm.scn.20");
         }
 
         [Fact]
         public void Rebuild_RE8_ST03_EVENTPROPS()
         {
-            AssertRebuild(GameNames.RE8, "natives/stm/spawn/item/scene/st03/st03_eventprops.scn.20", 4709);
+            AssertRebuild(GameNames.RE8, "natives/stm/spawn/item/scene/st03/st03_eventprops.scn.20");
         }
 
         [Fact]
         public void Rebuild_RE8_C02_2_ENEMYSET_MADAM()
         {
-            AssertRebuild(GameNames.RE8, "natives/stm/spawn/enemy/scene/c02_2/c02_2_enemyset_madam.scn.20", 83509);
+            AssertRebuild(GameNames.RE8, "natives/stm/spawn/enemy/scene/c02_2/c02_2_enemyset_madam.scn.20");
         }
 
-        private void AssertRebuild(string gameName, string path, int expectedLength)
+        private void AssertRebuild(string gameName, string path, int? expectedLength = null)
         {
             var repo = _pakHelper.GetTypeRepository(gameName);
             var input = new ScnFile(FileVersion.FromPath(path), _pakHelper.GetFileData(gameName, path));
@@ -55,12 +56,30 @@ namespace IntelOrca.Biohazard.REE.Tests
             var output = inputBuilder.Build();
             var outputBuilder = output.ToBuilder(repo);
 
-            // We currently don't keep prefabs that have no owner, so file size might be different
             if (input.Data.Length == output.Data.Length)
             {
                 Assert.True(input.Data.Span.SequenceEqual(output.Data.Span));
             }
-            Assert.Equal(expectedLength, output.Data.Length);
+            Assert.Equal(expectedLength ?? input.Data.Length, output.Data.Length);
+        }
+
+        private void AssertRebuildScene(string gameName, string path, int? expectedLength = null)
+        {
+            var repo = _pakHelper.GetTypeRepository(gameName);
+            var input = new ScnFile(FileVersion.FromPath(path), _pakHelper.GetFileData(gameName, path));
+            var inputBuilder = input.ToBuilder(repo);
+            var output = inputBuilder.Build();
+            var outputBuilder = output.ToBuilder(repo);
+
+            var inputJson = RszJsonSerializer.Serialize(inputBuilder.Scene, new JsonSerializerOptions()
+            {
+                WriteIndented = true
+            });
+            var outputJson = RszJsonSerializer.Serialize(outputBuilder.Scene, new JsonSerializerOptions()
+            {
+                WriteIndented = true
+            });
+            Assert.Equal(inputJson, outputJson);
         }
     }
 }
