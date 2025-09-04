@@ -419,7 +419,7 @@ namespace IntelOrca.Biohazard.REE.Messages
                     else
                         bw.Write(i);
                     bw.Write(stringDataBuilder.AddString(m.Name));
-                    bw.Write(attributeStartOffset);
+                    bw.Write(attributeStartOffset + (ulong)i * 8 * (ulong)Attributes.Count);
                     for (var j = 0; j < Languages.Count; j++)
                     {
                         var languageId = Languages[j];

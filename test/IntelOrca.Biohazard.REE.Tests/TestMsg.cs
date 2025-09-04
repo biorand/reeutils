@@ -50,6 +50,12 @@ namespace IntelOrca.Biohazard.REE.Tests
         }
 
         [Fact]
+        public void Rebuild_RE8_UI_FILE()
+        {
+            AssertRebuild(GameNames.RE8, "natives/stm/message/gui/ui_file.msg.33685777");
+        }
+
+        [Fact]
         public void GetMessage_RE4_CH_MES_MAIN_CONV_CP42()
         {
             var path = "natives/stm/_chainsaw/message/mes_main_conv/ch_mes_main_conv_cp42.msg.22";
