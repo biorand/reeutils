@@ -41,7 +41,7 @@ namespace IntelOrca.Biohazard.REE.Package
                     _map[PakFile.GetNormalizedPathHash(path)] = path;
                 }
             }
-            Entries = [.. _map.Values.OrderBy(x => x)];
+            Entries = [.. _map.Values.OrderBy(x => x, StringComparer.Ordinal)];
         }
 
         public string? GetPath(ulong hash)
