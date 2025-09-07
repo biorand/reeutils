@@ -21,6 +21,7 @@ namespace IntelOrca.Biohazard.REE.Package
         private Header _header;
         private ImmutableArray<Entry> _entries = [];
         private ImmutableDictionary<ulong, int> _hashToEntry = ImmutableDictionary<ulong, int>.Empty;
+        private readonly object _streamLock = new object();
 
         public PakFile(string path) : this(File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
@@ -146,8 +147,6 @@ namespace IntelOrca.Biohazard.REE.Package
 
         private byte[] GetEntryData(in Entry entry)
         {
-            _stream.Seek(entry.Offset, SeekOrigin.Begin);
-
             var compressionType = (CompressionKind)(entry.CompressionType & 0x0F);
             if (compressionType == CompressionKind.None)
             {
@@ -175,8 +174,11 @@ namespace IntelOrca.Biohazard.REE.Package
         private byte[] ReadBytes(long position, long length)
         {
             var result = new byte[length];
-            _stream.Seek(position, SeekOrigin.Begin);
-            _br.Read(result, 0, (int)length);
+            lock (_streamLock)
+            {
+                _stream.Seek(position, SeekOrigin.Begin);
+                _br.Read(result, 0, (int)length);
+            }
             return result;
         }
 
