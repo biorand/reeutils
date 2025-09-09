@@ -25,10 +25,13 @@ namespace IntelOrca.Biohazard.REEUtils
                     .WithExample("export", "-o", "ch_mes_main_item_caption.msg.22.json", "ch_mes_main_item_caption.msg.22");
                 config.AddCommand<ImportCommand>("import")
                     .WithDescription("Import a JSON file and convert to an REE file.")
-                    .WithExample("export", "-o", "ch_mes_main_item_caption.msg.22", "ch_mes_main_item_caption.msg.22.json");
+                    .WithExample("import", "-o", "ch_mes_main_item_caption.msg.22", "ch_mes_main_item_caption.msg.22.json");
                 config.AddCommand<MsgCommand>("msg")
                     .WithDescription("Lists strings in an MSG file")
                     .WithExample("msg", "input.msg.22");
+                config.AddCommand<HierarchyCommand>("hierarchy")
+                    .WithDescription("Shows the dependency hierarchy for a given pattern.")
+                    .WithExample("hierarchy", "input.msg.22", "-g", "re8", @"C:\games\re8");
             });
             return app.Run(args);
         }
