@@ -23,6 +23,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
         private ReadOnlySpan<UserDataInfo> UserDataInfoList => data.Get<UserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
         private RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
 
+        public int InstanceCount => Rsz.InstanceCount;
+
         public ImmutableArray<string> Prefabs
         {
             get

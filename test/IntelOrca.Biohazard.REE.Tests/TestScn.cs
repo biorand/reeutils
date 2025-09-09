@@ -48,6 +48,12 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertRebuild(GameNames.RE8, "natives/stm/spawn/enemy/scene/c02_2/c02_2_enemyset_madam.scn.20");
         }
 
+        [Fact]
+        public void Rebuild_RE8_C02_4_ENEMYSET_BOSS()
+        {
+            AssertRebuild(GameNames.RE8, "natives/stm/Spawn/Enemy/scene/c02_4/c02_4_enemyset_boss.scn.20");
+        }
+
         private void AssertRebuild(string gameName, string path, int? expectedLength = null)
         {
             var repo = _pakHelper.GetTypeRepository(gameName);
@@ -61,6 +67,15 @@ namespace IntelOrca.Biohazard.REE.Tests
                 Assert.True(input.Data.Span.SequenceEqual(output.Data.Span));
             }
             Assert.Equal(expectedLength ?? input.Data.Length, output.Data.Length);
+        }
+
+        private void AssertRebuildInstanceCount(string gameName, string path, int? expectedLength = null)
+        {
+            var repo = _pakHelper.GetTypeRepository(gameName);
+            var input = new ScnFile(FileVersion.FromPath(path), _pakHelper.GetFileData(gameName, path));
+            var inputBuilder = input.ToBuilder(repo);
+            var output = inputBuilder.Build();
+            Assert.Equal(input.InstanceCount, output.InstanceCount);
         }
 
         private void AssertRebuildScene(string gameName, string path, int? expectedLength = null)

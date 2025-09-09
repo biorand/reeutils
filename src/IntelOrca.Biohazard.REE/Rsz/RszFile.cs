@@ -27,6 +27,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         internal int Version => (int)Header.Version;
 
+        public int InstanceCount => InstanceInfoList.Length;
+
         internal ImmutableArray<string> UserDataInfoPaths
         {
             get
@@ -123,6 +125,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 result[i] = new RszInstance(new RszInstanceId(i), rszValue);
             }
 
+#if DEBUG_RSZ
+            var instanceIds = Enumerable.Range(0, instanceInfoList.Length).ToHashSet();
+#endif
             for (var i = 0; i < instanceInfoList.Length; i++)
             {
                 var value = result[i].Value;
@@ -135,11 +140,23 @@ namespace IntelOrca.Biohazard.REE.Rsz
                             if (valueNode.Type == RszFieldType.Object)
                             {
                                 var instanceId = valueNode.AsInt32();
+#if DEBUG_RSZ
+                                if (!instanceIds.Remove(instanceId))
+                                {
+                                    Console.WriteLine("HMM");
+                                }
+#endif
                                 return result[instanceId].Value;
                             }
                             else if (valueNode.Type == RszFieldType.UserData)
                             {
                                 var instanceId = valueNode.AsInt32();
+#if DEBUG_RSZ
+                                if (!instanceIds.Remove(instanceId))
+                                {
+                                    Console.WriteLine("HMM");
+                                }
+#endif
                                 return instanceId == 0 ? new RszUserDataNode() : result[instanceId].Value;
                             }
                         }
@@ -147,6 +164,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }));
                 }
             }
+
+#if DEBUG_RSZ
+            foreach (var o in ObjectInstanceIds)
+            {
+                instanceIds.Remove(o.Index);
+            }
+#endif
 
             return result.ToImmutable();
         }
