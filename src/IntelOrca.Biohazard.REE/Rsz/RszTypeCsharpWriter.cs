@@ -43,9 +43,25 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             void WriteType(RszType t)
             {
-                writer.BeginClassBlock(t.NameWithoutNamespace);
+                if (t.Name.Contains("[]") || t.Name.Contains('<'))
+                    return;
+
+                string? parentName = null;
+                RszType? parent = null;
+                if (t.Parent != null && allTypes.Contains(t.Parent))
+                {
+                    parent = t.Parent;
+                    parentName = t.Parent.Namespace == t.Namespace
+                        ? t.Parent.NameWithoutNamespace
+                        : t.Parent.Name;
+                }
+
+                writer.BeginClassBlock(t.NameWithoutNamespace, parentName);
                 foreach (var f in t.Fields)
                 {
+                    if (parent != null && t.IsFieldInherited(f.Name))
+                        continue;
+
                     var fieldType = GetFieldTypeName(f);
                     if (f.IsArray)
                     {
@@ -53,11 +69,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     else
                     {
-                        writer.Property(fieldType, f.Name, f.Type == RszFieldType.String
-                            ? "\"\""
-                            : fieldType.StartsWith("System.")
-                                ? null
-                                : "new()");
+                        writer.Property(fieldType, f.Name, GetInitializer(f));
                     }
                 }
 
@@ -71,11 +83,21 @@ namespace IntelOrca.Biohazard.REE.Rsz
             }
         }
 
+        private string? GetInitializer(RszTypeField f)
+        {
+            if (f.Type == RszFieldType.String)
+                return "\"\"";
+
+            if (f.ObjectType is RszType rszType)
+            {
+                return null;
+            }
+
+            return "new()";
+        }
+
         private string GetFieldTypeName(RszTypeField field)
         {
-            if (field.Type == RszFieldType.String)
-                return "string";
-
             var objectType = field.ObjectType;
             if (!GenerateEnums)
             {
@@ -85,12 +107,42 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
             }
 
-            return objectType?.Name ?? "object";
+            return field.Type switch
+            {
+                RszFieldType.Bool => "bool",
+                RszFieldType.S8 => "sbyte",
+                RszFieldType.U8 => "byte",
+                RszFieldType.S16 => "short",
+                RszFieldType.U16 => "ushort",
+                RszFieldType.S32 => "int",
+                RszFieldType.U32 => "uint",
+                RszFieldType.S64 => "long",
+                RszFieldType.U64 => "ulong",
+                RszFieldType.F32 => "float",
+                RszFieldType.F64 => "double",
+                RszFieldType.Vec2 => "System.Numerics.Vector2",
+                RszFieldType.Vec3 => "System.Numerics.Vector3",
+                RszFieldType.Vec4 => "System.Numerics.Vector4",
+                RszFieldType.Quaternion => "System.Numerics.Quaternion",
+                RszFieldType.Guid or RszFieldType.GameObjectRef => "System.Guid",
+                RszFieldType.Range => "IntelOrca.Biohazard.REE.Rsz.Native.Range",
+                RszFieldType.KeyFrame => "IntelOrca.Biohazard.REE.Rsz.Native.KeyFrame",
+                RszFieldType.String => "string",
+                RszFieldType.UserData => "RszUserDataNode",
+                RszFieldType.Resource => "RszResourceNode",
+                _ => objectType?.Name ?? "object"
+            };
         }
 
         private List<RszType> FindTypes(List<RszType> types, RszType type)
         {
             if (type.Name.StartsWith("System."))
+                return types;
+
+            if (type.Name.StartsWith("via."))
+                return types;
+
+            if (type.IsEnum && !GenerateEnums)
                 return types;
 
             if (types.Contains(type))
@@ -99,6 +151,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
             // Do not include nested types
             if (type.Repository.FromName(type.Namespace) == null)
                 types.Add(type);
+
+            // Include sub classes
+            foreach (var subType in type.Children.OrderBy(x => x.Name))
+                types.Add(subType);
 
             foreach (var f in type.Fields)
             {
@@ -136,9 +192,15 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 Indent();
             }
 
-            public void BeginClassBlock(string name)
+            public void BeginClassBlock(string name, string? parentName)
             {
-                AppendLine($"internal class {name}");
+                var inhertiance = "";
+                if (parentName != null)
+                    inhertiance = $" : {parentName}";
+                else
+                    inhertiance = "";
+
+                AppendLine($"internal class {name}{inhertiance}");
                 AppendLine("{");
                 Indent();
             }

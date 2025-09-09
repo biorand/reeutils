@@ -32,22 +32,47 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 },
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
             })!;
-            var idMap = stringIdMap
-                .Where(x => x.Key != "metadata")
-                .ToDictionary(x => Convert.ToUInt32(x.Key, 16), x => x.Value);
+            stringIdMap.Remove("metadata");
+            foreach (var kvp in stringIdMap)
+            {
+                kvp.Value.Id = Convert.ToUInt32(kvp.Key, 16);
+            }
+            var typeModels = stringIdMap.Values.OrderBy(x => x.Id).ToImmutableArray();
 
             var repo = new RszTypeRepository();
-            foreach (var kvp in idMap)
+
+            // Create types
+            foreach (var typeModel in typeModels)
             {
-                var rszType = new RszType(repo);
-                rszType.Id = kvp.Key;
-                rszType.Crc = kvp.Value.Crc;
-                rszType.Name = kvp.Value.Name ?? "";
-                repo.AddType(rszType);
+                repo.AddType(new RszType
+                {
+                    Repository = repo,
+                    Id = typeModel.Id,
+                    Crc = typeModel.Crc,
+                    Name = typeModel.Name ?? ""
+                });
             }
-            foreach (var kvp in idMap)
+
+            // Set parents
+            foreach (var typeModel in typeModels)
             {
-                var rszType = repo.FromId(kvp.Key) ?? throw new Exception();
+                var parentTypeName = typeModel.Parent;
+                if (string.IsNullOrEmpty(parentTypeName))
+                    continue;
+
+                var parentType = repo.FromName(parentTypeName);
+                if (parentType == null)
+                    continue;
+
+                var rszType = repo.FromId(typeModel.Id) ?? throw new Exception("Type not found");
+                rszType.Parent = parentType;
+            }
+
+            // Create fields
+            foreach (var kvp in stringIdMap)
+            {
+                var id = Convert.ToUInt32(kvp.Key, 16);
+                var rszType = repo.FromId(id) ?? throw new Exception();
                 var fields = ImmutableArray.CreateBuilder<RszTypeField>();
                 foreach (var f in kvp.Value.Fields ?? [])
                 {
@@ -70,9 +95,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         private class RszTypeModel
         {
+            public uint Id { get; set; }
             public uint Crc { get; set; }
             public string? Name { get; set; }
             public RszFieldModel[]? Fields { get; set; }
+            public string? Parent { get; set; }
         }
 
         private class RszFieldModel

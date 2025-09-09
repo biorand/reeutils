@@ -1,17 +1,29 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Linq;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
     [DebuggerDisplay("{Name,nq}")]
-    public class RszType(RszTypeRepository repository)
+    public class RszType
     {
-        public RszTypeRepository Repository => repository;
-        public uint Id { get; set; }
-        public uint Crc { get; set; }
-        public string Name { get; set; } = "";
+        public required RszTypeRepository Repository { get; init; }
+        public required uint Id { get; init; }
+        public required uint Crc { get; init; }
+        public required string Name { get; init; }
         public ImmutableArray<RszTypeField> Fields { get; set; } = [];
+
+        /// <summary>
+        /// Gets the parent type that is likely the super class for this type.
+        /// </summary>
+        public RszType? Parent { get; set; }
+
+        /// <summary>
+        /// Gets other types that are likely sub classes of this type.
+        /// </summary>
+        public IEnumerable<RszType> Children => Repository.Types.Where(x => x.Parent == this);
 
         public string Namespace
         {
@@ -98,6 +110,20 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
             }
             return new RszObjectNode(this, children.ToImmutable());
+        }
+
+        public bool IsFieldInherited(string fieldName)
+        {
+            var parent = Parent;
+            while (parent != null)
+            {
+                if (parent.Fields.Any(x => x.Name == fieldName))
+                {
+                    return true;
+                }
+                parent = parent.Parent;
+            }
+            return false;
         }
     }
 }

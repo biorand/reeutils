@@ -32,6 +32,17 @@ namespace IntelOrca.Biohazard.REE.Tests
         }
 
         [Fact]
+        public void Inheritance()
+        {
+            var repo = _pakHelper.GetTypeRepository(GameNames.RE4);
+
+            var spCategoryBase = repo.FromName("chainsaw.SpCategoryEvaluationSettingBase")!;
+            var spCategory00 = repo.FromName("chainsaw.SpCategory00EvaluationSetting")!;
+            Assert.Same(spCategoryBase, spCategory00.Parent);
+            Assert.Equal(4, spCategoryBase.Children.Count());
+        }
+
+        [Fact]
         public void Create_WeaponPartsCombineDefinition()
         {
             var repo = _pakHelper.GetTypeRepository(GameNames.RE4);

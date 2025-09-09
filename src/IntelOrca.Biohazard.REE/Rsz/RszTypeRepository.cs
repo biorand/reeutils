@@ -7,6 +7,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
     {
         private Dictionary<uint, RszType> _idToTypeMap = [];
         private Dictionary<string, RszType> _nameToTypeMap = [];
+        private List<RszType> _types = [];
+
+        public IReadOnlyCollection<RszType> Types => _types;
 
         public RszType? FromId(uint id)
         {
@@ -38,6 +41,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             _idToTypeMap.Add(type.Id, type);
             _nameToTypeMap.Add(type.Name, type);
+            _types.Add(type);
         }
 
         public RszObjectNode Create(string name)
