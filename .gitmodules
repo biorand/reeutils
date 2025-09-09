@@ -1,4 +1,0 @@
-[submodule "lib/rsztool"]
-	path = lib/rsztool
-	url = https://github.com/IntelOrca/RszTool.git
-	branch = biorand/v0.2.2
