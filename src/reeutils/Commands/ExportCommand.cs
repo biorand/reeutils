@@ -4,9 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using IntelOrca.Biohazard.REE.Messages;
 using IntelOrca.Biohazard.REE.Package;
-using Namsku.REE.Messages;
-using RszTool;
+using IntelOrca.Biohazard.REE.Rsz;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -48,7 +48,6 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             var jsonOptions = new JsonSerializerOptions()
             {
                 Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-                IncludeFields = true,
                 WriteIndented = true
             };
 
@@ -61,16 +60,16 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
             if (settings.InputPath.EndsWith(".msg.22"))
             {
-                var msg = new Msg(fileData);
+                var msg = new MsgFile(fileData).ToBuilder();
                 var data = new SerializableMsg
                 {
                     Version = msg.Version,
-                    Languages = [.. msg.Languages],
-                    Entries = msg.Entries.Select(x => new SerializableMsg.Entry()
+                    Languages = [.. msg.Languages.Cast<int>()],
+                    Entries = msg.Messages.Select(x => new SerializableMsg.Entry()
                     {
                         Guid = x.Guid,
                         Name = x.Name,
-                        Values = [.. x.Langs]
+                        Values = [.. x.Values.Select(x => x.Text)]
                     }).ToArray()
                 };
                 await File.WriteAllTextAsync(settings.OutputPath!, data.ToJson(camelCase: true));
@@ -80,12 +79,10 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 if (settings.Game == null)
                     throw new Exception("Game not specified");
 
-                var rszFileOption = EmbeddedData.CreateRszFileOptionBinary(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
-                var userFile = new UserFile(rszFileOption, new FileHandler(new MemoryStream(fileData)));
-                userFile.Read();
-
-                var serializer = new RszInstanceSerializer(userFile.RSZ!);
-                var rootJson = serializer.Serialize(userFile, jsonOptions);
+                var repo = GetRszTypeRepository(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
+                var userFile = new UserFile(fileData);
+                var root = userFile.GetObjects(repo)[0];
+                var rootJson = RszJsonSerializer.Serialize(root, jsonOptions);
                 await File.WriteAllTextAsync(settings.OutputPath!, rootJson);
             }
             else if (settings.InputPath.EndsWith(".scn.20"))
@@ -93,13 +90,10 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 if (settings.Game == null)
                     throw new Exception("Game not specified");
 
-                var rszFileOption = EmbeddedData.CreateRszFileOptionBinary(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
-                var scnFile = new ScnFile(rszFileOption, new FileHandler(new MemoryStream(fileData)));
-                scnFile.Read();
-                scnFile.SetupGameObjects();
-
-                var serializer = new RszInstanceSerializer(scnFile.RSZ!);
-                var rootJson = serializer.Serialize(scnFile, jsonOptions);
+                var repo = GetRszTypeRepository(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
+                var scnFile = new ScnFile(20, fileData);
+                var root = scnFile.ReadScene(repo);
+                var rootJson = RszJsonSerializer.Serialize(root, jsonOptions);
                 await File.WriteAllTextAsync(settings.OutputPath!, rootJson);
             }
             else if (settings.InputPath.EndsWith(".pfb.17"))
@@ -107,13 +101,10 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 if (settings.Game == null)
                     throw new Exception("Game not specified");
 
-                var rszFileOption = EmbeddedData.CreateRszFileOptionBinary(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
-                var pfbFile = new PfbFile(rszFileOption, new FileHandler(new MemoryStream(fileData)));
-                pfbFile.Read();
-                pfbFile.SetupGameObjects();
-
-                var serializer = new RszInstanceSerializer(pfbFile.RSZ!);
-                var rootJson = serializer.Serialize(pfbFile, jsonOptions);
+                var repo = GetRszTypeRepository(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
+                var pfbFile = new PfbFile(17, fileData);
+                var root = pfbFile.ReadScene(repo);
+                var rootJson = RszJsonSerializer.Serialize(root, jsonOptions);
                 await File.WriteAllTextAsync(settings.OutputPath!, rootJson);
             }
             else
@@ -121,6 +112,15 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 throw new NotSupportedException("File format not supported.");
             }
             return 0;
+        }
+
+        private static RszTypeRepository? GetRszTypeRepository(string game)
+        {
+            var rszJsonGz = EmbeddedData.GetCompressedFile($"rsz{game}.json");
+            if (rszJsonGz == null)
+                return null;
+
+            return RszRepositorySerializer.Default.FromJsonGz(rszJsonGz);
         }
 
         private static byte[]? GetFileData(Settings settings)

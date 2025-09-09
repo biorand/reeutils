@@ -6,11 +6,9 @@
     <RootNamespace>IntelOrca.Biohazard.REEUtils</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Namsku.REE.Messages" Version="1.0.0" />
     <PackageReference Include="Spectre.Console.Cli" Version="0.49.1" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../lib/rsztool/RszTool/RszTool.csproj" />
     <ProjectReference Include="../IntelOrca.Biohazard.REE/IntelOrca.Biohazard.REE.csproj" />
   </ItemGroup>
   <ItemGroup>

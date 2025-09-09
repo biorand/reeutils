@@ -13,6 +13,18 @@ namespace IntelOrca.Biohazard.REE.Rsz
             options.Converters.Add(RszNodeJsonConverter.Default);
             return JsonSerializer.Serialize(node, options);
         }
+
+        public static IRszNode Deserialize(string jsonDocument, JsonSerializerOptions? options = null)
+        {
+            return Deserialize(JsonDocument.Parse(jsonDocument), options);
+        }
+
+        public static IRszNode Deserialize(JsonDocument jsonDocument, JsonSerializerOptions? options = null)
+        {
+            options ??= new JsonSerializerOptions();
+            options.Converters.Add(RszNodeJsonConverter.Default);
+            return JsonSerializer.Deserialize<IRszNode>(jsonDocument, options)!;
+        }
     }
 
     public sealed class RszNodeJsonConverter : JsonConverter<IRszNode>

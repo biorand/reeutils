@@ -1,5 +1,4 @@
-﻿using System.IO;
-using IntelOrca.Biohazard.REEUtils.Commands;
+﻿using IntelOrca.Biohazard.REEUtils.Commands;
 using Spectre.Console.Cli;
 
 namespace IntelOrca.Biohazard.REEUtils
@@ -27,23 +26,11 @@ namespace IntelOrca.Biohazard.REEUtils
                 config.AddCommand<ImportCommand>("import")
                     .WithDescription("Import a JSON file and convert to an REE file.")
                     .WithExample("export", "-o", "ch_mes_main_item_caption.msg.22", "ch_mes_main_item_caption.msg.22.json");
-                // config.AddCommand<DumpCommand>("dump")
-                //     .WithDescription("Dumps an SCN file to JSON")
-                //     .WithExample("dump", "input.scn");
                 config.AddCommand<MsgCommand>("msg")
                     .WithDescription("Lists strings in an MSG file")
                     .WithExample("msg", "input.msg.22");
             });
             return app.Run(args);
-        }
-
-        private static void CreateBinaryRszData()
-        {
-            var data = RszBinarySerializer.Serialize(
-                EmbeddedData.GetCompressedFile("rszre4.json")!,
-                EmbeddedData.GetCompressedFile("rszre4_patch.json")!,
-                EmbeddedData.GetCompressedFile("re4_enum.json")!);
-            File.WriteAllBytes(@"M:\git\reeutils\src\reeutils\data\reszre4.dat", data);
         }
     }
 }

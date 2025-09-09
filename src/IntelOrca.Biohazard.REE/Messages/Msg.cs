@@ -10,8 +10,8 @@ namespace IntelOrca.Biohazard.REE.Messages
         public Guid Guid { get; set; }
         public int Crc { get; set; }
         public string Name { get; set; } = "";
-        public List<MsgValue> Values { get; } = [];
-        public List<MsgAttributeValue> Attributes { get; } = [];
+        public List<MsgValue> Values { get; set; } = [];
+        public List<MsgAttributeValue> Attributes { get; set; } = [];
 
         public string this[LanguageId languageId]
         {

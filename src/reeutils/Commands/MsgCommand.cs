@@ -2,7 +2,7 @@
 using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
-using Namsku.REE.Messages;
+using IntelOrca.Biohazard.REE.Messages;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -32,8 +32,8 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
         public override Task<int> ExecuteAsync(CommandContext context, Settings settings)
         {
-            var msgFile = new Msg(File.ReadAllBytes(settings.InputPath!));
-            foreach (var entry in msgFile.Entries)
+            var msgFile = new MsgFile(File.ReadAllBytes(settings.InputPath!)).ToBuilder();
+            foreach (var entry in msgFile.Messages)
             {
                 var str = (msgFile.GetString(entry.Guid, LanguageId.English) ?? "")
                     .Replace("\r\n", "\n")

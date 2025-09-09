@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using IntelOrca.Biohazard.REE.Package;
 using IntelOrca.Biohazard.REEUtils.Commands;
-using Namsku.REE.Messages;
 
 namespace IntelOrca.Biohazard.REEUtils.Tests
 {
@@ -14,7 +13,6 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
 
         public TestImportExport()
         {
-            var h = PakHash.GetHash("natives/stm/_chainsaw/appsystem/ui/userdata/itemcraftsettinguserdata.user.2");
             _pak = GetVanillaPak();
         }
 

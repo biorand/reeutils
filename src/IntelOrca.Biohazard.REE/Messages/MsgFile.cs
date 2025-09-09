@@ -191,9 +191,13 @@ namespace IntelOrca.Biohazard.REE.Messages
         public class Builder
         {
             public int Version { get; set; }
-            public List<LanguageId> Languages { get; } = [];
-            public List<MsgAttributeDefinition> Attributes { get; } = [];
-            public List<Msg> Messages { get; } = [];
+            public List<LanguageId> Languages { get; set; } = [];
+            public List<MsgAttributeDefinition> Attributes { get; set; } = [];
+            public List<Msg> Messages { get; set; } = [];
+
+            public Builder()
+            {
+            }
 
             public Builder(MsgFile msgFile)
             {
