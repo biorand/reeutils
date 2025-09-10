@@ -16,6 +16,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public ImmutableArray<RszTypeField> Fields { get; set; } = [];
 
         /// <summary>
+        /// Gets the type that contains this type if this is a nested type.
+        /// </summary>
+        public RszType? DeclaringType { get; set; }
+
+        /// <summary>
         /// Gets the parent type that is likely the super class for this type.
         /// </summary>
         public RszType? Parent { get; set; }

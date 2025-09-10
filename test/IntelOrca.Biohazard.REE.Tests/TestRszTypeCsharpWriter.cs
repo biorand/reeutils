@@ -32,6 +32,38 @@ namespace IntelOrca.Biohazard.REE.Tests
         }
 
         [Fact]
+        public void Generate_SubObjects()
+        {
+            AssertCode(GameNames.RE4, "chainsaw.ItemCraftResultSetting",
+                """
+                namespace chainsaw
+                {
+                    internal class ItemCraftResultSetting
+                    {
+                        public int _Difficulty { get; set; }
+                        public chainsaw.ItemCraftResult _Result { get; set; } = new();
+                    }
+                    internal class ItemCraftResult
+                    {
+                        public int _ItemID { get; set; }
+                        public int _GeneratedNumMin { get; set; }
+                        public int _GeneratedNumMax { get; set; }
+                        public chainsaw.ItemCraftGenerateNumUniqueSetting _GenerateNumUniqueSetting { get; set; } = new();
+                        public via.AnimationCurve _ProbabilityCurve { get; set; } = new();
+                        public bool _IsEnableProbabilityCurve { get; set; }
+                    }
+                    internal class ItemCraftGenerateNumUniqueSetting
+                    {
+                        public int _ItemId { get; set; }
+                        public int _GenerateNumMin { get; set; }
+                        public int _Durability { get; set; }
+                        public int _GenerateNum { get; set; }
+                    }
+                }
+                """);
+        }
+
+        [Fact]
         public void Generate_Inheritance()
         {
             AssertCode(GameNames.RE4, "chainsaw.RaderChartGuiSingleSettingData",
@@ -46,7 +78,7 @@ namespace IntelOrca.Biohazard.REE.Tests
                         internal class Setting
                         {
                             public int _Category { get; set; }
-                            public IntelOrca.Biohazard.REE.Rsz.Native.Range _Range { get; set; }
+                            public IntelOrca.Biohazard.REE.Rsz.Native.Range _Range { get; set; } = new();
                             public float _Rate { get; set; }
                             public System.Collections.Generic.List<chainsaw.StabilityEvaluationSetting> _StabilityEvaluationSettings { get; set; } = [];
                             public System.Collections.Generic.List<chainsaw.SpCategoryEvaluationSettingBase> _SpCategoryEvaluationSettings { get; set; } = [];
@@ -75,6 +107,37 @@ namespace IntelOrca.Biohazard.REE.Tests
                     }
                     internal class SpCategory03EvaluationSetting : SpCategoryEvaluationSettingBase
                     {
+                    }
+                }
+                """);
+        }
+
+        [Fact]
+        public void Generate_ComplexNested()
+        {
+            AssertCode(GameNames.RE4, "chainsaw.WeaponDetailCustomUserdata.AttackUp",
+                """
+                namespace chainsaw
+                {
+                    internal class WeaponDetailCustomUserdata
+                    {
+                        internal class AttackUp
+                        {
+                            public System.Collections.Generic.List<chainsaw.ShellBaseAttackInfo.CurveVariable> _DamageRates { get; set; } = [];
+                            public System.Collections.Generic.List<chainsaw.ShellBaseAttackInfo.CurveVariable> _WinceRates { get; set; } = [];
+                            public System.Collections.Generic.List<chainsaw.ShellBaseAttackInfo.CurveVariable> _BreakRates { get; set; } = [];
+                            public System.Collections.Generic.List<chainsaw.ShellBaseAttackInfo.CurveVariable> _StoppingRates { get; set; } = [];
+                            public System.Collections.Generic.List<float> _ExplosionRadiusScale { get; set; } = [];
+                            public System.Collections.Generic.List<float> _ExplosionSensorRadiusScale { get; set; } = [];
+                        }
+                    }
+                    internal class ShellBaseAttackInfo
+                    {
+                        internal class CurveVariable
+                        {
+                            public float _BaseValue { get; set; }
+                            public via.AnimationCurve _RateCurve { get; set; } = new();
+                        }
                     }
                 }
                 """);

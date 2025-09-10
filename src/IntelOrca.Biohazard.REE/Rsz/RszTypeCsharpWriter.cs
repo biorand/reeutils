@@ -16,10 +16,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
             var writer = new CsharpWriter();
 
             // Collate types
-            var allTypes = FindTypes([], rszType);
+            var impl = new HashSet<RszType>();
+            var allTypes = FindTypes([], impl, rszType);
 
             foreach (var g in allTypes.GroupBy(x => x.Namespace))
             {
+                if (rszType.Repository.FromName(g.Key) != null)
+                    continue;
+
                 writer.BeginNamespaceBlock(g.Key);
                 foreach (var t in g)
                 {
@@ -31,7 +35,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                             writer.EndBlock();
                         }
                     }
-                    else
+                    else if (t.DeclaringType == null)
                     {
                         WriteType(t);
                     }
@@ -57,26 +61,32 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
 
                 writer.BeginClassBlock(t.NameWithoutNamespace, parentName);
-                foreach (var f in t.Fields)
+                if (impl.Contains(t))
                 {
-                    if (parent != null && t.IsFieldInherited(f.Name))
-                        continue;
+                    foreach (var f in t.Fields)
+                    {
+                        if (parent != null && t.IsFieldInherited(f.Name))
+                            continue;
 
-                    var fieldType = GetFieldTypeName(f);
-                    if (f.IsArray)
-                    {
-                        writer.Property($"System.Collections.Generic.List<{fieldType}>", f.Name, "[]");
-                    }
-                    else
-                    {
-                        writer.Property(fieldType, f.Name, GetInitializer(f));
+                        var fieldType = GetFieldTypeName(f);
+                        if (f.IsArray)
+                        {
+                            writer.Property($"System.Collections.Generic.List<{fieldType}>", f.Name, "[]");
+                        }
+                        else
+                        {
+                            writer.Property(fieldType, f.Name, GetInitializer(f));
+                        }
                     }
                 }
 
                 var nestedTypes = t.Repository.GetNestedTypes(t);
                 foreach (var nestedType in nestedTypes)
                 {
-                    WriteType(nestedType);
+                    if (allTypes.Contains(nestedType))
+                    {
+                        WriteType(nestedType);
+                    }
                 }
 
                 writer.EndBlock();
@@ -90,7 +100,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             if (f.ObjectType is RszType rszType)
             {
-                return null;
+                if (rszType.IsEnum)
+                {
+                    return null;
+                }
+                else if (rszType.Name.StartsWith("System."))
+                {
+                    return null;
+                }
             }
 
             return "new()";
@@ -134,36 +151,47 @@ namespace IntelOrca.Biohazard.REE.Rsz
             };
         }
 
-        private List<RszType> FindTypes(List<RszType> types, RszType type)
+        private List<RszType> FindTypes(List<RszType> decl, HashSet<RszType> impl, RszType type)
         {
             if (type.Name.StartsWith("System."))
-                return types;
+                return decl;
 
             if (type.Name.StartsWith("via."))
-                return types;
+                return decl;
 
             if (type.IsEnum && !GenerateEnums)
-                return types;
+                return decl;
 
-            if (types.Contains(type))
-                return types;
+            if (decl.Contains(type))
+                return decl;
 
-            // Do not include nested types
-            if (type.Repository.FromName(type.Namespace) == null)
-                types.Add(type);
+            var definingType = type.DeclaringType;
+            if (definingType != null && !decl.Contains(definingType))
+            {
+                if (!decl.Contains(type))
+                {
+                    decl.Add(definingType);
+                }
+            }
+
+            decl.Add(type);
+            impl.Add(type);
 
             // Include sub classes
             foreach (var subType in type.Children.OrderBy(x => x.Name))
-                types.Add(subType);
+            {
+                decl.Add(subType);
+                impl.Add(subType);
+            }
 
             foreach (var f in type.Fields)
             {
                 if (f.ObjectType != null)
                 {
-                    FindTypes(types, f.ObjectType);
+                    FindTypes(decl, impl, f.ObjectType);
                 }
             }
-            return types;
+            return decl;
         }
 
         private class CsharpWriter

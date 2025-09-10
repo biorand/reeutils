@@ -53,6 +53,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 });
             }
 
+            // Set declaring types
+            foreach (var typeModel in typeModels)
+            {
+                var rszType = repo.FromId(typeModel.Id) ?? throw new Exception("Type not found");
+                rszType.DeclaringType = repo.FromName(rszType.Namespace);
+            }
+
             // Set parents
             foreach (var typeModel in typeModels)
             {
