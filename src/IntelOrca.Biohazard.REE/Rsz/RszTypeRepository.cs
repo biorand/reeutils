@@ -36,8 +36,15 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public void AddType(RszType type)
         {
-            _idToTypeMap.Add(type.Id, type);
-            _nameToTypeMap.Add(type.Name, type);
+            if (!_idToTypeMap.ContainsKey(type.Id))
+            {
+                _idToTypeMap.Add(type.Id, type);
+            }
+
+            if (!_nameToTypeMap.ContainsKey(type.Name))
+            {
+                _nameToTypeMap.Add(type.Name, type);
+            }
         }
 
         public RszObjectNode Create(string name)

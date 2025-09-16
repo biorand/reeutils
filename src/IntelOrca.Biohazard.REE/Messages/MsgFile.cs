@@ -139,6 +139,22 @@ namespace IntelOrca.Biohazard.REE.Messages
             return null;
         }
 
+        public string? GetPreviewFromName(string name, LanguageId languageId)
+        {
+            var stringData = GetStringData();
+            var messages = Messages;
+            for (int i = 0; i < messages.Length; i++)
+            {
+                if (stringData.GetString(messages[i].EntryName) == name)
+                {
+                    // if message contains Rejected, return null
+                    var msg = GetMessage(i)?[languageId];
+                    return msg != null && msg.Contains("Rejected", StringComparison.OrdinalIgnoreCase) ? null : msg;
+                }
+            }
+            return null;
+        }
+
         public Msg GetMessage(int index)
         {
             if (index < 0 || index >= Count)
