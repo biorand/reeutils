@@ -130,6 +130,20 @@ namespace IntelOrca.Biohazard.REE.Messages
             return null;
         }
 
+        public Msg? FindMessage(string Name)
+        {
+            var messages = Messages;
+            for (var i = 0; i < messages.Length; i++)
+            {
+                var msg = GetMessage(i);
+                if (msg.Name == Name)
+                {
+                    return msg;
+                }
+            }
+            return null;
+        }
+
         public string? GetString(Guid guid, LanguageId languageId)
         {
             if (FindMessage(guid) is Msg msg)

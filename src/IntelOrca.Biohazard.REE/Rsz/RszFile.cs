@@ -82,7 +82,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
             for (var i = 0; i < instanceRszTypes.Length; i++)
             {
                 var rszTypeId = instanceInfoList[i].TypeId;
-                instanceRszTypes[i] = repository.FromId(rszTypeId) ?? throw new Exception($"Type ID {rszTypeId} not found");
+                var rszType = repository.FromId(rszTypeId);
+
+                if (rszType != null) 
+                    instanceRszTypes[i] = repository.FromId(rszTypeId) ?? throw new Exception($"Type ID {rszTypeId} not found");
             }
 
 
@@ -121,6 +124,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     continue;
 
                 var rszType = instanceRszTypes[i];
+
+                if (rszType == null) continue;
                 var rszValue = rszType.Id == 0 ? new RszNullNode() : (IRszNode)rszDataReader.ReadStruct(rszType);
                 result[i] = new RszInstance(new RszInstanceId(i), rszValue);
             }
