@@ -140,6 +140,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.Vec2 => "System.Numerics.Vector2",
                 RszFieldType.Vec3 => "System.Numerics.Vector3",
                 RszFieldType.Vec4 => "System.Numerics.Vector4",
+                RszFieldType.Mat4 => "System.Numerics.Matrix4x4",
                 RszFieldType.Quaternion => "System.Numerics.Quaternion",
                 RszFieldType.Guid or RszFieldType.GameObjectRef => "System.Guid",
                 RszFieldType.Range => "IntelOrca.Biohazard.REE.Rsz.Native.Range",

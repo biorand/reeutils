@@ -58,6 +58,7 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertReserialize<Vector2>(RszFieldType.Vec2, new Vector2(10, 22));
             AssertReserialize<Vector3>(RszFieldType.Vec3, new Vector3(10, 22, 33));
             AssertReserialize<Vector4>(RszFieldType.Vec4, new Vector4(10, 22, 33, 44));
+            AssertReserialize<Matrix4x4>(RszFieldType.Mat4, Matrix4x4.Identity);
             AssertReserialize<Quaternion>(RszFieldType.Quaternion, Quaternion.Identity);
             AssertReserialize<Guid>(RszFieldType.Guid, new Guid("63680a70-f2ce-4a41-83f3-485a22717d12"));
             AssertReserialize<Guid>(RszFieldType.GameObjectRef, new Guid("63680a70-f2ce-4a41-83f3-485a22717d12"));
