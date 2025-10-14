@@ -45,6 +45,8 @@ namespace IntelOrca.Biohazard.REE.Tests
             {
                 GameNames.RE2 => FindFirstExisting(
                     @"F:\games\steamapps\common\RESIDENT EVIL 2  BIOHAZARD RE2"),
+                GameNames.RE3 => FindFirstExisting(
+                    @"F:\games\steamapps\common\RE3"),
                 GameNames.RE4 => FindFirstExisting(
                     @"G:\re4r\vanilla"),
                 GameNames.RE8 => FindFirstExisting(
@@ -70,6 +72,7 @@ namespace IntelOrca.Biohazard.REE.Tests
             var jsonPath = gameName switch
             {
                 GameNames.RE2 => @"M:\git\reasy\resources\data\dumps\rszre2.json",
+                GameNames.RE3 => @"M:\git\reasy\resources\data\dumps\rszre3.json",
                 GameNames.RE4 => @"M:\git\reasy\resources\data\dumps\rszre4.json",
                 GameNames.RE8 => @"M:\git\reasy\resources\data\dumps\rszre8.json",
                 _ => throw new NotImplementedException()

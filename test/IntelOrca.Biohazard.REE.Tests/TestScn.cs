@@ -19,6 +19,12 @@ namespace IntelOrca.Biohazard.REE.Tests
         }
 
         [Fact]
+        public void Rebuild_RE3_CATALOG()
+        {
+            AssertRebuild(GameNames.RE3, "natives/stm/escape/scene/contents/main/catalog.scn.20", 0);
+        }
+
+        [Fact]
         public void Rebuild_RE4_LEVEL_CP10_CHP1_1_010()
         {
             AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/leveldesign/chapter/cp10_chp1_1/level_cp10_chp1_1_010.scn.20");

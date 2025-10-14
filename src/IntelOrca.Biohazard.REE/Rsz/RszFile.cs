@@ -84,7 +84,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var rszTypeId = instanceInfoList[i].TypeId;
                 var rszType = repository.FromId(rszTypeId);
 
-                if (rszType != null) 
+                if (rszType != null)
                     instanceRszTypes[i] = repository.FromId(rszTypeId) ?? throw new Exception($"Type ID {rszTypeId} not found");
             }
 
