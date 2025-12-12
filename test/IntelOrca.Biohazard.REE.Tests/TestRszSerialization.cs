@@ -157,6 +157,8 @@ namespace chainsaw
 {
     public class WeaponPartsCombineDefinitionUserdata
     {
+        public static WeaponPartsCombineDefinitionUserdata Default => new();
+
         public List<WeaponPartsCombineDefinition> _Datas { get; set; } = [];
     }
 

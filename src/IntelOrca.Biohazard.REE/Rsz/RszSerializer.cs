@@ -31,7 +31,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 var clrType = FindClrType(objectNode.Type, targetClrType);
                 var obj = CreateClrInstance<object>(clrType)!;
-                foreach (var property in clrType.GetProperties())
+                foreach (var property in clrType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
                 {
                     var propertyClrType = property.PropertyType;
                     var value = objectNode[property.Name];
