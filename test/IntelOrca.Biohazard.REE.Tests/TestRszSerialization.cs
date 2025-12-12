@@ -15,6 +15,18 @@ namespace IntelOrca.Biohazard.REE.Tests
         }
 
         [Fact]
+        public void Serialize_ObjectType()
+        {
+            var repo = _pakHelper.GetTypeRepository(GameNames.RE4);
+            var value = new chainsaw.WeaponPartsCombineDefinition
+            {
+                _ItemId = 2,
+            };
+            var rszValue = RszSerializer.Serialize(RszFieldType.Object, value, repo);
+            Assert.Equal(2, rszValue.Get<int>("_ItemId"));
+        }
+
+        [Fact]
         public void Serialize_FieldType()
         {
             var repo = _pakHelper.GetTypeRepository(GameNames.RE4);

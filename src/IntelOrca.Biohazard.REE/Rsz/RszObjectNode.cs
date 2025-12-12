@@ -87,7 +87,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     else
                     {
-                        children.Add(RszSerializer.Serialize(field.Type, item));
+                        children.Add(RszSerializer.Serialize(field.Type, item, Type.Repository));
                     }
                 }
                 return new RszObjectNode(Type, Children.SetItem(index, new RszArrayNode(field.Type, children.ToImmutable())));

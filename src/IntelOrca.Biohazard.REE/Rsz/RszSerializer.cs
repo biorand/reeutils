@@ -148,7 +148,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                             }
                             else
                             {
-                                arrayChildren.Add(Serialize(field.Type, listItem));
+                                arrayChildren.Add(Serialize(field.Type, listItem, type.Repository));
                             }
                         }
                         arrayNode = new RszArrayNode(field.Type, arrayChildren.ToImmutableArray());
@@ -168,7 +168,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         }
                         else
                         {
-                            node = Serialize(field.Type, propertyValue);
+                            node = Serialize(field.Type, propertyValue, type.Repository);
                         }
                     }
                     children.Add(node);
@@ -204,7 +204,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             };
         }
 
-        public static IRszNode Serialize(RszFieldType type, object? obj)
+        public static IRszNode Serialize(RszFieldType type, object? obj, RszTypeRepository? typeRepository = null)
         {
             if (obj is null)
             {
@@ -223,7 +223,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var children = ImmutableArray.CreateBuilder<IRszNode>(list.Count);
                 for (var i = 0; i < list.Count; i++)
                 {
-                    children.Add(Serialize(type, list[i]));
+                    children.Add(Serialize(type, list[i], typeRepository));
                 }
                 return new RszArrayNode(type, children.ToImmutable());
             }
@@ -265,6 +265,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     ? resourceNode
                     : new RszResourceNode((string)obj),
                 RszFieldType.UserData => (RszUserDataNode)obj,
+                RszFieldType.Object => typeRepository == null
+                    ? throw new ArgumentException("Unable to serialize objects without a repository")
+                    : Serialize(typeRepository.FromName(obj.GetType().FullName ?? "") ?? throw new ArgumentException($"{obj.GetType().FullName} not found in repository."), obj),
                 _ => throw new NotSupportedException()
             };
         }
