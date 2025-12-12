@@ -76,7 +76,7 @@ namespace IntelOrca.Biohazard.REE.Tests
         {
             var path = "natives/stm/_chainsaw/appsystem/ui/userdata/weaponpartscombinedefinitionuserdata.user.2";
 
-            var repo = GetTypeRepository();
+            var repo = _pakHelper.GetTypeRepository(GameNames.RE4);
             var input = new UserFile(_pakHelper.GetFileData(GameNames.RE4, path)).ToBuilder(repo);
 
             var userData = RszSerializer.Deserialize<chainsaw.WeaponPartsCombineDefinitionUserdata>(input.Objects[0])!;
@@ -95,7 +95,7 @@ namespace IntelOrca.Biohazard.REE.Tests
         [Fact]
         public void RE4_WEAPONPARTSCOMBINEDEFINITIONUSERDATA_Encode()
         {
-            var repo = GetTypeRepository();
+            var repo = _pakHelper.GetTypeRepository(GameNames.RE4);
             var rszType = repo.FromName("chainsaw.WeaponPartsCombineDefinitionUserdata");
             Assert.NotNull(rszType);
 
@@ -140,7 +140,7 @@ namespace IntelOrca.Biohazard.REE.Tests
         {
             var path = "natives/stm/_chainsaw/appsystem/ui/userdata/itemcraftsettinguserdata.user.2";
 
-            var repo = GetTypeRepository();
+            var repo = _pakHelper.GetTypeRepository(GameNames.RE4);
             var input = new UserFile(_pakHelper.GetFileData(GameNames.RE4, path));
             var inputBuilder = input.ToBuilder(repo);
             var root = inputBuilder.Objects[0];
@@ -149,14 +149,6 @@ namespace IntelOrca.Biohazard.REE.Tests
             inputBuilder.Objects = [(RszObjectNode)RszSerializer.Serialize(rootRszType, userData)];
             var output = inputBuilder.Build();
             Assert.True(input.Data.Span.SequenceEqual(output.Data.Span));
-        }
-
-        private static RszTypeRepository GetTypeRepository()
-        {
-            var jsonPath = @"G:\apps\reasy\rszre4_reasy.json";
-            var json = File.ReadAllBytes(jsonPath);
-            var repo = RszRepositorySerializer.Default.FromJson(json);
-            return repo;
         }
     }
 }

@@ -48,7 +48,7 @@ namespace IntelOrca.Biohazard.REE.Tests
                 GameNames.RE3 => FindFirstExisting(
                     @"F:\games\steamapps\common\RE3"),
                 GameNames.RE4 => FindFirstExisting(
-                    @"G:\re4r\vanilla"),
+                    @"G:\biorand\re4r\vanilla"),
                 GameNames.RE8 => FindFirstExisting(
                     @"G:\biorand\re8\vanilla"),
                 _ => throw new NotSupportedException()
