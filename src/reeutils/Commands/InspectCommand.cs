@@ -2,22 +2,21 @@
 using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
+using IntelOrca.Biohazard.REE;
 using IntelOrca.Biohazard.REE.Package;
+using IntelOrca.Biohazard.REE.Rsz;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
 namespace IntelOrca.Biohazard.REEUtils.Commands
 {
-    internal sealed class UnpackCommand : AsyncCommand<UnpackCommand.Settings>
+    internal sealed class InspectCommand : AsyncCommand<InspectCommand.Settings>
     {
         public sealed class Settings : CommandSettings
         {
             [Description("Input pak file")]
             [CommandArgument(0, "<input>")]
             public required string InputPath { get; init; }
-
-            [CommandOption("-o|--output")]
-            public string? OutputPath { get; init; }
 
             [CommandOption("-g|--game")]
             public string? Game { get; init; }
@@ -48,45 +47,36 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
         public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
         {
-            IPakFile pakFile;
-            if (File.Exists(settings.InputPath))
-            {
-                pakFile = new PakFile(settings.InputPath);
-            }
-            else
-            {
-                pakFile = new RePakCollection(settings.InputPath);
-            }
-
-            var outputPath = settings.OutputPath;
-            if (string.IsNullOrEmpty(outputPath))
-            {
-                outputPath = Environment.CurrentDirectory;
-            }
-
+            var pakFile = new PakFile(settings.InputPath);
             var pakList = settings.PakListPath == null
                 ? EmbeddedData.GetPakList(settings.Game!) ?? throw new Exception($"{settings.Game} not recognized.")
                 : new PakList(File.ReadAllText(settings.PakListPath));
+            var rszTypeRepo = GetRszTypeRepository(settings.Game ?? throw new Exception($"{settings.Game} not recognized."))
+                ?? throw new Exception("Failed to open RSZ type repository.");
 
-            var hashes = pakFile.FileHashes;
-            for (var i = 0; i < hashes.Length; i++)
+            var finder = new PakPathFinder(rszTypeRepo, pakFile);
+            var totalHashes = pakFile.EntryCount;
+            var unknownHashes = finder.GetUnknownHashes(pakList);
+            var foundPaths = finder.Find(pakList);
+
+            Console.WriteLine($"{totalHashes} files in pak file");
+            Console.WriteLine($"{unknownHashes.Length} unknown");
+            Console.WriteLine($"{foundPaths.Length} figured out");
+
+            foreach (var p in foundPaths)
             {
-                var entryHash = hashes[i];
-                var entryPath = pakList.GetPath(entryHash);
-                if (entryPath == null)
-                {
-                    AnsiConsole.WriteLine($"No file name found for hash: {entryHash}");
-                }
-                else
-                {
-                    var fullPath = Path.Combine(outputPath, entryPath);
-                    var data = pakFile.GetEntryData(entryHash)!;
-                    Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-                    await File.WriteAllBytesAsync(fullPath, data);
-                    AnsiConsole.WriteLine(entryPath);
-                }
+                Console.WriteLine(p);
             }
             return 0;
+        }
+
+        private static RszTypeRepository? GetRszTypeRepository(string game)
+        {
+            var rszJsonGz = EmbeddedData.GetFile($"rsz{game}.json.gz");
+            if (rszJsonGz == null)
+                return null;
+
+            return RszRepositorySerializer.Default.FromJsonGz(rszJsonGz);
         }
     }
 }

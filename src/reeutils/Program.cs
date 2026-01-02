@@ -32,6 +32,9 @@ namespace IntelOrca.Biohazard.REEUtils
                 config.AddCommand<HierarchyCommand>("hierarchy")
                     .WithDescription("Shows the dependency hierarchy for a given pattern.")
                     .WithExample("hierarchy", "input.msg.22", "-g", "re8", @"C:\games\re8");
+                config.AddCommand<InspectCommand>("inspect")
+                    .WithDescription("Looks through every file in a pak to find paths for a pak list.")
+                    .WithExample("inspect", "-g", "re4", "input.pak");
             });
             return app.Run(args);
         }

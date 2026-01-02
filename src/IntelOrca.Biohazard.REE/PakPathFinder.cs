@@ -22,20 +22,46 @@ namespace IntelOrca.Biohazard.REE
             _allFileHashes = _pakFile.FileHashes.ToImmutableHashSet();
         }
 
+        public ulong[] GetUnknownHashes(PakList excludeList)
+        {
+            return _allFileHashes.Except(excludeList.Hashes).ToArray();
+        }
+
         public string[] Find(PakList excludeList)
         {
             foreach (var hash in _allFileHashes)
             {
-                var entry = _pakFile.GetEntryData(hash);
-                var fileKind = FileVersion.DetectFileKind(entry);
-                if (fileKind == FileKind.UserData)
+                try
                 {
-                    var userFile = new UserFile(entry);
-                    var objects = userFile.GetObjects(_rszTypeRepository);
-                    foreach (var obj in objects)
+                    var entry = _pakFile.GetEntryData(hash);
+                    var fileKind = FileVersion.DetectFileKind(entry);
+                    if (fileKind == FileKind.UserData)
                     {
-                        Visit(obj);
+                        var userFile = new UserFile(entry);
+                        var objects = userFile.GetObjects(_rszTypeRepository);
+                        foreach (var obj in objects)
+                        {
+                            Visit(obj);
+                        }
                     }
+                    else if (fileKind == FileKind.Scene)
+                    {
+                        var scnFile = new ScnFile(20, entry);
+                        DiscoverStrings(scnFile.Resources);
+                        var scene = scnFile.ReadScene(_rszTypeRepository);
+                        Visit(scene);
+                    }
+                    else if (fileKind == FileKind.Prefab)
+                    {
+                        var pfbFile = new PfbFile(17, entry);
+                        var scene = pfbFile.ReadScene(_rszTypeRepository);
+                        DiscoverStrings(pfbFile.Resources);
+                        Visit(scene);
+                    }
+                }
+                catch
+                {
+                    Console.WriteLine($"Failed to look at {hash}");
                 }
             }
 
@@ -47,8 +73,10 @@ namespace IntelOrca.Biohazard.REE
                 if (excludeList.GetPath(hash) != null)
                     continue;
                 if (!_allFileHashes.Contains(hash))
+                {
+                    // Console.WriteLine(">>>>" + fullPath);
                     continue;
-
+                }
                 foundPaths.Add(fullPath);
             }
             return foundPaths
@@ -56,15 +84,25 @@ namespace IntelOrca.Biohazard.REE
                 .ToArray();
         }
 
-        private string GetFullPath(string p)
+        private static string GetFullPath(string p)
         {
-            if (p.EndsWith(".pfb", StringComparison.OrdinalIgnoreCase))
-                return $"natives/stm/{p}.17";
-            else if (p.EndsWith(".scn", StringComparison.OrdinalIgnoreCase))
-                return $"natives/stm/{p}.20";
-            else if (p.EndsWith(".user", StringComparison.OrdinalIgnoreCase))
-                return $"natives/stm/{p}.user";
+            foreach (var ext in g_extensions)
+            {
+                var versionStart = ext.LastIndexOf('.');
+                var extension = ext.Substring(0, versionStart);
+                var version = ext.Substring(versionStart);
+                if (p.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+                    return $"natives/stm/{p}{version}";
+            }
             return $"natives/stm/{p}";
+        }
+
+        private void DiscoverStrings(IEnumerable<string> strings)
+        {
+            foreach (var s in strings)
+            {
+                DiscoverString(s);
+            }
         }
 
         private void DiscoverString(string s)
@@ -95,11 +133,36 @@ namespace IntelOrca.Biohazard.REE
 
             if (node is IRszNodeContainer container)
             {
+                if (node is RszFolder folder)
+                {
+                    Visit(folder.Settings);
+                }
                 foreach (var child in container.Children)
                 {
                     Visit(child);
                 }
             }
         }
+
+        private static readonly string[] g_extensions = new[] {
+            ".cfil.7",
+            ".chain.53",
+            ".efx.3539837",
+            ".lfa.4",
+            ".mcol.20021",
+            ".mdf2.32",
+            ".mesh.221108797",
+            ".mot.613",
+            ".motbank.3",
+            ".motfsm2.43",
+            ".msg.22",
+            ".pfb.17",
+            ".rbs.34",
+            ".rcol.25",
+            ".rmesh.24013",
+            ".scn.20",
+            ".tex.143221013",
+            ".user.2",
+        };
     }
 }

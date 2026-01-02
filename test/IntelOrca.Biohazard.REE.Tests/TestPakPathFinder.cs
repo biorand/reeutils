@@ -8,11 +8,14 @@ namespace IntelOrca.Biohazard.REE.Tests
         [Fact]
         public void Find()
         {
-            var path = @"C:\Users\Ted\Downloads\re_chunk_000.pak.patch_005.pak";
+            var path = @"G:\temp\notime4death\NT4DST-1.0-No_Time_4_Death_ST\nt4dst.pak";
             var pak = new PakFile(path);
             var finder = new PakPathFinder(GetTypeRepository(), pak);
 
             var pakList = PakList.FromFile(@"M:\git\reeutils\src\reeutils\data\paklist.re4.txt.gz");
+
+            var totalHashes = pak.EntryCount;
+            var unknownHashes = finder.GetUnknownHashes(pakList);
             var foundPaths = finder.Find(pakList);
         }
 

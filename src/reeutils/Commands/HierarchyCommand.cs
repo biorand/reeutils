@@ -65,12 +65,24 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                     }
                     else if (path.EndsWith(".scn.20"))
                     {
-                        var scn = new ScnFile(20, pakFile.GetEntryData(path)).ReadScene(repo);
+                        var scnFile = new ScnFile(20, pakFile.GetEntryData(path));
+                        foreach (var r in scnFile.Resources)
+                        {
+                            list.Add(PathHelpers.GetFullPath(r));
+                        }
+
+                        var scn = scnFile.ReadScene(repo);
                         Explore(list, scn);
                     }
                     else if (path.EndsWith(".pfb.17"))
                     {
-                        var pfb = new PfbFile(17, pakFile.GetEntryData(path)).ReadScene(repo);
+                        var pfbFile = new PfbFile(17, pakFile.GetEntryData(path));
+                        foreach (var r in pfbFile.Resources)
+                        {
+                            list.Add(PathHelpers.GetFullPath(r));
+                        }
+
+                        var pfb = pfbFile.ReadScene(repo);
                         Explore(list, pfb);
                     }
                     if (list.Count > 0)

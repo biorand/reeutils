@@ -12,6 +12,7 @@ namespace IntelOrca.Biohazard.REE.Package
     {
         private readonly Dictionary<ulong, string> _map = [];
 
+        public ImmutableArray<ulong> Hashes { get; }
         public ImmutableArray<string> Entries { get; }
 
         public static PakList FromFile(string path)
@@ -41,6 +42,7 @@ namespace IntelOrca.Biohazard.REE.Package
                     _map[PakFile.GetNormalizedPathHash(path)] = path;
                 }
             }
+            Hashes = [.. _map.Keys];
             Entries = [.. _map.Values.OrderBy(x => x, StringComparer.Ordinal)];
         }
 
