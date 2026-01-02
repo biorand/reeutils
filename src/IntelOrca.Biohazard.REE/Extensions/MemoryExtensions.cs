@@ -12,6 +12,8 @@ namespace IntelOrca.Biohazard.REE.Extensions
 
         public static ReadOnlySpan<T> Get<T>(this ReadOnlyMemory<byte> data, int offset, int count) where T : struct
         {
+            if (count == 0)
+                return [];
             return MemoryMarshal.Cast<byte, T>(data.Span.Slice((int)offset)).Slice(0, (int)count);
         }
     }
