@@ -20,7 +20,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public override bool Equals(object? obj) => obj is RszUserDataNode node && Equals(node);
         public override int GetHashCode() => HashCode.Combine(Type, Path);
 
-        public override string ToString() => $"Userdata({Path}): {Type.Name}";
+        public override string ToString() => $"Userdata({Path ?? "null"}): {Type?.Name ?? "null"}";
     }
 
     public class RszEmbeddedUserValueNode(RszType type, int hash, RszFile embedded) : IRszNode
