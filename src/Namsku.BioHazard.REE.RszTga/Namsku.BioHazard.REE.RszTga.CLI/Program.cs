@@ -1,6 +1,5 @@
 ﻿using CommandLine;
 using Namsku.BioHazard.REE.RszTga.Core;
-using DirectXTexNet;
 
 namespace Namsku.BioHazard.REE.RszTga.CLI;
 
@@ -66,8 +65,7 @@ public class Program
                 Console.WriteLine($"Importing Image: {opts.Input}");
                 var texFile = new ReTextureFile();
                 
-                DXGI_FORMAT fmt = DXGI_FORMAT.UNKNOWN;
-                if (opts.Format.HasValue) fmt = (DXGI_FORMAT)opts.Format.Value;
+                uint? targetFormat = opts.Format;
                 
                 int version = opts.Version ?? 36;
                 // Try to infer version from output extension if not specified? 
@@ -91,7 +89,7 @@ public class Program
                     }
                 }
                 
-                texFile.ImportFromImage(opts.Input, fmt, version);
+                texFile.ImportFromImage(opts.Input, targetFormat, version);
                 Console.WriteLine($"Processed. Target Version: {version}");
                 Console.WriteLine($"Mips generated: {texFile.Mips.Count}");
                 

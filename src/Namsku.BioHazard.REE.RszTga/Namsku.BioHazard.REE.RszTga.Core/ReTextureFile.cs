@@ -1,5 +1,11 @@
 using System.Runtime.InteropServices;
-using DirectXTexNet;
+using BCnEncoder.Shared;
+using BCnEncoder.Decoder;
+using BCnEncoder.Encoder;
+using BCnEncoder.ImageSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 
 namespace Namsku.BioHazard.REE.RszTga.Core;
 
@@ -94,7 +100,7 @@ public class ReTextureFile
         if (HeaderV2.HasValue) formatId = HeaderV2.Value.Format;
         else if (HeaderV1.HasValue) formatId = HeaderV1.Value.Format;
         
-        var dxgiFormat = (DXGI_FORMAT)formatId;
+        var compressionFormat = GetCompressionFormat(formatId);
 
         if (Mips.Count == 0) throw new InvalidDataException("No mips found");
         
@@ -103,79 +109,74 @@ public class ReTextureFile
         byte[] data = new byte[mainMip.Size];
         stream.ReadExactly(data, 0, data.Length);
 
-        var metadata = new TexMetadata(
-            Header.Width, Header.Height, 1, 1, 1, 0, 0, dxgiFormat, TEX_DIMENSION.TEXTURE2D);
+        // Decompress using BCnEncoder
+        var decoder = new BcDecoder();
+        
+        // Handle SRGB if needed (BCnEncoder usually handles this via format, but output is Raw RGBA32)
+        // Memory<byte> rawRgba;
+        byte[] rawBytes;
 
-        using var scratch = CheckFormatAndLoad(data, metadata, mainMip.Pitch);
+        if (compressionFormat == CompressionFormat.Unknown)
+        {
+             // Assume uncompressed R8G8B8A8 if unknown? Or throw?
+             // For now, if format is R8G8B8A8 (28) or SRGB (29), simple copy
+             if (formatId == 28 || formatId == 29) // R8G8B8A8
+                 rawBytes = data;
+             else
+                 throw new NotSupportedException($"Format {formatId} not supported by BCnEncoder mapping yet.");
+        }
+        else
+        {
+             // Decompress
+             // Note: DecodeRawToByteRgba expects tight packing? 
+             // We need to decode to ColorRgba32 first to be safe
+             var colors = decoder.DecodeRaw(data, Header.Width, Header.Height, compressionFormat);
+             
+             // Convert ColorRgba32[] to byte[]
+             rawBytes = new byte[colors.Length * 4];
+             MemoryMarshal.Cast<ColorRgba32, byte>(colors).CopyTo(rawBytes);
+        }
         
-        // Decompress to R8G8B8A8 for TGA
-        // Check if source is SRGB to preserve gamma
-        var targetFmt = DXGI_FORMAT.R8G8B8A8_UNORM;
-        if (TexHelper.Instance.IsSRGB(dxgiFormat))
-            targetFmt = DXGI_FORMAT.R8G8B8A8_UNORM_SRGB;
-            
-        using var decompressed = scratch.Decompress(targetFmt);
-        var image = decompressed.GetImage(0, 0, 0);
-        
-        // Manual TGA Write
+        // Manual TGA Write (Bottom-Up)
         using var fs = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
         using var writer = new BinaryWriter(fs);
         
         // Header
-        writer.Write((byte)0); // ID Length
-        writer.Write((byte)0); // ColorMapType
-        writer.Write((byte)2); // ImageType (Uncompressed TrueColor)
-        writer.Write((short)0); // ColorMapSpec
+        writer.Write((byte)0);
+        writer.Write((byte)0);
+        writer.Write((byte)2); // TrueColor
+        writer.Write((short)0);
         writer.Write((byte)0);
         writer.Write((byte)0);
         writer.Write((byte)0);
         
-        writer.Write((ushort)0); // X Origin
-        writer.Write((ushort)0); // Y Origin
-        writer.Write((ushort)image.Width);
-        writer.Write((ushort)image.Height);
-        writer.Write((byte)32); // BPP
-        // Match Noesis Header: Byte 17 = 0 implies 0 alpha bits, Bottom-Left origin.
-        // If we want to match exactly byte-for-byte.
-        // Assuming 32bpp contains alpha but descriptor says 0 bits.
-        writer.Write((byte)0); // Descriptor
+        writer.Write((ushort)0);
+        writer.Write((ushort)0);
+        writer.Write((ushort)Header.Width);
+        writer.Write((ushort)Header.Height);
+        writer.Write((byte)32); // 32 bpp
+        writer.Write((byte)0); // Descriptor: Bottom-Left
         
-        // Data
-        // Row-by-row writing
-        // Noesis uses Bottom-Left origin (implied by 0x00 descriptor).
-        // So we write Bottom-Up (y from Height-1 down to 0).
+        // Data Copy with Vertical Flip
+        // pitch = width * 4
+        int rowPitch = Header.Width * 4;
+        byte[] row = new byte[rowPitch];
         
-        byte[] row = new byte[image.Width * 4];
-        for (int y = (int)image.Height - 1; y >= 0; y--)
+        for (int y = (int)Header.Height - 1; y >= 0; y--)
         {
-            unsafe
-            {
-                byte* src = (byte*)image.Pixels + (y * image.RowPitch);
-                Marshal.Copy((nint)src, row, 0, row.Length);
-            }
-
-            // Swap R and B channels (RGBA -> BGRA) because TGA expects BGR
+            Array.Copy(rawBytes, y * rowPitch, row, 0, rowPitch);
+            
+            // Swap R/B? BCnEncoder Decodes to R,G,B,A (ColorRgba32)
+            // TGA expects B,G,R,A
             for (int x = 0; x < row.Length; x += 4)
             {
                 byte temp = row[x];
-                row[x] = row[x + 2];
-                row[x + 2] = temp;
+                row[x] = row[x+2];
+                row[x+2] = temp;
             }
-
+            
             writer.Write(row);
         }
-    }
-
-    private ScratchImage CheckFormatAndLoad(byte[] data, TexMetadata metadata, uint pitch)
-    {
-        var scratch = TexHelper.Instance.Initialize2D(metadata.Format, metadata.Width, metadata.Height, 1, 1, CP_FLAGS.NONE);
-        
-        unsafe
-        {
-            var image = scratch.GetImage(0, 0, 0);
-            Marshal.Copy(data, 0, (nint)image.Pixels, Math.Min(data.Length, (int)image.SlicePitch));
-        }
-        return scratch;
     }
 
     public void Write(Stream stream)
@@ -227,7 +228,7 @@ public class ReTextureFile
         {
             var mip = Mips[i];
             mip.Offset = (ulong)currentOffset;
-            Mips[i] = mip; 
+            Mips[i] = mip; // Update offset
             
             writer.Write(mip.Offset);
             writer.Write(mip.Pitch);
@@ -245,110 +246,132 @@ public class ReTextureFile
         }
     }
 
-    public void ImportFromImage(string inputPath, DXGI_FORMAT targetFormat = DXGI_FORMAT.UNKNOWN, int version = 36)
+    public void ImportFromImage(string inputPath, uint? targetFormatId = null, int version = 36)
     {
-         ScratchImage scratch;
-         var ext = Path.GetExtension(inputPath).ToLower();
-         if (ext == ".tga")
-             scratch = TexHelper.Instance.LoadFromTGAFile(inputPath);
-         else if (ext == ".png" || ext == ".jpg" || ext == ".bmp")
-             scratch = TexHelper.Instance.LoadFromWICFile(inputPath, WIC_FLAGS.NONE);
-         else if (ext == ".dds")
-             scratch = TexHelper.Instance.LoadFromDDSFile(inputPath, DDS_FLAGS.NONE);
-         else
-             throw new NotSupportedException($"Extension {ext} not supported for import");
-             
-         using (scratch)
-         {
-             var meta = scratch.GetMetadata();
-             
-             ScratchImage processed = scratch;
-             bool isDecompressed = false;
-             
-             if (targetFormat != DXGI_FORMAT.UNKNOWN && targetFormat != meta.Format)
-             {
-                 if (TexHelper.Instance.IsCompressed(targetFormat))
-                 {
-                      processed = scratch.Compress(targetFormat, TEX_COMPRESS_FLAGS.DEFAULT, 0.5f);
-                      isDecompressed = true;
-                 }
-                 else
-                 {
-                      processed = scratch.Convert(targetFormat, TEX_FILTER_FLAGS.DEFAULT, 0.5f);
-                      isDecompressed = true;
-                 }
-             }
-             
-             Header = new ReTextureHeaderCommon
-             {
-                 Magic = MAGIC_TEX,
-                 Version = (uint)version,
-                 Width = (ushort)meta.Width,
-                 Height = (ushort)meta.Height,
-                 Unk00 = 0
-             };
-             
-             var resultMeta = processed.GetMetadata();
-             int mipCount = resultMeta.MipLevels;
-             int numImages = resultMeta.ArraySize;
-             
-             Mips.Clear();
-             var dataList = new List<byte[]>();
-             
-             for (int item = 0; item < resultMeta.ArraySize; item++)
-             {
-                 for (int level = 0; level < resultMeta.MipLevels; level++)
-                 {
-                      var image = processed.GetImage(level, item, 0);
-                      
-                      int size = (int)image.SlicePitch;
-                      byte[] buffer = new byte[size];
-                      unsafe
-                      {
-                           Marshal.Copy((nint)image.Pixels, buffer, 0, size);
-                      }
-                      
-                      dataList.Add(buffer);
-                      
-                      Mips.Add(new ReTextureMip
-                      {
-                           Offset = 0,
-                           Pitch = (uint)image.RowPitch,
-                           Size = (uint)size
-                      });
-                 }
-             }
-             
-             MipData = dataList.ToArray();
-             
-             uint fmt = (uint)resultMeta.Format;
-             if (version == 143221013) version = 36;
-             
-             if (version > 27)
-             {
-                 HeaderV2 = new ReTextureHeaderV2
-                 {
-                     NumImages = (byte)numImages,
-                     OneImgMipHdrSize = (byte)(mipCount * 16),
-                     Format = fmt,
-                     Unk02 = 0, Unk03 = 0, Unk04 = 0
-                 };
-             }
-             else
-             {
-                 HeaderV1 = new ReTextureHeaderV1
-                 {
-                     MipCount = (byte)mipCount,
-                     NumImages = (byte)numImages,
-                     Format = fmt,
-                     Unk02 = 0, Unk03 = 0, Unk04 = 0
-                 };
-             }
-             
-             // If processed was created by Compress/Convert, we must dispose it.
-             // If processed == scratch, do NOT dispose it here (used by wrapping 'using').
-             if (isDecompressed)
-                 processed.Dispose();
-         }
+        // Load using ImageSharp
+        using var image = Image.Load<Rgba32>(inputPath);
+        
+        // Determine target format
+        CompressionFormat targetFormat = CompressionFormat.Bc7; // Default to BC7
+        uint finalFormatId = 98; // BC7_UNORM
+        
+        if (targetFormatId.HasValue)
+        {
+            finalFormatId = targetFormatId.Value;
+            targetFormat = GetCompressionFormat(finalFormatId);
+            if (targetFormat == CompressionFormat.Unknown)
+                 throw new NotSupportedException($"Format ID {finalFormatId} is not supported for compression.");
+        }
+        
+        var encoder = new BcEncoder();
+        encoder.OutputOptions.GenerateMipMaps = true;
+        encoder.OutputOptions.Quality = CompressionQuality.Balanced;
+        encoder.OutputOptions.Format = targetFormat;
+        
+        // Manual conversion (Retry with 4 args)
+        var pixels = new byte[image.Width * image.Height * 4];
+        image.CopyPixelDataTo(pixels);
+        
+        // Encode with correct overload: (byte[], width, height, PixelFormat)
+        // Ensure OutputOptions.Format is set (it is above)
+        var mipsData = encoder.EncodeToRawBytes(pixels, image.Width, image.Height, PixelFormat.Rgba32);
+        
+        // Prepare Headers
+        MipData = mipsData.ToArray();
+        
+        Header = new ReTextureHeaderCommon
+        {
+            Magic = MAGIC_TEX,
+            Version = (uint)version,
+            Width = (ushort)image.Width,
+            Height = (ushort)image.Height,
+            Unk00 = 0
+        };
+
+        int mipCount = mipsData.Count(); // Compiler says method group, so invocation needed
+        int numImages = 1;
+        int currentWidth = image.Width;
+        int currentHeight = image.Height;
+        
+        for (int i = 0; i < mipCount; i++)
+        {
+            // Calculate size and pitch
+            // For block formats (BCn), size is based on 4x4 blocks
+            // This is handled by encoder output size, but we need pitch?
+            // RE Engine pitch: usually width * bpp? For BCn it's width * blocks?
+            // Actually pitch in RE Headers for compressed is often just width * 4 or something similar?
+            // Let's approximate standard pitch logic:
+            
+            // Standard calc: max(1, (width+3)/4) * blockSize
+            int blockSize = 16; // BC7, BC1=8
+            if (targetFormat == CompressionFormat.Bc1 || targetFormat == CompressionFormat.Bc4) blockSize = 8;
+            
+            int blocksW = Math.Max(1, (currentWidth + 3) / 4);
+            uint pitch = (uint)(blocksW * blockSize);
+            
+            Mips.Add(new ReTextureMip
+            {
+                Offset = 0,
+                Pitch = pitch,
+                Size = (uint)mipsData[i].Length
+            });
+            
+            currentWidth = Math.Max(1, currentWidth / 2);
+            currentHeight = Math.Max(1, currentHeight / 2);
+        }
+        
+        if (version == 143221013) version = 36;
+
+        if (version > 27)
+        {
+            HeaderV2 = new ReTextureHeaderV2
+            {
+                NumImages = 1,
+                OneImgMipHdrSize = (byte)(mipCount * 16),
+                Format = finalFormatId,
+                Unk02 = 0, Unk03 = 0, Unk04 = 0
+            };
+        }
+        else
+        {
+            HeaderV1 = new ReTextureHeaderV1
+            {
+                MipCount = (byte)mipCount,
+                NumImages = 1,
+                Format = finalFormatId,
+                Unk02 = 0, Unk03 = 0, Unk04 = 0
+            };
+        }
+    }
+
+    private CompressionFormat GetCompressionFormat(uint reFormat)
+    {
+        // Simple mapping based on ReTextureFormat enum
+        // DXGI 71 = BC1_UNORM
+        // DXGI 72 = BC1_UNORM_SRGB
+        // DXGI 74 = BC2_UNORM
+        // DXGI 77 = BC3_UNORM
+        // DXGI 80 = BC4_UNORM
+        // DXGI 83 = BC5_UNORM
+        // DXGI 95 = BC6H
+        // DXGI 98 = BC7_UNORM
+        // DXGI 99 = BC7_UNORM_SRGB
+        
+        return reFormat switch
+        {
+            71 => CompressionFormat.Bc1,
+            72 => CompressionFormat.Bc1, // Encoder doesn't distinguish SRGB flag usually, handled by metadata
+            74 => CompressionFormat.Bc2,
+            75 => CompressionFormat.Bc2,
+            77 => CompressionFormat.Bc3,
+            78 => CompressionFormat.Bc3,
+            80 => CompressionFormat.Bc4,
+            83 => CompressionFormat.Bc5,
+            95 => CompressionFormat.Bc6U, // Unsigned?
+            96 => CompressionFormat.Bc6S,
+            98 => CompressionFormat.Bc7,
+            99 => CompressionFormat.Bc7,
+            _ => CompressionFormat.Unknown
+        };
     }
 }
