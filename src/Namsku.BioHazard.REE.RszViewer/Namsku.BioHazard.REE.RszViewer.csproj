@@ -7,7 +7,7 @@
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>RszCompare</AssemblyName>
-    <RootNamespace>Namsku.BioHazard.REE.RszCompare</RootNamespace>
+    <RootNamespace>RszViewer</RootNamespace>
     <Authors>namsku</Authors>
     <Company>Namsku.BioHazard</Company>
     <Product>RszCompare</Product>
@@ -24,10 +24,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\IntelOrca.Biohazard.REE\IntelOrca.Biohazard.REE.csproj" />
+    <ProjectReference Include="..\Namsku.BioHazard.REE.RszTga\Namsku.BioHazard.REE.RszTga.Core\Namsku.BioHazard.REE.RszTga.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ExcelDataReader" Version="3.8.0" />
+    <PackageReference Include="ExcelDataReader.DataSet" Version="3.8.0" />
     <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="10.0.2" />
   </ItemGroup>
 
 </Project>

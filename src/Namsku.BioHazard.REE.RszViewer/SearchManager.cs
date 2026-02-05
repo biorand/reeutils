@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using IntelOrca.Biohazard.REE.Rsz;
 
-namespace ReeCompare
+namespace RszViewer
 {
     public class SearchManager
     {
@@ -17,7 +17,7 @@ namespace ReeCompare
 
         public class SearchResult
         {
-            public RszNodeViewModel Node { get; set; }
+            public RszNodeViewModel? Node { get; set; }
             public string ComponentName { get; set; } = "";
             public string PropertyName { get; set; } = "";
             public string Value { get; set; } = "";
@@ -85,12 +85,12 @@ namespace ReeCompare
             node.MatchCount = 0;
 
             // Search in properties if it's an object node
-            if (node.Node != null)
+            if (node.Node is RszObjectNode objNode)
             {
-                for (int i = 0; i < node.Node.Type.Fields.Length; i++)
+                for (int i = 0; i < objNode.Type.Fields.Length; i++)
                 {
-                    var field = node.Node.Type.Fields[i];
-                    var val = node.Node.Children[i];
+                    var field = objNode.Type.Fields[i];
+                    var val = objNode.Children[i];
                     
                     bool nameMatch = IsMatch(field.Name);
                     bool valueMatch = false;

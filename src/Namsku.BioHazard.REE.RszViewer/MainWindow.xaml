@@ -1,0 +1,612 @@
+<Window x:Class="RszViewer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:RszViewer"
+        mc:Ignorable="d"
+        Title="RSZViewer" Height="800" Width="1400"
+        Background="{StaticResource BgPrimary}"
+        Icon="Resources/icon.png"
+        FontFamily="{StaticResource SystemFont}"
+        AllowDrop="True"
+        Drop="Window_Drop">
+    
+    <Window.Resources>
+        <!-- Converters -->
+        <local:LinkIconConverter x:Key="LinkIconConverter"/>
+        <local:PathToNameConverter x:Key="PathToNameConverter"/>
+        <local:ShortNameConverter x:Key="ShortNameConverter"/>
+        <local:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
+
+        <!-- Property Templates -->
+        <DataTemplate x:Key="PropDefaultTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="PropName"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Name, Converter={StaticResource ShortNameConverter}}" Foreground="{StaticResource TextSecondary}" Margin="0,2,15,2" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PropObjectTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="PropName"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Name, Converter={StaticResource ShortNameConverter}}" Foreground="{StaticResource TextPrimary}" Margin="0,2,15,2" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                <TextBlock Grid.Column="1" Text="{Binding TypeName}" Foreground="{StaticResource AccentBlueLight}" Opacity="0.7" FontStyle="Italic" VerticalAlignment="Center"/>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PropBoolTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="PropName"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Name, Converter={StaticResource ShortNameConverter}}" Foreground="{StaticResource TextSecondary}" Margin="0,2,15,2" VerticalAlignment="Center"/>
+                <CheckBox Grid.Column="1" IsChecked="{Binding BoolValue, Mode=TwoWay}" IsEnabled="True" VerticalAlignment="Center"/>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PropNumericTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="PropName"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Name, Converter={StaticResource ShortNameConverter}}" Foreground="{StaticResource TextSecondary}" Margin="0,2,15,2" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <TextBox Text="{Binding Value, Mode=TwoWay}" Style="{StaticResource ProTextBox}" Width="140" HorizontalAlignment="Left" Padding="4,2"/>
+                    <TextBlock Text="{Binding TypeName}" Foreground="{StaticResource AccentOrange}" Opacity="0.6" FontSize="10" Margin="8,0,0,0" VerticalAlignment="Center" FontStyle="Italic"/>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PropVectorTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="PropName"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Name, Converter={StaticResource ShortNameConverter}}" Foreground="{StaticResource TextSecondary}" Margin="0,2,15,2" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <ItemsControl ItemsSource="{Binding VectorValues}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding ComponentValue, Mode=TwoWay}" Style="{StaticResource ProTextBox}" Width="85" Margin="0,0,4,0" Padding="4,2"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="Copy" Style="{StaticResource ProButtonSecondary}" Padding="6,2" Height="20" Margin="5,0,0,0" FontSize="9" Click="BtnVectorCopy_Click"/>
+                    <Button Content="Paste" Style="{StaticResource ProButtonSecondary}" Padding="6,2" Height="20" Margin="4,0,0,0" FontSize="9" Click="BtnVectorPaste_Click"/>
+                    <Button Content="Reset" Style="{StaticResource ProButtonSecondary}" Padding="6,2" Height="20" Margin="4,0,0,0" FontSize="9" Click="BtnVectorReset_Click"/>
+                    <TextBlock Text="{Binding TypeName}" Foreground="{StaticResource AccentOrange}" Opacity="0.6" FontSize="10" Margin="8,0,0,0" VerticalAlignment="Center" FontStyle="Italic"/>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PropGuidTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="PropName"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Name, Converter={StaticResource ShortNameConverter}}" Foreground="{StaticResource TextSecondary}" Margin="0,2,15,2" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <TextBox Text="{Binding Value}" Style="{StaticResource ProTextBox}" Width="250" IsReadOnly="True" Padding="4,2"/>
+                    <Button Content="Generate" Style="{StaticResource ProButtonSecondary}" Padding="6,2" Height="20" Margin="5,0,0,0" FontSize="9" Click="BtnGuidGenerate_Click"/>
+                    <Button Content="Reset" Style="{StaticResource ProButtonSecondary}" Padding="6,2" Height="20" Margin="4,0,0,0" FontSize="9" Click="BtnGuidReset_Click"/>
+                    <Button Content="Search" Style="{StaticResource ProButtonSecondary}" Padding="6,2" Height="20" Margin="4,0,0,0" FontSize="9" Click="BtnGuidSearch_Click"/>
+                    <TextBlock Text="{Binding TypeName}" Foreground="{StaticResource AccentOrange}" Opacity="0.6" FontSize="10" Margin="8,0,0,0" VerticalAlignment="Center" FontStyle="Italic"/>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PropStringTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="PropName"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Name, Converter={StaticResource ShortNameConverter}}" Foreground="{StaticResource TextSecondary}" Margin="0,2,15,2" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <TextBox Text="{Binding Value}" Style="{StaticResource ProTextBox}" Width="250" Padding="4,2"/>
+                    <Button Content="Search" Style="{StaticResource ProButtonSecondary}" Padding="6,2" Height="20" Margin="8,0,0,0" FontSize="9" Click="BtnSearch_Click"/>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PropResourceTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="PropName"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Name, Converter={StaticResource ShortNameConverter}}" Foreground="{StaticResource TextSecondary}" Margin="0,2,15,2" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <TextBox Text="{Binding Value}" Style="{StaticResource ProTextBox}" Width="300" Padding="4,2"/>
+                    <TextBlock Text="Resource" Foreground="#CCCC00" VerticalAlignment="Center" Margin="8,0" FontSize="11" FontWeight="SemiBold"/>
+                    <Button Content="Open" Style="{StaticResource ProButtonSecondary}" Padding="6,2" Height="20" Margin="0,0,4,0" FontSize="9" Click="BtnResourceOpen_Click"/>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <local:RszPropertyTemplateSelector x:Key="PropSelector"
+            DefaultTemplate="{StaticResource PropDefaultTemplate}"
+            ObjectTemplate="{StaticResource PropObjectTemplate}"
+            BoolTemplate="{StaticResource PropBoolTemplate}"
+            NumericTemplate="{StaticResource PropNumericTemplate}"
+            VectorTemplate="{StaticResource PropVectorTemplate}"
+            GuidTemplate="{StaticResource PropGuidTemplate}"
+            StringTemplate="{StaticResource PropStringTemplate}"
+            ResourceTemplate="{StaticResource PropResourceTemplate}"/>
+        
+        <!-- Shared Tree Template -->
+        <HierarchicalDataTemplate x:Key="RszNodeTemplate" ItemsSource="{Binding Children}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="24"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,4,0"/>
+                <ContentControl Grid.Column="1" Content="{Binding}" ContentTemplateSelector="{StaticResource PropSelector}">
+                    <ContentControl.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Copy Value" Click="CopyValue_Click"/>
+                            <MenuItem Header="Analyze Signal" Click="LinkObject_Click"/>
+                            <Separator/>
+                            <MenuItem Header="Open File Explorer" Click="OpenExplorer_Click"/>
+                            <MenuItem Header="Open Terminal" Click="OpenTerminal_Click"/>
+                        </ContextMenu>
+                    </ContentControl.ContextMenu>
+                </ContentControl>
+            </Grid>
+        </HierarchicalDataTemplate>
+
+        <Style x:Key="ProDataGrid" TargetType="DataGrid">
+            <Setter Property="Background" Value="{StaticResource BgSecondary}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="RowBackground" Value="{StaticResource BgSecondary}"/>
+            <Setter Property="AlternatingRowBackground" Value="{StaticResource BgTertiary}"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="ColumnHeaderStyle" Value="{StaticResource ProDataGridColumnHeader}"/>
+            <Setter Property="CellStyle" Value="{StaticResource ProDataGridCell}"/>
+        </Style>
+
+        <FontFamily x:Key="MonoFont">Consolas, Courier New, monospace</FontFamily>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36"/>  <!-- Menu Bar -->
+            <RowDefinition Height="Auto"/>  <!-- Breadcrumb Bar -->
+            <RowDefinition Height="*"/>     <!-- Content -->
+            <RowDefinition Height="Auto"/>  <!-- Output Panel -->
+            <RowDefinition Height="28"/>    <!-- Status Bar -->
+        </Grid.RowDefinitions>
+        <!-- MENU BAR -->
+        <Border Grid.Row="0" Background="{StaticResource BgSecondary}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+            <Menu Background="Transparent" BorderThickness="0" Margin="10,0" VerticalAlignment="Center">
+                <Menu.Resources>
+                    <Style TargetType="MenuItem">
+                        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Padding" Value="14,6"/>
+                        <Setter Property="FontSize" Value="13"/>
+                        <Setter Property="FontWeight" Value="Medium"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                        <ControlTemplate TargetType="MenuItem">
+                            <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter Grid.Column="0" ContentSource="Icon" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                    <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}" Foreground="{StaticResource TextSecondary}" Margin="20,0,0,0" VerticalAlignment="Center" FontSize="11"/>
+                                    <Popup x:Name="PART_Popup" AllowsTransparency="True" Placement="Bottom" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" Focusable="False" PopupAnimation="Fade">
+                                        <Border Background="{StaticResource BgSecondary}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" Padding="6" Margin="0,4,0,0">
+                                            <Border.Effect>
+                                                <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.4"/>
+                                            </Border.Effect>
+                                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                                        </Border>
+                                    </Popup>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsHighlighted" Value="True">
+                                    <Setter TargetName="Border" Property="Background" Value="{StaticResource BgHover}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Border" Property="Background" Value="{StaticResource BgTertiary}"/>
+                                </Trigger>
+                                <Trigger Property="Role" Value="TopLevelHeader">
+                                    <Setter TargetName="PART_Popup" Property="Placement" Value="Bottom"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                    <Style TargetType="Separator">
+                        <Setter Property="Background" Value="{StaticResource BorderColor}"/>
+                        <Setter Property="Height" Value="1"/>
+                        <Setter Property="Margin" Value="4,4"/>
+                    </Style>
+                </Menu.Resources>
+                
+                <MenuItem Header="File">
+                    <MenuItem Header="Open Folder..." InputGestureText="Ctrl+O" Click="BtnOpenFolder_Click"/>
+                    <MenuItem x:Name="MenuRecentFolders" Header="Recent Folders"/>
+                    <Separator/>
+                    <MenuItem Header="Save" InputGestureText="Ctrl+S" Click="BtnSave_Click"/>
+                    <MenuItem Header="Save As..." InputGestureText="Ctrl+Shift+S" Click="BtnSaveAs_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Reload" InputGestureText="Ctrl+R" Click="BtnReload_Click"/>
+                    <MenuItem Header="Reload RSZ Repo" Click="LoadRsz_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Close Tab" InputGestureText="Ctrl+W" Click="BtnCloseTab_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Settings" Click="BtnSettings_Click"/>
+                    <MenuItem Header="Exit" InputGestureText="Alt+F4" Click="BtnExit_Click"/>
+                </MenuItem>
+
+                <MenuItem Header="Edit">
+                    <MenuItem Header="Undo" InputGestureText="Ctrl+Z" Click="BtnUndo_Click"/>
+                    <MenuItem Header="Redo" InputGestureText="Ctrl+Y" Click="BtnRedo_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Cut" InputGestureText="Ctrl+X" Click="BtnCut_Click"/>
+                    <MenuItem Header="Copy" InputGestureText="Ctrl+C" Click="BtnCopy_Click"/>
+                    <MenuItem Header="Paste" InputGestureText="Ctrl+V" Click="BtnPaste_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Find" InputGestureText="Ctrl+F" Click="PerformSearch_Click"/>
+                </MenuItem>
+
+                <MenuItem Header="View">
+                    <MenuItem x:Name="MenuShowExplorer" Header="Show File Explorer" InputGestureText="Ctrl+E" IsCheckable="True" IsChecked="False" Click="BtnToggleExplorer_Click"/>
+                    <MenuItem Header="Show Output Panel" Click="BtnToggleOutput_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Zoom In" InputGestureText="Ctrl++" Click="BtnZoomIn_Click"/>
+                    <MenuItem Header="Zoom Out" InputGestureText="Ctrl+-" Click="BtnZoomOut_Click"/>
+                    <MenuItem Header="Reset Zoom" InputGestureText="Ctrl+0" Click="BtnZoomReset_Click"/>
+                </MenuItem>
+
+                <MenuItem Header="Settings">
+                    <MenuItem Header="Preferences" InputGestureText="Ctrl+," Click="BtnSettings_Click"/>
+                    <MenuItem Header="Theme">
+                        <MenuItem Header="Dark" IsCheckable="True" IsChecked="True" Click="BtnTheme_Click"/>
+                        <MenuItem Header="Light" IsCheckable="True" Click="BtnTheme_Click"/>
+                        <MenuItem Header="Auto" IsCheckable="True" Click="BtnTheme_Click"/>
+                    </MenuItem>
+                </MenuItem>
+
+                <MenuItem Header="Help">
+                    <MenuItem Header="Documentation" Click="BtnDoc_Click"/>
+                    <MenuItem Header="About RSZViewer" Click="BtnAbout_Click"/>
+                </MenuItem>
+            </Menu>
+        </Border>
+
+        <!-- BREADCRUMB BAR -->
+        <Border Grid.Row="1" Background="{StaticResource BgPrimary}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="12,4">
+            <TextBlock x:Name="TxtBreadcrumbs" Text="No folder selected" Foreground="{StaticResource TextSecondary}" FontSize="12" VerticalAlignment="Center" FontWeight="SemiBold"/>
+        </Border>
+
+        <!-- CONTENT AREA -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="ColExplorer" Width="0"/> <!-- Hidden by default -->
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- EXPLORER -->
+            <Border Grid.Column="0" Background="{StaticResource BgSecondary}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,1,0" x:Name="PnlExplorer">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <Border Background="{StaticResource BgTertiary}" Padding="10,6" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                        <TextBlock Text="EXPLORER" Foreground="{StaticResource AccentOrange}" FontSize="10" FontWeight="Bold"/>
+                    </Border>
+                    
+                    <TreeView x:Name="TreeFiles" Grid.Row="1" Style="{StaticResource ProTreeView}" 
+                              HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                              ItemContainerStyle="{StaticResource ProTreeViewItem}"
+                              SelectedItemChanged="TreeFiles_SelectedItemChanged"
+                              MouseDoubleClick="TreeFiles_MouseDoubleClick">
+                        <TreeView.ItemTemplate>
+                            <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                <StackPanel Orientation="Horizontal" Margin="0,2">
+                                    <StackPanel.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Open File Explorer" Click="OpenExplorer_Click"/>
+                                            <MenuItem Header="Open Terminal" Click="OpenTerminal_Click"/>
+                                        </ContextMenu>
+                                    </StackPanel.ContextMenu>
+                                    <TextBlock Text="{Binding Icon}" Margin="0,0,8,0" Foreground="#FFD700" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </HierarchicalDataTemplate>
+                        </TreeView.ItemTemplate>
+                    </TreeView>
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Width="1" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{StaticResource BorderColor}"/>
+
+            <!-- MAIN TABS -->
+            <TabControl Grid.Column="2" x:Name="MainTabControl" Style="{StaticResource ProTabControl}" SelectionChanged="MainTabControl_SelectionChanged">
+                <TabControl.LayoutTransform>
+                    <ScaleTransform x:Name="MainScaleTransform" ScaleX="1" ScaleY="1"/>
+                </TabControl.LayoutTransform>
+                <!-- RSZ VIEW -->
+                <TabItem Header="RSZ VIEW" Style="{StaticResource ProTabItem}">
+                    <Grid Background="{StaticResource BgPrimary}">
+                        <TabControl x:Name="FileTabControl" ItemsSource="{Binding RszTabs}" Background="Transparent" BorderThickness="0">
+                            <TabControl.ItemContainerStyle>
+                                <Style TargetType="TabItem">
+                                    <Setter Property="Background" Value="#2A2A2A"/>
+                                    <Setter Property="Foreground" Value="#999999"/>
+                                    <Setter Property="BorderBrush" Value="#3A3A3A"/>
+                                    <Setter Property="BorderThickness" Value="1,1,1,0"/>
+                                    <Setter Property="Padding" Value="8,4"/>
+                                    <Setter Property="Margin" Value="0,0,2,0"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="TabItem">
+                                                <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4,4,0,0" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="Border" Property="Background" Value="#1E1E1E"/>
+                                                        <Setter Property="Foreground" Value="#FFFFFF"/>
+                                                        <Setter TargetName="Border" Property="BorderBrush" Value="#FF6B35"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Border" Property="Background" Value="#333333"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </TabControl.ItemContainerStyle>
+                            <TabControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Header}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <Button Content="✕" Click="BtnCloseTab_Click" Width="16" Height="16" Padding="0" FontSize="10" VerticalAlignment="Center" Background="#CC3333" Foreground="White" BorderThickness="0" Cursor="Hand">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Background" Value="#CC3333"/>
+                                                    <Setter Property="Foreground" Value="White"/>
+                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="{TemplateBinding Background}" CornerRadius="2" Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="#FF4444"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsPressed" Value="True">
+                                                            <Setter Property="Background" Value="#AA2222"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </TabControl.ItemTemplate>
+                            <TabControl.Resources>
+                                <DataTemplate DataType="{x:Type local:RszTabViewModel}">
+                                    <TreeView ItemsSource="{Binding Nodes}" Style="{StaticResource ProTreeView}" ItemContainerStyle="{StaticResource ProTreeViewItem}" ItemTemplate="{StaticResource RszNodeTemplate}" Grid.IsSharedSizeScope="True"/>
+                                </DataTemplate>
+                                <DataTemplate DataType="{x:Type local:TextureTabViewModel}">
+                                    <local:TextureViewer TexturePath="{Binding FullPath}"/>
+                                </DataTemplate>
+                            </TabControl.Resources>
+                        </TabControl>
+                    </Grid>
+                </TabItem>
+
+                <!-- RSZ COMPARE -->
+                <TabItem Header="RSZ COMPARE" Style="{StaticResource ProTabItem}">
+                    <Grid Background="{StaticResource BgPrimary}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="200"/>
+                        </Grid.RowDefinitions>
+
+                        <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid Grid.Column="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TxtFileA" Style="{StaticResource ProTextBox}" IsReadOnly="True" AllowDrop="True" Drop="FileA_Drop"/>
+                                    <Button Grid.Column="1" Content="Browse A" Style="{StaticResource ProButtonSecondary}" Margin="5,0,0,0" Padding="8,4" Click="BtnLoadA_Click"/>
+                                </Grid>
+                                <Border Grid.Column="1" Width="1" Background="{StaticResource BorderColor}" Margin="10,0"/>
+                                <Grid Grid.Column="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TxtFileB" Style="{StaticResource ProTextBox}" IsReadOnly="True" AllowDrop="True" Drop="FileB_Drop"/>
+                                    <Button Grid.Column="1" Content="Browse B" Style="{StaticResource ProButtonSecondary}" Margin="5,0,0,0" Padding="8,4" Click="BtnLoadB_Click"/>
+                                </Grid>
+                            </Grid>
+                        </Border>
+
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TreeView x:Name="TreeA" Grid.Column="0" Style="{StaticResource ProTreeView}" ItemContainerStyle="{StaticResource ProTreeViewItem}" ItemTemplate="{StaticResource RszNodeTemplate}" SelectedItemChanged="TreeA_SelectedItemChanged" Loaded="TreeA_Loaded" Grid.IsSharedSizeScope="True"/>
+                            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" Background="{StaticResource BorderColor}"/>
+                            <TreeView x:Name="TreeB" Grid.Column="2" Style="{StaticResource ProTreeView}" ItemContainerStyle="{StaticResource ProTreeViewItem}" ItemTemplate="{StaticResource RszNodeTemplate}" SelectedItemChanged="TreeB_SelectedItemChanged" Loaded="TreeB_Loaded" Grid.IsSharedSizeScope="True"/>
+                        </Grid>
+
+                        <GridSplitter Grid.Row="2" Height="4" HorizontalAlignment="Stretch" Background="{StaticResource BorderColor}"/>
+
+                        <Grid Grid.Row="3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="300"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,1,0" Background="{StaticResource BgTertiary}" Padding="10">
+                                <StackPanel>
+                                    <TextBlock Text="SEARCH OPTIONS" Style="{StaticResource ProSectionTitleOrange}"/>
+                                    <CheckBox x:Name="SearchChkMatchCase" Content="Match Case" Margin="0,5" Padding="4,0" Checked="SearchOption_Changed" Unchecked="SearchOption_Changed"/>
+                                    <CheckBox x:Name="SearchChkRegex" Content="Use Regex" Margin="0,5" Padding="4,0" Checked="SearchOption_Changed" Unchecked="SearchOption_Changed"/>
+                                    <CheckBox x:Name="SearchChkDiffOnly" Content="Show Differences Only" Margin="0,5" Padding="4,0" Checked="SearchOption_Changed" Unchecked="SearchOption_Changed"/>
+                                    <TextBlock Text="TARGET" Style="{StaticResource ProSectionTitleOrange}" Margin="0,15,0,5"/>
+                                    <RadioButton x:Name="SearchRadPropName" Content="Property Name" GroupName="SearchTarget" Margin="0,2" Padding="4,0" IsChecked="True" Checked="SearchOption_Changed"/>
+                                    <RadioButton x:Name="SearchRadPropValue" Content="Property Value" GroupName="SearchTarget" Margin="0,2" Padding="4,0" Checked="SearchOption_Changed"/>
+                                    <TextBlock Text="MATCHES" Style="{StaticResource ProSectionTitleOrange}" Margin="0,15,0,5"/>
+                                    <DockPanel>
+                                        <Button Content="&lt;" Width="30" Click="BtnPrev_Click" Style="{StaticResource ProButtonSecondary}" Padding="0"/>
+                                        <TextBlock x:Name="TxtMatchStatus" Text="0/0" VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}" Margin="10,0"/>
+                                        <Button Content="&gt;" Width="30" Click="BtnNext_Click" Style="{StaticResource ProButtonSecondary}" Padding="0"/>
+                                    </DockPanel>
+                                </StackPanel>
+                            </Border>
+                            <DataGrid x:Name="GridDiff" Grid.Column="1" Style="{StaticResource ProDataGrid}" AutoGenerateColumns="False">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="COMPONENT" Binding="{Binding ComponentName}" Width="150" ElementStyle="{StaticResource ProDataGridTextColumnStyle}"/>
+                                    <DataGridTextColumn Header="FIELD" Binding="{Binding FieldName}" Width="150" ElementStyle="{StaticResource ProDataGridTextColumnStyle}"/>
+                                    
+                                    <DataGridTextColumn Header="VALUE A" Binding="{Binding ValueA}" Width="*">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource ProDataGridTextColumnStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ValueA}" Value="&lt;Missing&gt;">
+                                                        <Setter Property="Foreground" Value="{StaticResource ErrorRed}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+
+                                    <DataGridTextColumn Header="VALUE B" Binding="{Binding ValueB}" Width="*">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource ProDataGridTextColumnStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ValueB}" Value="&lt;Missing&gt;">
+                                                        <Setter Property="Foreground" Value="{StaticResource ErrorRed}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Grid>
+                </TabItem>
+
+                <!-- RSZ LINK Tab -->
+            <TabItem Header="RSZ LINK" Style="{StaticResource ProTabItem}">
+                <local:LinkTracerControl x:Name="TracerUI"/>
+            </TabItem>
+
+            <!-- RSZ SHEET Tab -->
+            <TabItem Header="RSZ SHEET" Style="{StaticResource ProTabItem}" DataContext="{Binding SheetVM}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <Border Background="{StaticResource BgSecondary}" Padding="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Status}" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                            <Button Content="Reload Sheet" Margin="10,0,0,0" Click="BtnReloadSheet_Click"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Sheet Content -->
+                    <TabControl Grid.Row="1" ItemsSource="{Binding Sheets}" Background="Transparent" BorderThickness="0">
+                        <TabControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}" Padding="6,2"/>
+                            </DataTemplate>
+                        </TabControl.ItemTemplate>
+                        <TabControl.ContentTemplate>
+                            <DataTemplate>
+                                <TreeView ItemsSource="{Binding Nodes}" ItemTemplate="{StaticResource RszNodeTemplate}" 
+                                          Style="{StaticResource ProTreeView}" BorderThickness="0"/>
+                            </DataTemplate>
+                        </TabControl.ContentTemplate>
+                    </TabControl>
+                </Grid>
+            </TabItem>
+            </TabControl>
+        </Grid>
+
+        <!-- OUTPUT PANEL -->
+        <Border x:Name="PnlOutput" Grid.Row="3" Height="150" Background="{StaticResource BgTertiary}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Visibility="Collapsed">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Border Background="{StaticResource BgSecondary}" Padding="10,4">
+                    <TextBlock Text="OUTPUT" Foreground="{StaticResource AccentBlue}" FontSize="10" FontWeight="Bold"/>
+                </Border>
+                <TextBox Grid.Row="1" x:Name="TxtOutput" Background="Transparent" Foreground="{StaticResource TextSecondary}" BorderThickness="0" IsReadOnly="True" VerticalScrollBarVisibility="Auto" FontFamily="{StaticResource MonoFont}" Padding="10"/>
+            </Grid>
+        </Border>
+
+        <!-- STATUS BAR (28px) -->
+        <Border Grid.Row="4" Background="{StaticResource BgSecondary}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0">
+            <DockPanel Margin="14,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse Width="6" Height="6" Fill="{StaticResource SuccessGreen}" Margin="0,0,10,0"/>
+                    <TextBlock x:Name="TxtStatusMessage" Text="Ready" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,0,20,0"/>
+                    <TextBlock x:Name="TxtStatusStats" Text="" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                </StackPanel>
+                <TextBlock DockPanel.Dock="Right" Text="RSZViewer v1.3" FontSize="11" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

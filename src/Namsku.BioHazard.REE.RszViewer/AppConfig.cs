@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 
-namespace ReeCompare
+namespace RszViewer
 {
     public class AppConfig
     {
@@ -14,6 +14,12 @@ namespace ReeCompare
         public List<SavedSearch> SavedSearches { get; set; } = new List<SavedSearch>();
         public List<FileHistoryItem> RecentFiles { get; set; } = new List<FileHistoryItem>();
         public ComparisonSession? LastSession { get; set; }
+        public string? LastViewFolder { get; set; }
+        public string? LastOpenFile { get; set; }
+        public string? LastLinkerFolder { get; set; }
+        public string? SpreadsheetPath { get; set; }
+        public List<string> RecentFolders { get; set; } = new List<string>();
+        public bool IsExplorerVisible { get; set; } = true;
 
         private static readonly string ConfigPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

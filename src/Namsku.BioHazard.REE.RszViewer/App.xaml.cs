@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 
-namespace ReeCompare
+namespace RszViewer
 {
     public partial class App : Application
     {
@@ -28,7 +28,7 @@ namespace ReeCompare
             LogException("CurrentDomain_UnhandledException", e.ExceptionObject as Exception);
         }
 
-        private void TaskScheduler_UnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
+        private void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
         {
             LogException("TaskScheduler_UnobservedTaskException", e.Exception);
             e.SetObserved();

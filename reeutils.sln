@@ -17,7 +17,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IntelOrca.Biohazard.REE.Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "reeexamples", "src\reeexamples\reeexamples.csproj", "{756CF99D-989E-4BD9-8CDE-2A557946D209}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Namsku.BioHazard.REE.RszCompare", "src\Namsku.BioHazard.REE.RszCompare\Namsku.BioHazard.REE.RszCompare.csproj", "{3DCAA97B-2E54-433B-AC8C-89F75342B535}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Namsku.BioHazard.REE.RszViewer", "src\Namsku.BioHazard.REE.RszViewer\Namsku.BioHazard.REE.RszViewer.csproj", "{3DCAA97B-2E54-433B-AC8C-89F75342B535}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Namsku.BioHazard.REE.RszTga", "Namsku.BioHazard.REE.RszTga", "{C82856B5-035A-47CC-BA78-B5EA86819D7B}"
 EndProject

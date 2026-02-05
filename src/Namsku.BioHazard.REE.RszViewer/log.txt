@@ -1,0 +1,2 @@
+MSBUILD : error MSB1009: Project file does not exist.
+Switch:  e:\Projects\Library\reeutils\src\Namsku.BioHazard.REE.RszViewer\Namsku.BioHazard.REE.RszViewer.csproj

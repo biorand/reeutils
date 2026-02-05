@@ -94,8 +94,11 @@ public class ReTextureFile
         }
     }
 
-    public void ExportToTga(string outputPath, Stream stream)
+    public byte[] GetDecompressedData(Stream stream, out int width, out int height)
     {
+        width = Header.Width;
+        height = Header.Height;
+        
         uint formatId = 0;
         if (HeaderV2.HasValue) formatId = HeaderV2.Value.Format;
         else if (HeaderV1.HasValue) formatId = HeaderV1.Value.Format;
@@ -112,13 +115,10 @@ public class ReTextureFile
         // Decompress using BCnEncoder
         var decoder = new BcDecoder();
         
-        // Handle SRGB if needed (BCnEncoder usually handles this via format, but output is Raw RGBA32)
-        // Memory<byte> rawRgba;
         byte[] rawBytes;
 
         if (compressionFormat == CompressionFormat.Unknown)
         {
-             // Assume uncompressed R8G8B8A8 if unknown? Or throw?
              // For now, if format is R8G8B8A8 (28) or SRGB (29), simple copy
              if (formatId == 28 || formatId == 29) // R8G8B8A8
                  rawBytes = data;
@@ -127,15 +127,16 @@ public class ReTextureFile
         }
         else
         {
-             // Decompress
-             // Note: DecodeRawToByteRgba expects tight packing? 
-             // We need to decode to ColorRgba32 first to be safe
              var colors = decoder.DecodeRaw(data, Header.Width, Header.Height, compressionFormat);
-             
-             // Convert ColorRgba32[] to byte[]
              rawBytes = new byte[colors.Length * 4];
              MemoryMarshal.Cast<ColorRgba32, byte>(colors).CopyTo(rawBytes);
         }
+        return rawBytes;
+    }
+
+    public void ExportToTga(string outputPath, Stream stream)
+    {
+        var rawBytes = GetDecompressedData(stream, out _, out _);
         
         // Manual TGA Write (Bottom-Up)
         using var fs = new FileStream(outputPath, FileMode.Create, FileAccess.Write);

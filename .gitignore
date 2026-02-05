@@ -402,3 +402,11 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Custom build logs and artifacts
+build_*.txt
+build_*.log
+*_output.txt
+*_check.log
+*_verify.log
+*_error.txt
