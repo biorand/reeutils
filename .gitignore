@@ -410,3 +410,9 @@ build_*.log
 *_check.log
 *_verify.log
 *_error.txt
+error_list.txt
+errors.log
+errors_*.log
+log.txt
+*.log
+
