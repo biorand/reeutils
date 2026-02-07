@@ -11,7 +11,8 @@
         FontFamily="{StaticResource SystemFont}"
         AllowDrop="True"
         Drop="Window_Drop"
-        Closing="Window_Closing">
+        Closing="Window_Closing"
+        PreviewKeyDown="Window_PreviewKeyDown">
     
     <Window.Resources>
         <!-- Converters -->
@@ -122,7 +123,7 @@
                 <TextBlock Grid.Column="0" Text="{Binding Name, Converter={StaticResource ShortNameConverter}}" Foreground="{StaticResource TextSecondary}" Margin="0,2,15,2" VerticalAlignment="Center"/>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <TextBox Text="{Binding Value}" Style="{StaticResource ProTextBox}" Width="250" Padding="4,2"/>
-                    <Button Content="Search" Style="{StaticResource ProButtonSecondary}" Padding="6,2" Height="20" Margin="8,0,0,0" FontSize="9" Click="BtnSearch_Click"/>
+                    <Button Content="Search" Style="{StaticResource ProButtonSecondary}" Padding="6,2" Height="20" Margin="8,0,0,0" FontSize="9" Click="BtnFindObject_Click"/>
                 </StackPanel>
             </Grid>
         </DataTemplate>
@@ -159,7 +160,11 @@
                     <ColumnDefinition Width="24"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding Icon}" FontFamily="{StaticResource IconFont}" FontSize="14" Foreground="{StaticResource AccentBlueLight}" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,4,0"/>
+                <TextBlock Grid.Column="0" Text="{Binding Icon}" FontFamily="{StaticResource IconFont}" FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,4,0">
+                    <TextBlock.Foreground>
+                        <SolidColorBrush Color="{Binding IconColor}"/>
+                    </TextBlock.Foreground>
+                </TextBlock>
                 <ContentControl Grid.Column="1" Content="{Binding}" ContentTemplateSelector="{StaticResource PropSelector}"
                                 MouseDoubleClick="RszNode_MouseDoubleClick">
                     <ContentControl.ContextMenu>
@@ -347,7 +352,11 @@
                                             <MenuItem Header="Open Terminal" Click="OpenTerminal_Click"/>
                                         </ContextMenu>
                                     </StackPanel.ContextMenu>
-                                    <TextBlock Text="{Binding Icon}" Margin="0,0,8,0" Foreground="#FFD700" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding Icon}" Margin="0,0,8,0" FontWeight="Bold">
+                                        <TextBlock.Foreground>
+                                            <SolidColorBrush Color="{Binding IconColor}"/>
+                                        </TextBlock.Foreground>
+                                    </TextBlock>
                                     <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </HierarchicalDataTemplate>
@@ -366,7 +375,71 @@
                 <!-- RSZ VIEW -->
                 <TabItem Header="RSZ VIEW" Style="{StaticResource ProTabItem}">
                     <Grid Background="{StaticResource BgPrimary}">
-                        <TabControl x:Name="FileTabControl" ItemsSource="{Binding RszTabs}" Background="Transparent" BorderThickness="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="150" MinHeight="100"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- INLINE SEARCH BAR -->
+                        <Border x:Name="SearchPanel" Grid.Row="0" Background="{StaticResource BgTertiary}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="8,6" Visibility="Collapsed">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Search icon -->
+                                <TextBlock Grid.Column="0" Text="&#xE721;" FontFamily="{StaticResource IconFont}" FontSize="14" Foreground="{StaticResource AccentBlueLight}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+
+                                <!-- Search textbox -->
+                                <TextBox x:Name="TxtViewSearch" Grid.Column="1" Style="{StaticResource ProTextBox}" 
+                                         Text="{Binding ViewSearchQuery, UpdateSourceTrigger=PropertyChanged}" 
+                                         KeyDown="TxtViewSearch_KeyDown" Padding="6,4" MinWidth="200"/>
+
+                                <!-- Scope -->
+                                <ComboBox x:Name="CboSearchScope" Grid.Column="2" Margin="8,0,0,0" SelectedIndex="0" Padding="6,4" MinWidth="130"
+                                          Background="{StaticResource BgSecondary}" Foreground="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderColor}">
+                                    <ComboBoxItem Content="Current File"/>
+                                    <ComboBoxItem Content="Current Directory"/>
+                                    <ComboBoxItem Content="Deep Scan"/>
+                                </ComboBox>
+
+                                <!-- Options -->
+                                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="10,0,0,0">
+                                    <CheckBox x:Name="ChkViewMatchCase" Content="Aa" ToolTip="Match Case" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}"/>
+                                    <CheckBox x:Name="ChkViewRegex" Content=".*" ToolTip="Use Regex" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}"/>
+                                </StackPanel>
+
+                                <!-- Navigation -->
+                                <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="10,0,0,0">
+                                    <Button Content="&#xE70E;" FontFamily="{StaticResource IconFont}" Width="28" Height="28" Click="BtnViewPrev_Click" Style="{StaticResource ProButtonSecondary}" Padding="0" ToolTip="Previous (Shift+Enter)"/>
+                                    <TextBlock x:Name="TxtViewMatchStatus" Text="0/0" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}" Margin="8,0" MinWidth="40" TextAlignment="Center"/>
+                                    <Button Content="&#xE70D;" FontFamily="{StaticResource IconFont}" Width="28" Height="28" Click="BtnViewNext_Click" Style="{StaticResource ProButtonSecondary}" Padding="0" ToolTip="Next (Enter)"/>
+                                </StackPanel>
+
+                                <!-- Search button -->
+                                <Button Grid.Column="5" Content="Search" Click="BtnViewSearch_Click" Style="{StaticResource ProButtonSecondary}" Padding="12,4" Margin="8,0,0,0"/>
+
+                                <!-- Stop button + Progress -->
+                                <StackPanel Grid.Column="6" Orientation="Horizontal" Margin="8,0,0,0">
+                                    <Button x:Name="BtnViewStop" Content="Stop" Click="BtnViewStop_Click" Style="{StaticResource ProButtonSecondary}" Padding="12,4" Visibility="Collapsed"/>
+                                    <ProgressBar x:Name="PrgViewSearch" Width="100" Height="16" Margin="8,0,0,0" Visibility="Collapsed" IsIndeterminate="True"/>
+                                </StackPanel>
+
+                                <!-- Close button -->
+                                <Button Grid.Column="7" Content="&#xE711;" FontFamily="{StaticResource IconFont}" Width="28" Height="28" Click="BtnCloseSearch_Click" Style="{StaticResource ProButtonSecondary}" Padding="0" Margin="8,0,0,0" ToolTip="Close (Esc)"/>
+                            </Grid>
+                        </Border>
+
+                        <TabControl x:Name="FileTabControl" Grid.Row="1" ItemsSource="{Binding RszTabs}" Background="Transparent" BorderThickness="0">
                             <TabControl.ItemContainerStyle>
                                 <Style TargetType="TabItem">
                                     <Setter Property="Background" Value="#2A2A2A"/>
@@ -438,6 +511,28 @@
                                 </DataTemplate>
                             </TabControl.Resources>
                         </TabControl>
+
+                        <!-- SPLITTER -->
+                        <GridSplitter Grid.Row="2" Height="4" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="{StaticResource BorderColor}" ShowsPreview="True"/>
+
+                        <!-- SEARCH RESULTS -->
+                        <DataGrid x:Name="ViewResultsGrid" Grid.Row="3" ItemsSource="{Binding ViewMatches}" Style="{StaticResource ProDataGrid}" AutoGenerateColumns="False" IsReadOnly="True" 
+                                  HeadersVisibility="Column" SelectionMode="Single" MouseDoubleClick="ViewResultsGrid_MouseDoubleClick" Background="{StaticResource BgTertiary}" BorderThickness="0,1,0,0">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="" Binding="{Binding Icon}" FontFamily="{StaticResource IconFont}" Width="30" IsReadOnly="True">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{Binding IconColorBrush}"/>
+                                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="200" ElementStyle="{StaticResource ProDataGridTextColumnStyle}"/>
+                                <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*" ElementStyle="{StaticResource ProDataGridTextColumnStyle}"/>
+                                <DataGridTextColumn Header="Type" Binding="{Binding TypeName}" Width="150" ElementStyle="{StaticResource ProDataGridTextColumnStyle}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
                     </Grid>
                 </TabItem>
 
@@ -499,6 +594,7 @@
                             <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,1,0" Background="{StaticResource BgTertiary}" Padding="10">
                                 <StackPanel>
                                     <TextBlock Text="SEARCH OPTIONS" Style="{StaticResource ProSectionTitleOrange}"/>
+                                    <TextBox x:Name="TxtCompareSearch" Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource ProSearchBox}" Margin="0,5,0,10" KeyUp="TxtCompareSearch_KeyUp"/>
                                     <CheckBox x:Name="SearchChkMatchCase" Content="Match Case" Margin="0,5" Padding="4,0" Checked="SearchOption_Changed" Unchecked="SearchOption_Changed"/>
                                     <CheckBox x:Name="SearchChkRegex" Content="Use Regex" Margin="0,5" Padding="4,0" Checked="SearchOption_Changed" Unchecked="SearchOption_Changed"/>
                                     <CheckBox x:Name="SearchChkDiffOnly" Content="Show Differences Only" Margin="0,5" Padding="4,0" Checked="SearchOption_Changed" Unchecked="SearchOption_Changed"/>

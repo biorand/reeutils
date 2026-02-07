@@ -15,16 +15,23 @@ using System.Windows.Input;
 using System.Windows.Media;
 using IntelOrca.Biohazard.REE.Rsz;
 using IntelOrca.Biohazard.REE;
+using IntelOrca.Biohazard.REE.Messages;
+using IntelOrca.Biohazard.REE.Variables;
+using IntelOrca.Biohazard.REE.Package;
 using Microsoft.Win32;
+using System.Threading;
 using System.Collections.Immutable;
 
 namespace RszViewer
 {
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, INotifyPropertyChanged
     {
         public static MainWindow? Instance { get; private set; }
         public AppConfig Config => _config;
-        public string SearchQuery { get; set; } = "";
+        
+        private string _searchQuery = "";
+        public string SearchQuery { get => _searchQuery; set { if (_searchQuery != value) { _searchQuery = value; OnPropertyChanged(); } } }
+
 
         private RszTypeRepository _repo = new RszTypeRepository(); // Safe default
         private SearchManager _searchManager = new SearchManager();
@@ -38,6 +45,14 @@ namespace RszViewer
         private int _matchIndex = -1;
         private List<RszNodeViewModel> _currentMatches = new List<RszNodeViewModel>();
         
+        // View search
+        private string _viewSearchQuery = "";
+        public string ViewSearchQuery { get => _viewSearchQuery; set { if (_viewSearchQuery != value) { _viewSearchQuery = value; OnPropertyChanged(); } } }
+
+        private int _viewMatchIndex = -1;
+        private CancellationTokenSource? _viewSearchCts;
+        private ObservableCollection<RszNodeViewModel> _viewMatches = new ObservableCollection<RszNodeViewModel>();
+        public ObservableCollection<RszNodeViewModel> ViewMatches => _viewMatches;
 
         // RszSheet
         public RszSheetViewModel SheetVM { get; } = new RszSheetViewModel();
@@ -124,7 +139,7 @@ namespace RszViewer
                 {
                     string filePath = files[0];
                     string lower = filePath.ToLower();
-                    if (lower.Contains(".scn.") || lower.Contains(".pfb.") || lower.Contains(".user.") || lower.Contains(".aimap") || lower.Contains(".tex"))
+                    if (lower.Contains(".scn.") || lower.Contains(".pfb.") || lower.Contains(".user.") || lower.Contains(".aimap") || lower.Contains(".tex") || lower.Contains(".msg") || lower.Contains(".uvar") || lower.Contains(".pak"))
                     {
                         LoadFileForView(filePath);
                     }
@@ -276,21 +291,36 @@ namespace RszViewer
                     return;
                 }
 
-                if (!EnsureRszLoaded()) return;
-
                 // Check if already open
                 var existing = _rszTabs.FirstOrDefault(t => t.FullPath == filePath);
                 if (existing != null)
                 {
-                    // Find FileTabControl if it's nested
                     FileTabControl.SelectedItem = existing;
                     return;
                 }
-                
+
                 byte[] data = File.ReadAllBytes(filePath);
                 IList<RszNodeViewModel> viewModels;
 
-                if (lower.Contains(".scn."))
+                // File types that don't require RSZ definitions
+                if (lower.Contains(".msg"))
+                {
+                    viewModels = LoadMsgFile(data, filePath);
+                }
+                else if (lower.Contains(".uvar"))
+                {
+                    viewModels = LoadUvarFile(data, filePath);
+                }
+                else if (lower.EndsWith(".pak") || lower.Contains(".pak."))
+                {
+                    viewModels = LoadPakFile(filePath);
+                }
+                // File types that require RSZ definitions
+                else if (!EnsureRszLoaded())
+                {
+                    return;
+                }
+                else if (lower.Contains(".scn."))
                 {
                     int version = GetVersion(lower, ".scn.");
                     var scnFile = new ScnFile(version, data);
@@ -426,7 +456,11 @@ namespace RszViewer
         private void BtnCut_Click(object sender, RoutedEventArgs e) => LogOutput("Cut requested.");
         private void BtnCopy_Click(object sender, RoutedEventArgs e) => LogOutput("Copy requested.");
         private void BtnPaste_Click(object sender, RoutedEventArgs e) => LogOutput("Paste requested.");
-        private void PerformSearch_Click(object sender, RoutedEventArgs e) { /* Focus search if it existed elsewhere */ }
+        private void PerformSearch_Click(object sender, RoutedEventArgs e)
+        {
+            SearchPanel.Visibility = Visibility.Visible;
+            TxtViewSearch.Focus();
+        }
 
         private void BtnToggleOutput_Click(object sender, RoutedEventArgs e)
         {
@@ -580,6 +614,365 @@ namespace RszViewer
             }
         }
 
+        // ======== VIEW SEARCH (Ctrl+F) ========
+
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                SearchPanel.Visibility = Visibility.Visible;
+                TxtViewSearch.Focus();
+                TxtViewSearch.SelectAll();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape && SearchPanel.Visibility == Visibility.Visible)
+            {
+                BtnCloseSearch_Click(sender, new RoutedEventArgs());
+                e.Handled = true;
+            }
+        }
+
+        private void TxtViewSearch_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                if (Keyboard.Modifiers == ModifierKeys.Shift)
+                    BtnViewPrev_Click(sender, new RoutedEventArgs());
+                else if (_viewMatches.Count == 0)
+                    BtnViewSearch_Click(sender, new RoutedEventArgs());
+                else
+                    BtnViewNext_Click(sender, new RoutedEventArgs());
+                e.Handled = true;
+            }
+        }
+
+        private void BtnViewSearch_Click(object sender, RoutedEventArgs e)
+        {
+            PerformViewSearch();
+        }
+
+        private void OpenInlineSearch(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query)) return;
+
+            // Check if we're on the RSZ COMPARE tab
+            if (MainTabControl.SelectedItem is TabItem tab && tab.Header?.ToString() == "RSZ COMPARE")
+            {
+                // Route to compare search
+                SearchQuery = query;
+                _searchManager.Type = SearchManager.SearchType.Both;
+                PerformSearch();
+                return;
+            }
+            
+            // Default: RSZ VIEW inline search
+            SearchPanel.Visibility = Visibility.Visible;
+            TxtViewSearch.Text = query;
+            TxtViewSearch.Focus();
+            if (CboSearchScope != null) CboSearchScope.SelectedIndex = 0; // Force "Current File"
+            PerformViewSearch();
+        }
+
+        private void BtnViewPrev_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewMatches.Count > 0)
+            {
+                _viewMatchIndex--;
+                if (_viewMatchIndex < 0) _viewMatchIndex = _viewMatches.Count - 1;
+                NavigateToViewMatch();
+            }
+        }
+
+        private void BtnViewNext_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewMatches.Count > 0)
+            {
+                _viewMatchIndex++;
+                if (_viewMatchIndex >= _viewMatches.Count) _viewMatchIndex = 0;
+                NavigateToViewMatch();
+            }
+        }
+
+        private void BtnCloseSearch_Click(object sender, RoutedEventArgs e)
+        {
+            SearchPanel.Visibility = Visibility.Collapsed;
+            // Clear highlighting
+            foreach (var match in _viewMatches)
+            {
+                match.IsSearchMatch = false;
+                match.OnPropertyChanged(nameof(RszNodeViewModel.IsSearchMatch));
+            }
+            _viewMatches.Clear();
+            _viewMatchIndex = -1;
+            TxtViewMatchStatus.Text = "0/0";
+        }
+
+        private void BtnViewStop_Click(object sender, RoutedEventArgs e)
+        {
+            _viewSearchCts?.Cancel();
+        }
+
+        private void ViewResultsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (ViewResultsGrid.SelectedItem is RszNodeViewModel match)
+            {
+                _viewMatchIndex = _viewMatches.IndexOf(match);
+                NavigateToViewMatch();
+            }
+        }
+
+        private async void PerformViewSearch()
+        {
+            string query = TxtViewSearch.Text?.Trim() ?? "";
+            if (string.IsNullOrEmpty(query)) return;
+
+            // Cancel previous
+            _viewSearchCts?.Cancel();
+            _viewSearchCts = new CancellationTokenSource();
+            var token = _viewSearchCts.Token;
+
+            // Clear previous
+            foreach (var m in _viewMatches)
+            {
+                m.IsSearchMatch = false;
+                m.OnPropertyChanged(nameof(RszNodeViewModel.IsSearchMatch));
+            }
+            _viewMatches.Clear();
+            _viewMatchIndex = -1;
+            TxtViewMatchStatus.Text = "0/0";
+            
+            // UI State
+            BtnViewStop.Visibility = Visibility.Visible;
+            PrgViewSearch.Visibility = Visibility.Visible;
+            TxtStatusMessage.Text = $"Searching for \"{query}\"...";
+
+            bool matchCase = ChkViewMatchCase?.IsChecked ?? false;
+            bool useRegex = ChkViewRegex?.IsChecked ?? false;
+            int scope = CboSearchScope?.SelectedIndex ?? 0;
+
+            // Capture UI state
+            var currentTab = FileTabControl.SelectedItem as RszTabViewModel;
+            var allTabs = _rszTabs.ToList();
+
+            try
+            {
+                await Task.Run(() =>
+                {
+                    System.Text.RegularExpressions.Regex? regex = null;
+                    if (useRegex)
+                    {
+                        try
+                        {
+                            var options = matchCase ? System.Text.RegularExpressions.RegexOptions.None : System.Text.RegularExpressions.RegexOptions.IgnoreCase;
+                            regex = new System.Text.RegularExpressions.Regex(query, options);
+                        }
+                        catch 
+                        { 
+                            Application.Current.Dispatcher.Invoke(() => MessageBox.Show("Invalid regex pattern.")); 
+                            return; 
+                        }
+                    }
+
+                    var comparison = matchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+
+                    if (scope == 0) // Current File
+                    {
+                        if (currentTab?.Nodes != null)
+                            SearchNodes(currentTab.Nodes, query, comparison, regex, token);
+                    }
+                    else if (scope == 1) // Current Directory
+                    {
+                        foreach (var tab in allTabs)
+                        {
+                            if (tab.Nodes != null) SearchNodes(tab.Nodes, query, comparison, regex, token);
+                        }
+                    }
+                    else if (scope == 2) // Deep Scan
+                    {
+                        PerformDeepScan(query, comparison, regex, token);
+                    }
+                }, token);
+
+                TxtStatusMessage.Text = $"Search complete: {_viewMatches.Count} matches found.";
+                if (_viewMatches.Count > 0)
+                {
+                    _viewMatchIndex = 0;
+                    TxtViewMatchStatus.Text = $"1/{_viewMatches.Count}";
+                    NavigateToViewMatch();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                TxtStatusMessage.Text = "Search canceled.";
+            }
+            finally
+            {
+                BtnViewStop.Visibility = Visibility.Collapsed;
+                PrgViewSearch.Visibility = Visibility.Collapsed;
+                _viewSearchCts?.Dispose();
+                _viewSearchCts = null;
+            }
+        }
+
+        private void SearchNodes(IEnumerable<RszNodeViewModel> nodes, string query, StringComparison comparison, System.Text.RegularExpressions.Regex? regex, System.Threading.CancellationToken token)
+        {
+            foreach (var node in nodes)
+            {
+                if (token.IsCancellationRequested) return;
+
+                bool nameMatch = regex != null ? regex.IsMatch(node.Name ?? "") : (node.Name ?? "").Contains(query, comparison);
+                bool valueMatch = regex != null ? regex.IsMatch(node.Value ?? "") : (node.Value ?? "").Contains(query, comparison);
+                bool typeMatch = regex != null ? regex.IsMatch(node.TypeName ?? "") : (node.TypeName ?? "").Contains(query, comparison);
+
+                if (nameMatch || valueMatch || typeMatch)
+                {
+                    Application.Current.Dispatcher.Invoke(() => 
+                    {
+                        node.IsSearchMatch = true;
+                        node.OnPropertyChanged(nameof(RszNodeViewModel.IsSearchMatch));
+                        _viewMatches.Add(node);
+                    });
+                }
+
+                if (node.Children != null && node.Children.Count > 0)
+                    SearchNodes(node.Children, query, comparison, regex, token);
+            }
+        }
+
+        private void NavigateToViewMatch()
+        {
+            if (_viewMatchIndex < 0 || _viewMatchIndex >= _viewMatches.Count) return;
+            var match = _viewMatches[_viewMatchIndex];
+            TxtViewMatchStatus.Text = $"{_viewMatchIndex + 1}/{_viewMatches.Count}";
+
+            // Find which tab this match belongs to and select it
+            foreach (var tab in _rszTabs.OfType<RszTabViewModel>())
+            {
+                if (tab.Nodes != null && ContainsNode(tab.Nodes, match))
+                {
+                    FileTabControl.SelectedItem = tab;
+                    break;
+                }
+            }
+
+            // Expand parents and select
+            var currentTab = FileTabControl.SelectedItem as RszTabViewModel;
+            if (currentTab?.Nodes != null)
+            {
+                ExpandParents(currentTab.Nodes, match);
+                match.IsSelected = true;
+                match.IsExpanded = true;
+            }
+        }
+
+        private bool ContainsNode(IEnumerable<RszNodeViewModel> nodes, RszNodeViewModel target)
+        {
+            foreach (var node in nodes)
+            {
+                if (node == target) return true;
+                if (node.Children != null && ContainsNode(node.Children, target)) return true;
+            }
+            return false;
+        }
+
+        private void PerformDeepScan(string query, StringComparison comparison, System.Text.RegularExpressions.Regex? regex, CancellationToken token)
+        {
+            if (string.IsNullOrEmpty(_config.NativesPath) || !Directory.Exists(_config.NativesPath))
+            {
+                MessageBox.Show("Set Natives path in settings first for Deep Scan.");
+                return;
+            }
+
+            // Use the current directory from the explorer
+            var currentDir = _config.NativesPath;
+            Application.Current.Dispatcher.Invoke(() => TxtStatusMessage.Text = $"Deep scanning: {currentDir}...");
+
+            try
+            {
+                var targetFiles = Directory.EnumerateFiles(currentDir, "*.*", SearchOption.AllDirectories)
+                    .Where(f => FileNodeViewModel.IsTargetFileStatic(Path.GetFileName(f)))
+                    .Take(100) // Limit to prevent freezing
+                    .ToList();
+
+                foreach (var filePath in targetFiles)
+                {
+                    if (token.IsCancellationRequested) return;
+
+                    try
+                    {
+                        // Check if already loaded
+                        var existing = _rszTabs.OfType<RszTabViewModel>().FirstOrDefault(t => t.FullPath == filePath);
+                        if (existing != null)
+                        {
+                            if (existing.Nodes != null) SearchNodes(existing.Nodes, query, comparison, regex, token);
+                            continue;
+                        }
+
+                        // Try to load and search
+                        string lower = filePath.ToLower();
+                        byte[] data = File.ReadAllBytes(filePath);
+                        IList<RszNodeViewModel>? viewModels = null;
+
+                        if (lower.Contains(".msg")) viewModels = LoadMsgFile(data, filePath);
+                        else if (lower.Contains(".uvar")) viewModels = LoadUvarFile(data, filePath);
+                        else if (lower.EndsWith(".pak") || lower.Contains(".pak.")) viewModels = LoadPakFile(filePath);
+                        else if (_repo != null)
+                        {
+                            if (lower.Contains(".scn."))
+                            {
+                                var version = GetVersion(lower, ".scn.");
+                                var scnFile = new ScnFile(version, data);
+                                var scene = scnFile.ReadScene(_repo);
+                                viewModels = CategorizeSceneNodes(scene);
+                            }
+                            else if (lower.Contains(".pfb."))
+                            {
+                                var version = GetVersion(lower, ".pfb.");
+                                var pfbFile = new PfbFile(version, data);
+                                var scene = pfbFile.ReadScene(_repo);
+                                viewModels = CategorizeSceneNodes(scene);
+                            }
+                            else if (lower.Contains(".user."))
+                            {
+                                var userFile = new UserFile(data);
+                                var builder = userFile.ToBuilder(_repo);
+                                viewModels = builder.Objects.Select((n, i) => new RszNodeViewModel(n) { Name = $"Object {i}" }).Cast<RszNodeViewModel>().ToList();
+                            }
+                        }
+
+                        if (viewModels != null && viewModels.Count > 0)
+                        {
+                            // Search without loading tab (SearchNodes dispatches match additions)
+                            SearchNodes(viewModels, query, comparison, regex, token);
+                            
+                            // Only add tab if matches found
+                            if (viewModels.Any(vm => ContainsAnyMatch(vm)))
+                            {
+                                Application.Current.Dispatcher.Invoke(() => 
+                                {
+                                    var tab = new RszTabViewModel { Header = Path.GetFileName(filePath), FullPath = filePath, Nodes = new ObservableCollection<RszNodeViewModel>(viewModels) };
+                                    _rszTabs.Add(tab);
+                                });
+                            }
+                        }
+                    }
+                    catch { /* Skip files that fail to load */ }
+                }
+            }
+            catch (Exception ex) { MessageBox.Show($"Deep scan error: {ex.Message}"); }
+        }
+
+
+
+        private bool ContainsAnyMatch(RszNodeViewModel node)
+        {
+            if (node.IsSearchMatch) return true;
+            if (node.Children != null)
+                foreach (var child in node.Children)
+                    if (ContainsAnyMatch(child)) return true;
+            return false;
+        }
+
         private void PerformSearch()
         {
             if (_repo == null) return;
@@ -604,6 +997,18 @@ namespace RszViewer
             RefreshTreeVisibility(TreeB.ItemsSource as IEnumerable<RszNodeViewModel>);
             
             if (_currentMatches.Count > 0) NavigateToMatch();
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+
+        private void TxtCompareSearch_KeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Enter)
+            {
+                PerformSearch();
+            }
         }
 
         private void RefreshTreeVisibility(IEnumerable<RszNodeViewModel>? nodes)
@@ -660,7 +1065,7 @@ namespace RszViewer
         private void LoadFileWithDialog(bool isA)
         {
             if (!EnsureRszLoaded()) return;
-            var dlg = new OpenFileDialog { Filter = "Engine Files|*.user.*;*.scn.*;*.pfb.*|All files|*.*" };
+            var dlg = new OpenFileDialog { Filter = "Engine Files|*.user.*;*.scn.*;*.pfb.*;*.msg.*;*.uvar*;*.pak|All files|*.*" };
             if (dlg.ShowDialog() == true) LoadFile(isA, dlg.FileName);
         }
 
@@ -701,10 +1106,25 @@ namespace RszViewer
                     return;
                 }
 
-                if (!EnsureRszLoaded()) return;
-
                 byte[] data = File.ReadAllBytes(filePath);
                 IList<RszNodeViewModel> viewModels;
+
+                // File types that don't require RSZ definitions
+                if (lower.EndsWith(".msg") || lower.Contains(".msg."))
+                {
+                    viewModels = LoadMsgFile(data, filePath);
+                }
+                else if (lower.EndsWith(".uvar") || lower.Contains(".uvar."))
+                {
+                    viewModels = LoadUvarFile(data, filePath);
+                }
+                else if (lower.EndsWith(".pak") || lower.Contains(".pak."))
+                {
+                    viewModels = LoadPakFile(filePath);
+                }
+                else
+                {
+                if (!EnsureRszLoaded()) return;
 
                 if (lower.Contains(".scn."))
                 {
@@ -776,6 +1196,7 @@ namespace RszViewer
                     var builder = userFile.ToBuilder(_repo);
                     viewModels = builder.Objects.Select((n, i) => new RszNodeViewModel(n, $"Object {i}")).ToList();
                 }
+                } // end else (RSZ-requiring types)
 
                 if (isA) { _cachedCompareLeft = viewModels; TreeA.ItemsSource = viewModels; TxtFileA.Text = filePath; _config.LeftFilePath = filePath; }
                 else { _cachedCompareRight = viewModels; TreeB.ItemsSource = viewModels; TxtFileB.Text = filePath; _config.RightFilePath = filePath; }
@@ -787,6 +1208,105 @@ namespace RszViewer
             {
                 MessageBox.Show($"Error loading file: {ex.Message}");
             }
+        }
+
+        private IList<RszNodeViewModel> LoadMsgFile(byte[] data, string filePath)
+        {
+            var list = new List<RszNodeViewModel>();
+            try
+            {
+                var msgFile = new MsgFile(data);
+                var root = new RszNodeViewModel($"\uD83D\uDCAC Messages", $"{msgFile.Count} entries", "MsgFile") { Icon = "\uE8B7" };
+
+                for (int i = 0; i < msgFile.Count; i++)
+                {
+                    var msg = msgFile.GetMessage(i);
+                    var msgNode = new RszNodeViewModel(msg.Name ?? $"Entry {i}", msg.Guid.ToString(), "Message") { Icon = "\uE735" };
+
+                    // Add language values
+                    foreach (var val in msg.Values)
+                    {
+                        msgNode.Children.Add(new RszNodeViewModel(val.Language.ToString(), val.Text ?? "", "String"));
+                    }
+
+                    // Add attributes
+                    if (msg.Attributes.Count > 0)
+                    {
+                        var attrNode = new RszNodeViewModel("Attributes", $"{msg.Attributes.Count}", "List") { Icon = "\uE71D" };
+                        foreach (var attr in msg.Attributes)
+                        {
+                            attrNode.Children.Add(new RszNodeViewModel(attr.Name, attr.Value?.ToString() ?? "null", attr.Type.ToString()));
+                        }
+                        msgNode.Children.Add(attrNode);
+                    }
+
+                    root.Children.Add(msgNode);
+                }
+                list.Add(root);
+            }
+            catch (Exception ex)
+            {
+                list.Add(new RszNodeViewModel("Error", ex.Message, "Error"));
+            }
+            return list;
+        }
+
+        private IList<RszNodeViewModel> LoadUvarFile(byte[] data, string filePath)
+        {
+            var list = new List<RszNodeViewModel>();
+            try
+            {
+                var uvar = new UvarFile(data);
+                var builder = uvar.ToBuilder();
+
+                var root = new RszNodeViewModel($"\uD83D\uDD27 {builder.Name}", $"v{uvar.Version} — {builder.Variables.Count} variables", "UvarFile") { Icon = "\uE8B7" };
+
+                foreach (var v in builder.Variables)
+                {
+                    root.Children.Add(new RszNodeViewModel(v.Name, v.Value.ToString("F4"), "Float"));
+                }
+
+                // Embedded children
+                for (int i = 0; i < builder.Children.Count; i++)
+                {
+                    var child = builder.Children[i];
+                    var childNode = new RszNodeViewModel($"\uD83D\uDCC1 {child.Name}", $"{child.Variables.Count} variables", "UvarFile");
+                    foreach (var v in child.Variables)
+                    {
+                        childNode.Children.Add(new RszNodeViewModel(v.Name, v.Value.ToString("F4"), "Float"));
+                    }
+                    root.Children.Add(childNode);
+                }
+
+                list.Add(root);
+            }
+            catch (Exception ex)
+            {
+                list.Add(new RszNodeViewModel("Error", ex.Message, "Error"));
+            }
+            return list;
+        }
+
+        private IList<RszNodeViewModel> LoadPakFile(string filePath)
+        {
+            var list = new List<RszNodeViewModel>();
+            try
+            {
+                using var pak = new PakFile(filePath);
+                var root = new RszNodeViewModel($"\uD83D\uDCE6 {Path.GetFileName(filePath)}", $"{pak.EntryCount} files", "PakFile") { Icon = "\uE8B7" };
+
+                for (int i = 0; i < pak.EntryCount; i++)
+                {
+                    var hash = pak.GetEntryHash(i);
+                    root.Children.Add(new RszNodeViewModel($"0x{hash:X16}", $"Entry {i}", "PakEntry"));
+                }
+                list.Add(root);
+            }
+            catch (Exception ex)
+            {
+                list.Add(new RszNodeViewModel("Error", ex.Message, "Error"));
+            }
+            return list;
         }
 
         private void AddToHistory()
@@ -927,12 +1447,12 @@ namespace RszViewer
             if (_searchManager == null) return;
             if (_searchManager.Type == SearchManager.SearchType.PropertyName || _searchManager.Type == SearchManager.SearchType.Both)
             {
-                if (_searchManager.IsMatch(item.FieldName)) item.IsNameMatch = true;
+                if (_searchManager.IsTextMatch(item.FieldName)) item.IsNameMatch = true;
             }
             if (_searchManager.Type == SearchManager.SearchType.PropertyValue || _searchManager.Type == SearchManager.SearchType.Both)
             {
-                if (_searchManager.IsMatch(item.ValueA)) item.IsValueAMatch = true;
-                if (_searchManager.IsMatch(item.ValueB)) item.IsValueBMatch = true;
+                if (_searchManager.IsTextMatch(item.ValueA)) item.IsValueAMatch = true;
+                if (_searchManager.IsTextMatch(item.ValueB)) item.IsValueBMatch = true;
             }
         }
 
@@ -987,7 +1507,13 @@ namespace RszViewer
             }
         }
 
-        private void BtnGuidSearch_Click(object sender, RoutedEventArgs e) => LinkObject_Click(sender, e);
+        private void BtnGuidSearch_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is RszNodeViewModel vm)
+            {
+                OpenInlineSearch(vm.Value);
+            }
+        }
 
         /// <summary>
         /// Double-click on a tree node: if it's a resource, open it
@@ -1141,7 +1667,17 @@ namespace RszViewer
             }
         }
 
-        private void BtnSearch_Click(object sender, RoutedEventArgs e) => LinkObject_Click(sender, e);
+
+        
+        // Renamed from BtnSearch_Click to avoid confusion with new search
+        // Renamed from BtnSearch_Click to avoid confusion with new search
+        private void BtnFindObject_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is RszNodeViewModel vm)
+            {
+                OpenInlineSearch(vm.Value);
+            }
+        }
         
         private void OpenExplorer_Click(object sender, RoutedEventArgs e)
         {
@@ -1196,7 +1732,7 @@ namespace RszViewer
         {
             if (_config.SpreadsheetPath != null && SheetVM != null)
             {
-                Dispatcher.InvokeAsync(() => 
+                _ = Dispatcher.InvokeAsync(() => 
                 {
                      if (!string.IsNullOrEmpty(_config.SpreadsheetPath)) 
                         SheetVM.LoadSheet(_config.SpreadsheetPath);
@@ -1219,6 +1755,15 @@ namespace RszViewer
         
         public string Name { get; set; } = "";
         public string Icon { get; set; } = "";
+        public string IconColor { get; set; } = "#64B5F6"; // Default: light blue
+        public Brush IconColorBrush 
+        { 
+            get 
+            {
+                try { return new SolidColorBrush((Color)ColorConverter.ConvertFromString(IconColor)); }
+                catch { return Brushes.LightBlue; }
+            } 
+        }
         private string _value = "";
         public string Value 
         {
@@ -1276,19 +1821,20 @@ namespace RszViewer
             {
                 GameObject = go;
                 Name = name ?? go.Name;
-                Icon = go.Children.Any() ? "\uE8B7" : "\uEA86"; // Cube if has children, Component if not
+                Icon = go.Children.Any() ? "\uE8B7" : "\uEA86";
+                IconColor = "#66BB6A"; // Green for GameObjects
                 TypeName = "GameObject";
                 FieldType = fieldType;
                 Children = new ObservableCollection<RszNodeViewModel>();
                 // Add special children
-                Children.Add(new RszNodeViewModel("GUID", go.Guid.ToString(), "System.Guid", go, RszFieldType.Guid) { Icon = "\uE8EC" }); // Tag icon
+                Children.Add(new RszNodeViewModel("GUID", go.Guid.ToString(), "System.Guid", go, RszFieldType.Guid) { Icon = "\uE8EC", IconColor = "#AB47BC" }); // Purple tag
                 if (go.Settings != null) Children.Add(new RszNodeViewModel(go.Settings, "Settings"));
                 foreach(var c in go.Components) Children.Add(new RszNodeViewModel(c, c.Type.Name));
                 
                 // Add child GameObjects in a subcategory if there are any
                 if (go.Children.Any())
                 {
-                    var childObjectsNode = new RszNodeViewModel("Child Objects", $"{go.Children.Count()} children", "List") { Icon = "\uE8F1" }; // List icon
+                    var childObjectsNode = new RszNodeViewModel("Child Objects", $"{go.Children.Count()} children", "List") { Icon = "\uE8F1", IconColor = "#26A69A" }; // Teal list
                     foreach (var child in go.Children) childObjectsNode.Children.Add(new RszNodeViewModel(child));
                     Children.Add(childObjectsNode);
                 }
@@ -1298,7 +1844,8 @@ namespace RszViewer
             if (node is RszFolder folder)
             {
                 Name = name ?? folder.Name;
-                Icon = "\uE8B7"; // Folder icon
+                Icon = "\uE8B7";
+                IconColor = "#FFD54F"; // Yellow for Folders
                 TypeName = "Folder";
                 Children = new ObservableCollection<RszNodeViewModel>();
                 if (folder.Settings != null) Children.Add(new RszNodeViewModel(folder.Settings, "Settings"));
@@ -1316,7 +1863,8 @@ namespace RszViewer
 
             if (node is RszObjectNode obj)
             {
-                Icon = "\uE713"; // Settings gear icon
+                Icon = "\uE713";
+                IconColor = "#4FC3F7"; // Cyan for components/objects
                 TypeName = obj.Type.Name;
                 if (obj.Children != null)
                 {
@@ -1390,6 +1938,7 @@ namespace RszViewer
             else if (node is IEnumerable<IRszNode> collection)
             {
                 Icon = "\uE71D"; // List icon
+                IconColor = "#26A69A"; // Teal for arrays
                 TypeName = "Array";
                 FieldType = fieldType;
                 var count = collection.Count();
@@ -1418,6 +1967,24 @@ namespace RszViewer
             GameObject = go;
             FieldType = fieldType;
             Children = new ObservableCollection<RszNodeViewModel>();
+
+            // Set icon color based on type
+            if (typeName == "System.Guid" || fieldType == RszFieldType.Guid)
+                IconColor = "#AB47BC"; // Purple
+            else if (typeName == "String" || fieldType == RszFieldType.String)
+                IconColor = "#FFA726"; // Orange
+            else if (typeName == "Float" || fieldType == RszFieldType.F32 || fieldType == RszFieldType.F64)
+                IconColor = "#29B6F6"; // Light blue
+            else if (typeName == "Component" || typeName == "AimapFile" || typeName == "MsgFile" || typeName == "UvarFile" || typeName == "PakFile")
+                IconColor = "#4FC3F7"; // Cyan
+            else if (typeName == "Error")
+                IconColor = "#EF5350"; // Red
+            else if (typeName == "List" || typeName == "Array")
+                IconColor = "#26A69A"; // Teal
+            else if (typeName == "Message")
+                IconColor = "#FFEE58"; // Yellow
+            else if (typeName == "PakEntry")
+                IconColor = "#8D6E63"; // Brown
 
             if (IsVector && !string.IsNullOrEmpty((value)))
             {

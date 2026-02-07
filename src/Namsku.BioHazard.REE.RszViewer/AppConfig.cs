@@ -22,6 +22,7 @@ namespace RszViewer
         public bool IsExplorerVisible { get; set; } = true;
         public List<string> OpenedTabPaths { get; set; } = new List<string>();
         public int SelectedTabIndex { get; set; } = 0;
+        public string? NativesPath { get; set; }
 
         private static readonly string ConfigPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

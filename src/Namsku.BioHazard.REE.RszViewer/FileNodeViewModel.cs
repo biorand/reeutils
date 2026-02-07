@@ -26,7 +26,36 @@ namespace RszViewer
         }
         
         // Simple text icons for now, can be replaced with images later
-        public string Icon => IsDirectory ? "📁" : "📄";
+        public string Icon => IsDirectory ? "📁" : GetFileIcon();
+        public string IconColor => IsDirectory ? "#FFD54F" : GetFileColor();
+
+        private string GetFileIcon()
+        {
+            string lower = Name.ToLower();
+            if (lower.Contains(".scn.")) return "🎬";
+            if (lower.Contains(".pfb.")) return "🧩";
+            if (lower.Contains(".user.")) return "👤";
+            if (lower.Contains(".tex")) return "🖼️";
+            if (lower.Contains(".msg")) return "💬";
+            if (lower.Contains(".uvar")) return "🔧";
+            if (lower.Contains(".pak")) return "📦";
+            if (lower.Contains(".aimap")) return "📍";
+            return "📄";
+        }
+
+        private string GetFileColor()
+        {
+            string lower = Name.ToLower();
+            if (lower.Contains(".scn.")) return "#42A5F5"; // Blue
+            if (lower.Contains(".pfb.")) return "#66BB6A"; // Green  
+            if (lower.Contains(".user.")) return "#AB47BC"; // Purple
+            if (lower.Contains(".tex")) return "#4FC3F7"; // Cyan
+            if (lower.Contains(".msg")) return "#FFA726"; // Orange
+            if (lower.Contains(".uvar")) return "#26A69A"; // Teal
+            if (lower.Contains(".pak")) return "#8D6E63"; // Brown
+            if (lower.Contains(".aimap")) return "#EF5350"; // Red
+            return "#90A4AE"; // Grey
+        }
 
         private static readonly FileNodeViewModel DummyNode = new FileNodeViewModel("Loading...", false);
 
@@ -131,7 +160,12 @@ namespace RszViewer
 
         private static bool IsTargetFile(string filename)
         {
-            return filename.Contains(".user.") || filename.Contains(".scn.") || filename.Contains(".pfb.") || filename.Contains(".tex");
+            return IsTargetFileStatic(filename);
+        }
+
+        public static bool IsTargetFileStatic(string filename)
+        {
+            return filename.Contains(".user.") || filename.Contains(".scn.") || filename.Contains(".pfb.") || filename.Contains(".tex") || filename.Contains(".msg") || filename.Contains(".uvar") || filename.Contains(".pak") || filename.Contains(".aimap");
         }
     }
 }
