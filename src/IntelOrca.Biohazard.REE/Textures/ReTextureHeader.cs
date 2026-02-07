@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Namsku.BioHazard.REE.RszTga.Core;
+namespace IntelOrca.Biohazard.REE.Textures;
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 public struct ReTextureHeaderCommon

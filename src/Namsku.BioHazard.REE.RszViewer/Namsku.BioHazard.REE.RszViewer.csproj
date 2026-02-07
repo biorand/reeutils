@@ -6,11 +6,11 @@
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>RszCompare</AssemblyName>
+    <AssemblyName>RszViewer</AssemblyName>
     <RootNamespace>RszViewer</RootNamespace>
     <Authors>namsku</Authors>
     <Company>Namsku.BioHazard</Company>
-    <Product>RszCompare</Product>
+    <Product>RszViewer</Product>
     <Description>Comparison tool for RE Engine files.</Description>
     <Copyright>Copyright © 2026 namsku</Copyright>
     <Version>1.0.0</Version>
@@ -24,7 +24,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\IntelOrca.Biohazard.REE\IntelOrca.Biohazard.REE.csproj" />
-    <ProjectReference Include="..\Namsku.BioHazard.REE.RszTga\Namsku.BioHazard.REE.RszTga.Core\Namsku.BioHazard.REE.RszTga.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,4 +1,4 @@
-namespace Namsku.BioHazard.REE.RszTga.Core;
+namespace IntelOrca.Biohazard.REE.Textures;
 
 public enum ReTextureFormat : uint
 {

@@ -115,5 +115,56 @@ namespace RszViewer
                 if (TxtStatus.Text.StartsWith("Scanning")) TxtStatus.Text = "Search Complete.";
             }
         }
+
+        // Double-click on link result opens the file
+        private void LinkResult_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2 && sender is FrameworkElement fe && fe.DataContext is LinkResult result)
+            {
+                OpenFileInViewer(result.FilePath);
+                e.Handled = true;
+            }
+        }
+
+        private void LinkResult_OpenFile_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is LinkResult result)
+            {
+                OpenFileInViewer(result.FilePath);
+            }
+        }
+
+        private void LinkResult_OpenExplorer_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is LinkResult result)
+            {
+                if (File.Exists(result.FilePath))
+                {
+                    System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{result.FilePath}\"");
+                }
+            }
+        }
+
+        private void LinkResult_CopyPath_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is LinkResult result)
+            {
+                Clipboard.SetText(result.FilePath);
+                TxtStatus.Text = "Path copied to clipboard!";
+            }
+        }
+
+        private void OpenFileInViewer(string filePath)
+        {
+            if (File.Exists(filePath) && MainWindow.Instance != null)
+            {
+                MainWindow.Instance.LoadFileForView(filePath);
+                TxtStatus.Text = $"Opened: {Path.GetFileName(filePath)}";
+            }
+            else
+            {
+                MessageBox.Show($"File not found:\n{filePath}", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
     }
 }

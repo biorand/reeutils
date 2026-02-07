@@ -24,6 +24,7 @@
     <!-- TYPOGRAPHY -->
     <FontFamily x:Key="SystemFont">-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif</FontFamily>
     <FontFamily x:Key="MonoFont">Consolas, 'Cascadia Code', monospace</FontFamily>
+    <FontFamily x:Key="IconFont">Segoe MDL2 Assets</FontFamily>
 
     <!-- ============================================ -->
     <!-- BUTTON STYLES                                -->

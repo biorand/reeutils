@@ -14,6 +14,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using IntelOrca.Biohazard.REE.Rsz;
+using IntelOrca.Biohazard.REE;
 using Microsoft.Win32;
 using System.Collections.Immutable;
 
@@ -81,7 +82,21 @@ namespace RszViewer
             if (_config.LastViewFolder != null && Directory.Exists(_config.LastViewFolder))
             {
                 OpenFolder(_config.LastViewFolder);
-                if (_config.LastOpenFile != null && File.Exists(_config.LastOpenFile)) LoadFileForView(_config.LastOpenFile);
+            }
+
+            // Restore opened tabs from config
+            foreach (var tabPath in _config.OpenedTabPaths)
+            {
+                if (File.Exists(tabPath))
+                {
+                    try { LoadFileForView(tabPath); } catch { }
+                }
+            }
+            
+            // Restore selected tab index
+            if (_config.SelectedTabIndex >= 0 && _config.SelectedTabIndex < _rszTabs.Count)
+            {
+                FileTabControl.SelectedIndex = _config.SelectedTabIndex;
             }
 
             IsExplorerVisible = _config.IsExplorerVisible;
@@ -90,6 +105,14 @@ namespace RszViewer
             if (_config.RightFilePath != null && File.Exists(_config.RightFilePath)) LoadFile(false, _config.RightFilePath);
             
             UpdateRszSheet();
+        }
+
+        private void Window_Closing(object sender, CancelEventArgs e)
+        {
+            // Save all currently opened tabs
+            _config.OpenedTabPaths = _rszTabs.Select(t => t.FullPath).Where(p => !string.IsNullOrEmpty(p)).ToList()!;
+            _config.SelectedTabIndex = FileTabControl.SelectedIndex;
+            _config.Save();
         }
 
         private void Window_Drop(object sender, DragEventArgs e)
@@ -101,7 +124,7 @@ namespace RszViewer
                 {
                     string filePath = files[0];
                     string lower = filePath.ToLower();
-                    if (lower.Contains(".scn.") || lower.Contains(".pfb.") || lower.Contains(".user."))
+                    if (lower.Contains(".scn.") || lower.Contains(".pfb.") || lower.Contains(".user.") || lower.Contains(".aimap") || lower.Contains(".tex"))
                     {
                         LoadFileForView(filePath);
                     }
@@ -231,7 +254,7 @@ namespace RszViewer
              }
         }
 
-        private void LoadFileForView(string filePath)
+        public void LoadFileForView(string filePath)
         {
             try
             {
@@ -280,6 +303,65 @@ namespace RszViewer
                     var pfbFile = new PfbFile(version, data);
                     var scene = pfbFile.ReadScene(_repo);
                     viewModels = CategorizeSceneNodes(scene);
+                }
+                else if (lower.Contains(".aimap"))
+                {
+                    var aimap = new AimapFile(data);
+
+                    // Create structured view with metadata + components + RSZ
+                    viewModels = new List<RszNodeViewModel>();
+
+                    // AIMAP metadata root node
+                    var aimapInfoNode = new RszNodeViewModel($"📍 {aimap.MapName}", aimap.ToString(), "AimapFile");
+                    aimapInfoNode.Children.Add(new RszNodeViewModel("GUID", aimap.MapGuid.ToString(), "System.Guid"));
+                    
+                    // Show each component with paginated point display
+                    foreach (var comp in aimap.Components)
+                    {
+                        var compNode = new RszNodeViewModel(
+                            $"📦 {comp.ShortTypeName} [{comp.PointCount}]", 
+                            $"{comp.TypeName} ({comp.DataSize:N0} bytes)", 
+                            "Component");
+                        
+                        // Create paginated chunks of 100
+                        const int CHUNK_SIZE = 100;
+                        int chunkCount = (comp.PointCount + CHUNK_SIZE - 1) / CHUNK_SIZE;
+                        
+                        for (int chunk = 0; chunk < chunkCount; chunk++)
+                        {
+                            int start = chunk * CHUNK_SIZE;
+                            int end = Math.Min(start + CHUNK_SIZE - 1, comp.PointCount - 1);
+                            
+                            var chunkNode = new RszNodeViewModel($"[{start}-{end}]", $"{end - start + 1} points", "Array");
+                            
+                            // Add individual points within chunk
+                            for (int i = start; i <= end; i++)
+                            {
+                                var (x, y, z) = comp.GetPointPosition(i);
+                                chunkNode.Children.Add(new RszNodeViewModel(
+                                    $"[{i}]", 
+                                    $"({x:F2}, {y:F2}, {z:F2})", 
+                                    "Vec3"));
+                            }
+                            
+                            compNode.Children.Add(chunkNode);
+                        }
+                        
+                        aimapInfoNode.Children.Add(compNode);
+                    }
+                    viewModels.Add(aimapInfoNode);
+
+                    // RSZ instances - the actual navigable objects
+                    var instanceList = aimap.Rsz.ReadInstanceList(_repo);
+                    var rszNode = new RszNodeViewModel($"RSZ Objects [{instanceList.Length}]", $"{instanceList.Length} instances", "RszFile");
+                    foreach (var inst in instanceList)
+                    {
+                        if (inst.Value != null)
+                        {
+                            rszNode.Children.Add(new RszNodeViewModel(inst.Value, $"Instance {inst.Id.Index}"));
+                        }
+                    }
+                    viewModels.Add(rszNode);
                 }
                 else
                 {
@@ -391,13 +473,13 @@ namespace RszViewer
             var rootNodes = new List<RszNodeViewModel>();
             if (gameObjects.Any())
             {
-                var goRoot = new RszNodeViewModel("Game Objects", "", "List") { Icon = "📦" };
+                var goRoot = new RszNodeViewModel("Game Objects", "", "List") { Icon = "\uE8B7" }; // Cube icon
                 foreach (var go in gameObjects) goRoot.Children.Add(go);
                 rootNodes.Add(goRoot);
             }
             if (folders.Any())
             {
-                var folderRoot = new RszNodeViewModel("Folders", "", "List") { Icon = "📁" };
+                var folderRoot = new RszNodeViewModel("Folders", "", "List") { Icon = "\uE8B7" }; // Folder icon
                 foreach (var folder in folders) folderRoot.Children.Add(folder);
                 rootNodes.Add(folderRoot);
             }
@@ -656,6 +738,38 @@ namespace RszViewer
                     AddToHistory();
                     return;
                 }
+                else if (lower.Contains(".aimap"))
+                {
+                    var aimap = new AimapFile(data);
+
+                    // Create a structured view with AIMAP metadata + RSZ content
+                    viewModels = new List<RszNodeViewModel>();
+
+                    // Create a root node for the AIMAP info
+                    var aimapInfoNode = new RszNodeViewModel($"📍 {aimap.MapName}", aimap.ToString(), "AimapFile");
+                    aimapInfoNode.Children.Add(new RszNodeViewModel("GUID", aimap.MapGuid.ToString(), "System.Guid"));
+                    
+                    // Show each component
+                    foreach (var comp in aimap.Components)
+                    {
+                        var shortName = comp.TypeName.Split('.').LastOrDefault() ?? comp.TypeName;
+                        var compNode = new RszNodeViewModel($"📦 {shortName}", $"{comp.TypeName} ({comp.DataSize:N0} bytes)", "Component");
+                        aimapInfoNode.Children.Add(compNode);
+                    }
+                    viewModels.Add(aimapInfoNode);
+
+                    // RSZ objects
+                    var instanceList = aimap.Rsz.ReadInstanceList(_repo);
+                    var rszNode = new RszNodeViewModel($"RSZ Objects [{instanceList.Length}]", $"{instanceList.Length} instances", "RszFile");
+                    foreach (var inst in instanceList)
+                    {
+                        if (inst.Value != null)
+                        {
+                            rszNode.Children.Add(new RszNodeViewModel(inst.Value, $"Instance {inst.Id.Index}"));
+                        }
+                    }
+                    viewModels.Add(rszNode);
+                }
                 else
                 {
                     var userFile = new UserFile(data);
@@ -875,12 +989,122 @@ namespace RszViewer
 
         private void BtnGuidSearch_Click(object sender, RoutedEventArgs e) => LinkObject_Click(sender, e);
 
+        /// <summary>
+        /// Double-click on a tree node: if it's a resource, open it
+        /// </summary>
+        private void RszNode_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is RszNodeViewModel vm)
+            {
+                // Check if this looks like a file path (resource or userdata)
+                if (vm.IsResource || LooksLikeFilePath(vm.Value))
+                {
+                    OpenResourceFile(vm.Value);
+                    e.Handled = true;
+                }
+            }
+        }
+
+        private bool LooksLikeFilePath(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            // Check for common file patterns
+            return value.Contains("\\") || value.Contains("/") ||
+                   value.EndsWith(".scn", StringComparison.OrdinalIgnoreCase) ||
+                   value.EndsWith(".pfb", StringComparison.OrdinalIgnoreCase) ||
+                   value.EndsWith(".user", StringComparison.OrdinalIgnoreCase) ||
+                   value.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
+                   value.EndsWith(".mesh", StringComparison.OrdinalIgnoreCase) ||
+                   value.StartsWith("natives", StringComparison.OrdinalIgnoreCase);
+        }
+
         private void BtnResourceOpen_Click(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement fe && fe.DataContext is RszNodeViewModel vm)
             {
-                MessageBox.Show("Opening resource: " + vm.Value);
+                OpenResourceFile(vm.Value);
             }
+        }
+
+        /// <summary>
+        /// Resolves a resource path and opens it in a new tab
+        /// </summary>
+        private void OpenResourceFile(string resourcePath)
+        {
+            if (string.IsNullOrWhiteSpace(resourcePath)) return;
+            
+            // Try to resolve path - it could be relative like "natives\x64\..." or a full path
+            string? fullPath = ResolveResourcePath(resourcePath);
+            
+            if (fullPath != null && File.Exists(fullPath))
+            {
+                LoadFileForView(fullPath);
+            }
+            else
+            {
+                MessageBox.Show($"Could not find file:\n{resourcePath}\n\nTried: {fullPath ?? "(no base path set)"}", 
+                    "File Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        /// <summary>
+        /// Resolves a resource path to an absolute path using the current base folder
+        /// </summary>
+        private string? ResolveResourcePath(string resourcePath)
+        {
+            if (string.IsNullOrWhiteSpace(resourcePath)) return null;
+            
+            // Normalize path separators
+            resourcePath = resourcePath.Replace("/", "\\");
+            
+            // If already absolute, use as-is
+            if (Path.IsPathRooted(resourcePath) && File.Exists(resourcePath))
+                return resourcePath;
+            
+            // Get base path from current file or configured folder
+            string? basePath = null;
+            
+            // Try to get from current tab's file path
+            if (MainTabControl.SelectedItem is TabItem tab && tab.Tag is string tabPath)
+            {
+                // Walk up to find "natives" folder
+                var dir = Path.GetDirectoryName(tabPath);
+                while (!string.IsNullOrEmpty(dir))
+                {
+                    if (Path.GetFileName(dir)?.Equals("natives", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        basePath = Path.GetDirectoryName(dir); // One level above "natives"
+                        break;
+                    }
+                    dir = Path.GetDirectoryName(dir);
+                }
+            }
+            
+            // Try from recent folders
+            if (basePath == null && RecentFolders.Count > 0)
+            {
+                foreach (var folder in RecentFolders)
+                {
+                    var candidate = Path.Combine(folder, resourcePath);
+                    if (File.Exists(candidate)) return candidate;
+                    
+                    // Also try stripping "natives\" prefix if present
+                    if (resourcePath.StartsWith("natives\\", StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidate = Path.Combine(folder, resourcePath.Substring(8));
+                        if (File.Exists(candidate)) return candidate;
+                    }
+                }
+            }
+            
+            // Build full path
+            if (basePath != null)
+            {
+                var fullPath = Path.Combine(basePath, resourcePath);
+                if (File.Exists(fullPath)) return fullPath;
+            }
+            
+            return null;
         }
 
         // --- New Button Handlers for Vectors ---
@@ -921,20 +1145,34 @@ namespace RszViewer
         
         private void OpenExplorer_Click(object sender, RoutedEventArgs e)
         {
-             if (sender is FrameworkElement fe && fe.DataContext is RszNodeViewModel vm)
-             {
-                 // Handle RszNodeViewModel context (e.g. resource path)
-                 string path = vm.Value;
-                 // Add logic to resolve full path...
-             }
-             if (sender is FrameworkElement fe2 && fe2.DataContext is FileNodeViewModel fm)
-             {
-                 string path = fm.FullPath;
-                  if (File.Exists(path) || Directory.Exists(path))
-                 {
-                     Process.Start("explorer.exe", $"/select,\"{path}\"");
-                 }
-             }
+            string? pathToOpen = null;
+            
+            if (sender is FrameworkElement fe && fe.DataContext is RszNodeViewModel vm)
+            {
+                // Try to resolve resource path to absolute path
+                pathToOpen = ResolveResourcePath(vm.Value);
+            }
+            else if (sender is FrameworkElement fe2 && fe2.DataContext is FileNodeViewModel fm)
+            {
+                pathToOpen = fm.FullPath;
+            }
+            
+            if (!string.IsNullOrEmpty(pathToOpen) && (File.Exists(pathToOpen) || Directory.Exists(pathToOpen)))
+            {
+                Process.Start("explorer.exe", $"/select,\"{pathToOpen}\"");
+            }
+            else if (!string.IsNullOrEmpty(pathToOpen))
+            {
+                // Try current tab's folder as fallback
+                if (MainTabControl.SelectedItem is TabItem tab && tab.Tag is string tabPath && File.Exists(tabPath))
+                {
+                    Process.Start("explorer.exe", $"/select,\"{tabPath}\"");
+                }
+                else
+                {
+                    MessageBox.Show($"Could not resolve path:\n{pathToOpen}", "Path Not Found", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
         }
 
         private void OpenTerminal_Click(object sender, RoutedEventArgs e)
@@ -1038,21 +1276,29 @@ namespace RszViewer
             {
                 GameObject = go;
                 Name = name ?? go.Name;
-                Icon = "🕹️";
+                Icon = go.Children.Any() ? "\uE8B7" : "\uEA86"; // Cube if has children, Component if not
                 TypeName = "GameObject";
                 FieldType = fieldType;
                 Children = new ObservableCollection<RszNodeViewModel>();
                 // Add special children
-                Children.Add(new RszNodeViewModel("GUID", go.Guid.ToString(), "System.Guid", go, RszFieldType.Guid) { Icon = "🆔" });
+                Children.Add(new RszNodeViewModel("GUID", go.Guid.ToString(), "System.Guid", go, RszFieldType.Guid) { Icon = "\uE8EC" }); // Tag icon
                 if (go.Settings != null) Children.Add(new RszNodeViewModel(go.Settings, "Settings"));
                 foreach(var c in go.Components) Children.Add(new RszNodeViewModel(c, c.Type.Name));
+                
+                // Add child GameObjects in a subcategory if there are any
+                if (go.Children.Any())
+                {
+                    var childObjectsNode = new RszNodeViewModel("Child Objects", $"{go.Children.Count()} children", "List") { Icon = "\uE8F1" }; // List icon
+                    foreach (var child in go.Children) childObjectsNode.Children.Add(new RszNodeViewModel(child));
+                    Children.Add(childObjectsNode);
+                }
                 return;
             }
 
             if (node is RszFolder folder)
             {
                 Name = name ?? folder.Name;
-                Icon = "📂";
+                Icon = "\uE8B7"; // Folder icon
                 TypeName = "Folder";
                 Children = new ObservableCollection<RszNodeViewModel>();
                 if (folder.Settings != null) Children.Add(new RszNodeViewModel(folder.Settings, "Settings"));
@@ -1070,7 +1316,7 @@ namespace RszViewer
 
             if (node is RszObjectNode obj)
             {
-                Icon = "⚙️";
+                Icon = "\uE713"; // Settings gear icon
                 TypeName = obj.Type.Name;
                 if (obj.Children != null)
                 {
@@ -1143,7 +1389,7 @@ namespace RszViewer
             }
             else if (node is IEnumerable<IRszNode> collection)
             {
-                Icon = "📚";
+                Icon = "\uE71D"; // List icon
                 TypeName = "Array";
                 FieldType = fieldType;
                 var count = collection.Count();

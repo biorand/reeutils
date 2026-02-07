@@ -5,12 +5,13 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:RszViewer"
         mc:Ignorable="d"
-        Title="RSZViewer" Height="800" Width="1400"
+        Title="RszViewer" Height="800" Width="1400"
         Background="{StaticResource BgPrimary}"
         Icon="Resources/icon.png"
         FontFamily="{StaticResource SystemFont}"
         AllowDrop="True"
-        Drop="Window_Drop">
+        Drop="Window_Drop"
+        Closing="Window_Closing">
     
     <Window.Resources>
         <!-- Converters -->
@@ -158,13 +159,15 @@
                     <ColumnDefinition Width="24"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding Icon}" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,4,0"/>
-                <ContentControl Grid.Column="1" Content="{Binding}" ContentTemplateSelector="{StaticResource PropSelector}">
+                <TextBlock Grid.Column="0" Text="{Binding Icon}" FontFamily="{StaticResource IconFont}" FontSize="14" Foreground="{StaticResource AccentBlueLight}" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,4,0"/>
+                <ContentControl Grid.Column="1" Content="{Binding}" ContentTemplateSelector="{StaticResource PropSelector}"
+                                MouseDoubleClick="RszNode_MouseDoubleClick">
                     <ContentControl.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Copy Value" Click="CopyValue_Click"/>
                             <MenuItem Header="Analyze Signal" Click="LinkObject_Click"/>
                             <Separator/>
+                            <MenuItem Header="Open Resource" Click="BtnResourceOpen_Click"/>
                             <MenuItem Header="Open File Explorer" Click="OpenExplorer_Click"/>
                             <MenuItem Header="Open Terminal" Click="OpenTerminal_Click"/>
                         </ContextMenu>
@@ -605,7 +608,7 @@
                     <TextBlock x:Name="TxtStatusMessage" Text="Ready" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,0,20,0"/>
                     <TextBlock x:Name="TxtStatusStats" Text="" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
                 </StackPanel>
-                <TextBlock DockPanel.Dock="Right" Text="RSZViewer v1.3" FontSize="11" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                <TextBlock DockPanel.Dock="Right" Text="RszViewer v1.3" FontSize="11" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
             </DockPanel>
         </Border>
     </Grid>

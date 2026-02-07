@@ -1,0 +1,255 @@
+﻿
+================================================================================
+FILE: location_rpd_b1.aimap.27
+Total size: 712484 bytes
+================================================================================
+
+0x00: Magic = 'AIMP'
+0x04: NameLength = 7 (chars including null)
+0x08: MapName = 'RPD_B1' (6 chars)
+      Name ends at byte offset 0x16
+
+Bytes after name (0x16 onwards):
+  8-byte aligned: 0x18
+  16-byte aligned: 0x20
+
+Uint32 fields starting at 0x16:
+  0x16:          0 (0x00000000) 
+  0x1A: 2560884736 (0x98A40000) 
+  0x1E: 1314937430 (0x4E605A56) 
+  0x22: 4204806468 (0xFAA04144) 
+  0x26:  847594019 (0x32854223) 
+  0x2A:     100726 (0x00018976) <-- possible offset
+  0x2E: 3704619008 (0xDCD00000) 
+  0x32:         10 (0x0000000A) <-- possible offset
+  0x36: 3738173440 (0xDED00000) 
+  0x3A:         10 (0x0000000A) <-- possible offset
+  0x3E: 3742367744 (0xDF100000) 
+  0x42:         10 (0x0000000A) <-- possible offset
+  0x46:    6815744 (0x00680000) 
+  0x4A:          0 (0x00000000) 
+  0x4E: 1861222400 (0x6EF00000) 
+  0x52:         10 (0x0000000A) <-- possible offset
+  0x56: 3901751296 (0xE8900000) 
+  0x5A:          5 (0x00000005) <-- possible offset
+  0x5E: 2573205504 (0x99600000) 
+  0x62:         10 (0x0000000A) <-- possible offset
+
+RSZ magic found at: 0xADED0 (712400)
+via. pattern found at: 0x70
+TypeName: 'via.navigation.map.ContentGroupTriangle' (39 chars)
+Length prefix at 0x6C: 40 (TypeName len = 39)
+
+Full Header Hex Dump (0x0000 - 0x0100):
+  0000: 41 49 4D 50 07 00 00 00 52 00 50 00 44 00 5F 00  AIMP....R.P.D._.
+  0010: 42 00 31 00 00 00 00 00 00 00 00 00 A4 98 56 5A  B.1...........VZ
+  0020: 60 4E 44 41 A0 FA 23 42 85 32 76 89 01 00 00 00  `NDA..#B.2v.....
+  0030: D0 DC 0A 00 00 00 00 00 D0 DE 0A 00 00 00 00 00  ................
+  0040: 10 DF 0A 00 00 00 00 00 68 00 00 00 00 00 00 00  ........h.......
+  0050: F0 6E 0A 00 00 00 00 00 90 E8 05 00 00 00 00 00  .n..............
+  0060: 60 99 0A 00 00 00 00 00 01 00 00 00 28 00 00 00  `...........(...
+  0070: 76 00 69 00 61 00 2E 00 6E 00 61 00 76 00 69 00  v.i.a...n.a.v.i.
+  0080: 67 00 61 00 74 00 69 00 6F 00 6E 00 2E 00 6D 00  g.a.t.i.o.n...m.
+  0090: 61 00 70 00 2E 00 43 00 6F 00 6E 00 74 00 65 00  a.p...C.o.n.t.e.
+  00A0: 6E 00 74 00 47 00 72 00 6F 00 75 00 70 00 54 00  n.t.G.r.o.u.p.T.
+  00B0: 72 00 69 00 61 00 6E 00 67 00 6C 00 65 00 00 00  r.i.a.n.g.l.e...
+  00C0: 9B 0A 00 00 00 00 00 00 01 00 00 00 02 00 00 00  ................
+  00D0: 01 00 01 00 CD 7A 24 40 8B 22 8F 40 CA A3 30 3F  .....z$@.".@..0?
+  00E0: 03 00 00 00 04 00 00 00 05 00 00 00 01 00 01 00  ................
+  00F0: B0 99 D9 3F F9 FF 0F 41 11 AE 8F 40 06 00 00 00  ...?...A...@....
+
+================================================================================
+FILE: location_rpd_tyrant_around.aimap.27
+Total size: 18916 bytes
+================================================================================
+
+0x00: Magic = 'AIMP'
+0x04: NameLength = 18 (chars including null)
+0x08: MapName = 'RPD_Tyrant_Around' (17 chars)
+      Name ends at byte offset 0x2C
+
+Bytes after name (0x2C onwards):
+  8-byte aligned: 0x30
+  16-byte aligned: 0x30
+
+Uint32 fields starting at 0x2C:
+  0x2C:          1 (0x00000001) <-- possible offset
+  0x30: 1538079704 (0x5BAD3BD8) 
+  0x34: 1299782878 (0x4D791CDE) 
+  0x38: 3690444962 (0xDBF7B8A2) 
+  0x3C:  798333616 (0x2F959AB0) 
+  0x40:          0 (0x00000000) 
+  0x44:      15808 (0x00003DC0) <-- possible offset
+  0x48:          0 (0x00000000) 
+  0x4C:      16320 (0x00003FC0) <-- possible offset
+  0x50:          0 (0x00000000) 
+  0x54:      18896 (0x000049D0) <-- possible offset
+  0x58:          0 (0x00000000) 
+  0x5C:        124 (0x0000007C) <-- possible offset
+  0x60:          0 (0x00000000) 
+  0x64:      15296 (0x00003BC0) <-- possible offset
+  0x68:          0 (0x00000000) 
+  0x6C:          0 (0x00000000) 
+  0x70:          0 (0x00000000) 
+  0x74:          0 (0x00000000) 
+  0x78:          0 (0x00000000) 
+
+RSZ magic found at: 0x3FC0 (16320)
+via. pattern found at: 0x84
+TypeName: 'via.navigation.map.ContentGroupMapPoint' (39 chars)
+Length prefix at 0x80: 40 (TypeName len = 39)
+
+Full Header Hex Dump (0x0000 - 0x0100):
+  0000: 41 49 4D 50 12 00 00 00 52 00 50 00 44 00 5F 00  AIMP....R.P.D._.
+  0010: 54 00 79 00 72 00 61 00 6E 00 74 00 5F 00 41 00  T.y.r.a.n.t._.A.
+  0020: 72 00 6F 00 75 00 6E 00 64 00 00 00 01 00 00 00  r.o.u.n.d.......
+  0030: D8 3B AD 5B DE 1C 79 4D A2 B8 F7 DB B0 9A 95 2F  .;.[..yM......./
+  0040: 00 00 00 00 C0 3D 00 00 00 00 00 00 C0 3F 00 00  .....=.......?..
+  0050: 00 00 00 00 D0 49 00 00 00 00 00 00 7C 00 00 00  .....I......|...
+  0060: 00 00 00 00 C0 3B 00 00 00 00 00 00 00 00 00 00  .....;..........
+  0070: 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00  ................
+  0080: 28 00 00 00 76 00 69 00 61 00 2E 00 6E 00 61 00  (...v.i.a...n.a.
+  0090: 76 00 69 00 67 00 61 00 74 00 69 00 6F 00 6E 00  v.i.g.a.t.i.o.n.
+  00A0: 2E 00 6D 00 61 00 70 00 2E 00 43 00 6F 00 6E 00  ..m.a.p...C.o.n.
+  00B0: 74 00 65 00 6E 00 74 00 47 00 72 00 6F 00 75 00  t.e.n.t.G.r.o.u.
+  00C0: 70 00 4D 00 61 00 70 00 50 00 6F 00 69 00 6E 00  p.M.a.p.P.o.i.n.
+  00D0: 74 00 00 00 7D 00 00 00 C4 EC 05 C0 EF 1A 82 3F  t...}..........?
+  00E0: AA 01 01 C1 00 00 00 00 00 00 00 00 00 00 00 00  ................
+  00F0: 32 B8 3E C1 95 60 82 3E A2 D5 95 BF 00 00 00 00  2.>..`.>........
+
+================================================================================
+FILE: location_laboratory_tyrant_around.aimap.27
+Total size: 1412 bytes
+================================================================================
+
+0x00: Magic = 'AIMP'
+0x04: NameLength = 25 (chars including null)
+0x08: MapName = 'Laboratory_Tyrant_Around' (24 chars)
+      Name ends at byte offset 0x3A
+
+Bytes after name (0x3A onwards):
+  8-byte aligned: 0x40
+  16-byte aligned: 0x40
+
+Uint32 fields starting at 0x3A:
+  0x3A:      65536 (0x00010000) 
+  0x3E: 1005125632 (0x3BE90000) 
+  0x42: 2452940757 (0x9234E7D5) 
+  0x46: 3650962931 (0xD99D45F3) 
+  0x4A:  761641894 (0x2D65BBA6) 
+  0x4E:      51822 (0x0000CA6E) 
+  0x52:   48234496 (0x02E00000) 
+  0x56:          0 (0x00000000) 
+  0x5A:   81788928 (0x04E00000) 
+  0x5E:          0 (0x00000000) 
+  0x62:   91226112 (0x05700000) 
+  0x66:          0 (0x00000000) 
+  0x6A:    9175040 (0x008C0000) 
+  0x6E:          0 (0x00000000) 
+  0x72:   47185920 (0x02D00000) 
+  0x76:          0 (0x00000000) 
+  0x7A:          0 (0x00000000) 
+  0x7E:          0 (0x00000000) 
+python : Traceback (most recent call last):
+At line:1 char:1
++ python analyze_header.py 2>&1 | Out-File -FilePath aimap_analysis\hea ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "E:\Projects\Library\reeutils\analyze_header.py", line 125, in <module>
+    print(f"{r['filename']:<45} {r['name_len']:>8} 0x{r['name_byte_end']:X}{' ':>4} 0x{r['rsz_off']:X}{' ':>4} 
+0x{r['via_off']:X if r['via_off'] else 'N/A':>6}")
+                                                                                                                 
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: Invalid format specifier 'X if r['via_off'] else 'N/A':>6' for object of type 'int'
+  0x82:          0 (0x00000000) 
+  0x86:          0 (0x00000000) 
+
+RSZ magic found at: 0x4E0 (1248)
+via. pattern found at: 0x94
+TypeName: 'via.navigation.map.ContentGroupMapPoint' (39 chars)
+Length prefix at 0x90: 40 (TypeName len = 39)
+
+Full Header Hex Dump (0x0000 - 0x0100):
+  0000: 41 49 4D 50 19 00 00 00 4C 00 61 00 62 00 6F 00  AIMP....L.a.b.o.
+  0010: 72 00 61 00 74 00 6F 00 72 00 79 00 5F 00 54 00  r.a.t.o.r.y._.T.
+  0020: 79 00 72 00 61 00 6E 00 74 00 5F 00 41 00 72 00  y.r.a.n.t._.A.r.
+  0030: 6F 00 75 00 6E 00 64 00 00 00 00 00 01 00 00 00  o.u.n.d.........
+  0040: E9 3B D5 E7 34 92 F3 45 9D D9 A6 BB 65 2D 6E CA  .;..4..E....e-n.
+  0050: 00 00 00 00 E0 02 00 00 00 00 00 00 E0 04 00 00  ................
+  0060: 00 00 00 00 70 05 00 00 00 00 00 00 8C 00 00 00  ....p...........
+  0070: 00 00 00 00 D0 02 00 00 00 00 00 00 00 00 00 00  ................
+  0080: 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00  ................
+  0090: 28 00 00 00 76 00 69 00 61 00 2E 00 6E 00 61 00  (...v.i.a...n.a.
+  00A0: 76 00 69 00 67 00 61 00 74 00 69 00 6F 00 6E 00  v.i.g.a.t.i.o.n.
+  00B0: 2E 00 6D 00 61 00 70 00 2E 00 43 00 6F 00 6E 00  ..m.a.p...C.o.n.
+  00C0: 74 00 65 00 6E 00 74 00 47 00 72 00 6F 00 75 00  t.e.n.t.G.r.o.u.
+  00D0: 70 00 4D 00 61 00 70 00 50 00 6F 00 69 00 6E 00  p.M.a.p.P.o.i.n.
+  00E0: 74 00 00 00 04 00 00 00 83 F0 85 42 00 E4 86 BF  t..........B....
+  00F0: F3 B6 B1 41 00 00 00 00 00 00 00 00 00 00 00 00  ...A............
+
+================================================================================
+FILE: location_orphanapproach_dog_around.aimap.27
+Total size: 1524 bytes
+================================================================================
+
+0x00: Magic = 'AIMP'
+0x04: NameLength = 26 (chars including null)
+0x08: MapName = 'OrphanApproach_Dog_Around' (25 chars)
+      Name ends at byte offset 0x3C
+
+Bytes after name (0x3C onwards):
+  8-byte aligned: 0x40
+  16-byte aligned: 0x40
+
+Uint32 fields starting at 0x3C:
+  0x3C:          1 (0x00000001) <-- possible offset
+  0x40: 4053703833 (0xF19E9C99) 
+  0x44: 1317286531 (0x4E843283) 
+  0x48:  821444530 (0x30F63FB2) 
+  0x4C:  201986356 (0x0C0A1134) 
+  0x50:          0 (0x00000000) 
+  0x54:        816 (0x00000330) <-- possible offset
+  0x58:          0 (0x00000000) 
+  0x5C:       1328 (0x00000530) <-- possible offset
+  0x60:          0 (0x00000000) 
+  0x64:       1504 (0x000005E0) <-- possible offset
+  0x68:          0 (0x00000000) 
+  0x6C:        140 (0x0000008C) <-- possible offset
+  0x70:          0 (0x00000000) 
+  0x74:        784 (0x00000310) <-- possible offset
+  0x78:          0 (0x00000000) 
+  0x7C:          0 (0x00000000) 
+  0x80:          0 (0x00000000) 
+  0x84:          0 (0x00000000) 
+  0x88:          0 (0x00000000) 
+
+RSZ magic found at: 0x530 (1328)
+via. pattern found at: 0x94
+TypeName: 'via.navigation.map.ContentGroupMapPoint' (39 chars)
+Length prefix at 0x90: 40 (TypeName len = 39)
+
+Full Header Hex Dump (0x0000 - 0x0100):
+  0000: 41 49 4D 50 1A 00 00 00 4F 00 72 00 70 00 68 00  AIMP....O.r.p.h.
+  0010: 61 00 6E 00 41 00 70 00 70 00 72 00 6F 00 61 00  a.n.A.p.p.r.o.a.
+  0020: 63 00 68 00 5F 00 44 00 6F 00 67 00 5F 00 41 00  c.h._.D.o.g._.A.
+  0030: 72 00 6F 00 75 00 6E 00 64 00 00 00 01 00 00 00  r.o.u.n.d.......
+  0040: 99 9C 9E F1 83 32 84 4E B2 3F F6 30 34 11 0A 0C  .....2.N.?.04...
+  0050: 00 00 00 00 30 03 00 00 00 00 00 00 30 05 00 00  ....0.......0...
+  0060: 00 00 00 00 E0 05 00 00 00 00 00 00 8C 00 00 00  ................
+  0070: 00 00 00 00 10 03 00 00 00 00 00 00 00 00 00 00  ................
+  0080: 00 00 00 00 00 00 00 00 00 00 00 00 01 00 00 00  ................
+  0090: 28 00 00 00 76 00 69 00 61 00 2E 00 6E 00 61 00  (...v.i.a...n.a.
+  00A0: 76 00 69 00 67 00 61 00 74 00 69 00 6F 00 6E 00  v.i.g.a.t.i.o.n.
+  00B0: 2E 00 6D 00 61 00 70 00 2E 00 43 00 6F 00 6E 00  ..m.a.p...C.o.n.
+  00C0: 74 00 65 00 6E 00 74 00 47 00 72 00 6F 00 75 00  t.e.n.t.G.r.o.u.
+  00D0: 70 00 4D 00 61 00 70 00 50 00 6F 00 69 00 6E 00  p.M.a.p.P.o.i.n.
+  00E0: 74 00 00 00 05 00 00 00 7E 9D 14 42 C2 EC 50 BC  t.......~..B..P.
+  00F0: 27 E2 CF C2 00 00 00 00 00 00 00 00 00 00 00 00  '...............
+
+
+================================================================================
+COMPARISON SUMMARY
+================================================================================
+Filename                                       NameLen    NameEnd        RSZ       via.

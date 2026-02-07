@@ -1,0 +1,452 @@
+
+============================================================
+aimap_opening3.aimap.27
+============================================================
+  calculated_name_end: 0x1A
+  filename: aimap_opening3.aimap.27
+  filesize: 287300
+  guid_at_0x1A: 0000000000005ca9b019188f214288d9
+  guid_at_0x1E: 00005ca9b019188f214288d9c6085731
+  guid_at_0x20: 5ca9b019188f214288d9c60857310068
+  map_name: Opening3
+  middle_fields: 0x1A:0 | 0x1E:2841378816 | 0x22:2400721328 | 0x26:3649585697 | 0x2A:827787462 | 0x2E:92160 | 0x32:1609564160 | 0x36:4 | 0x3A:1643118592 | 0x3E:4 | 0x42:1647312896 | 0x46:4
+  middle_section_size: 86
+  name_actual_len: 8
+  name_end_offset: 26
+  name_length: 9
+  rsz_offset: 0x461F0
+  rsz_offset_int: 287216
+  type_name: via.navigation.map.ContentGroupTriangle
+  type_name_len_prefix: 40 at 0x70
+  type_name_offset: 0x74
+
+============================================================
+location_crocodiliaarea.aimap.27
+============================================================
+  calculated_name_end: 0x26
+  filename: location_crocodiliaarea.aimap.27
+  filesize: 248404
+  guid_at_0x26: 00000000000080dd8ac131924040a6a1
+  guid_at_0x28: 0000000080dd8ac131924040a6a173cf
+  guid_at_0x2A: 000080dd8ac131924040a6a173cf8328
+  map_name: CrocodiliaArea
+  middle_fields: 0x26:0 | 0x2A:3716153344 | 0x2E:2452734346 | 0x32:2712027200 | 0x36:679726963 | 0x3A:107402 | 0x3E:3355443200 | 0x42:3 | 0x46:3388997632 | 0x4A:3 | 0x4E:3393191936 | 0x52:3
+  middle_section_size: 86
+  name_actual_len: 14
+  name_end_offset: 38
+  name_length: 15
+  rsz_offset: 0x3CA00
+  rsz_offset_int: 248320
+  type_name: via.navigation.map.ContentGroupTriangle
+  type_name_len_prefix: 40 at 0x7C
+  type_name_offset: 0x80
+
+============================================================
+location_gasstation2.aimap.27
+============================================================
+  calculated_name_end: 0x20
+  filename: location_gasstation2.aimap.27
+  filesize: 151140
+  guid_at_0x20: 000000008f6085787b2d4e45a5e2a8ab
+  guid_at_0x24: 8f6085787b2d4e45a5e2a8aba9108667
+  map_name: GasStation2
+  middle_fields: 0x20:0 | 0x24:2022006927 | 0x28:1162751355 | 0x2C:2879972005 | 0x30:1736839337 | 0x34:1 | 0x38:150544 | 0x3C:0 | 0x40:151056 | 0x44:0 | 0x48:151120 | 0x4C:0
+  middle_section_size: 84
+  name_actual_len: 11
+  name_end_offset: 32
+  name_length: 12
+  rsz_offset: 0x24E10
+  rsz_offset_int: 151056
+  type_name: via.navigation.map.ContentGroupTriangle
+  type_name_len_prefix: 40 at 0x74
+  type_name_offset: 0x78
+
+============================================================
+location_laboratory.aimap.27
+============================================================
+  calculated_name_end: 0x1E
+  filename: location_laboratory.aimap.27
+  filesize: 1144292
+  guid_at_0x1E: 00000000000067082c79492b4446b64d
+  guid_at_0x20: 0000000067082c79492b4446b64d5659
+  guid_at_0x22: 000067082c79492b4446b64d565924b0
+  map_name: Laboratory
+  middle_fields: 0x1E:0 | 0x22:140967936 | 0x26:726235436 | 0x2A:1303791172 | 0x2E:2955172182 | 0x32:84137 | 0x36:1938817024 | 0x3A:17 | 0x3E:1972371456 | 0x42:17 | 0x46:1976565760 | 0x4A:17
+  middle_section_size: 86
+  name_actual_len: 10
+  name_end_offset: 30
+  name_length: 11
+  rsz_offset: 0x117590
+  rsz_offset_int: 1144208
+  type_name: via.navigation.map.ContentGroupTriangle
+  type_name_len_prefix: 40 at 0x74
+  type_name_offset: 0x78
+
+============================================================
+location_laboratory_licker.aimap.27
+============================================================
+  calculated_name_end: 0x2C
+  filename: location_laboratory_licker.aimap.27
+  filesize: 69476
+  guid_at_0x2C: 00000000503ca529d05d2e4dadc59099
+  guid_at_0x30: 503ca529d05d2e4dadc5909963a3e346
+  map_name: Laboratory_Licker
+  middle_fields: 0x2C:0 | 0x30:698694736 | 0x34:1294884304 | 0x38:2576401837 | 0x3C:1189323619 | 0x40:2 | 0x44:68880 | 0x48:0 | 0x4C:69392 | 0x50:0 | 0x54:69456 | 0x58:0
+  middle_section_size: 84
+  name_actual_len: 17
+  name_end_offset: 44
+  name_length: 18
+  rsz_offset: 0x10F10
+  rsz_offset_int: 69392
+  type_name: via.navigation.map.ContentGroupTriangle
+  type_name_len_prefix: 40 at 0x80
+  type_name_offset: 0x84
+
+============================================================
+location_laboratory_licker_around.aimap.27
+============================================================
+  calculated_name_end: 0x3A
+  filename: location_laboratory_licker_around.aimap.27
+  filesize: 5444
+  guid_at_0x3A: 000001000000c5d508175517b842ad04
+  guid_at_0x3E: 0000c5d508175517b842ad04905a6784
+  guid_at_0x40: c5d508175517b842ad04905a678419c7
+  map_name: Laboratory_Licker_Atound
+  middle_fields: 0x3A:65536 | 0x3E:3586457600 | 0x42:391452424 | 0x46:78463672 | 0x4A:2221365904 | 0x4E:50969 | 0x52:247463936 | 0x56:0 | 0x5A:281018368 | 0x5E:0 | 0x62:355467264 | 0x66:0
+  middle_section_size: 86
+  name_actual_len: 24
+  name_end_offset: 58
+  name_length: 25
+  rsz_offset: 0x10C0
+  rsz_offset_int: 4288
+  type_name: via.navigation.map.ContentGroupMapPoint
+  type_name_len_prefix: 40 at 0x90
+  type_name_offset: 0x94
+
+============================================================
+location_laboratory_tyrant_around.aimap.27
+============================================================
+  calculated_name_end: 0x3A
+  filename: location_laboratory_tyrant_around.aimap.27
+  filesize: 1412
+  guid_at_0x3A: 000001000000e93bd5e73492f3459dd9
+  guid_at_0x3E: 0000e93bd5e73492f3459dd9a6bb652d
+  guid_at_0x40: e93bd5e73492f3459dd9a6bb652d6eca
+  map_name: Laboratory_Tyrant_Around
+  middle_fields: 0x3A:65536 | 0x3E:1005125632 | 0x42:2452940757 | 0x46:3650962931 | 0x4A:761641894 | 0x4E:51822 | 0x52:48234496 | 0x56:0 | 0x5A:81788928 | 0x5E:0 | 0x62:91226112 | 0x66:0
+  middle_section_size: 86
+  name_actual_len: 24
+  name_end_offset: 58
+  name_length: 25
+  rsz_offset: 0x4E0
+  rsz_offset_int: 1248
+  type_name: via.navigation.map.ContentGroupMapPoint
+  type_name_len_prefix: 40 at 0x90
+  type_name_offset: 0x94
+
+============================================================
+location_laboratoryundermost.aimap.27
+============================================================
+  calculated_name_end: 0x30
+  filename: location_laboratoryundermost.aimap.27
+  filesize: 281556
+  guid_at_0x30: 0000000054fc924274eddc48ad0e2e11
+  guid_at_0x34: 54fc924274eddc48ad0e2e11412d327c
+  map_name: LaboratoryUndermost
+  middle_fields: 0x30:0 | 0x34:1116929108 | 0x38:1222438260 | 0x3C:288231085 | 0x40:2083663169 | 0x44:1 | 0x48:280960 | 0x4C:0 | 0x50:281472 | 0x54:0 | 0x58:281536 | 0x5C:0
+  middle_section_size: 84
+  name_actual_len: 19
+  name_end_offset: 48
+  name_length: 20
+  rsz_offset: 0x44B80
+  rsz_offset_int: 281472
+  type_name: via.navigation.map.ContentGroupTriangle
+  type_name_len_prefix: 40 at 0x84
+  type_name_offset: 0x88
+
+============================================================
+location_orphanapproach.aimap.27
+============================================================
+  calculated_name_end: 0x26
+  filename: location_orphanapproach.aimap.27
+  filesize: 572916
+  guid_at_0x26: 0000000000007ab0a4f98a202c4f8217
+  guid_at_0x28: 000000007ab0a4f98a202c4f8217b759
+  guid_at_0x2A: 00007ab0a4f98a202c4f8217b75985e2
+  map_name: OrphanApproach
+  middle_fields: 0x26:0 | 0x2A:2960785408 | 0x2E:545978788 | 0x32:394415916 | 0x36:3800390071 | 0x3A:96623 | 0x3E:3147825152 | 0x42:8 | 0x46:3181379584 | 0x4A:8 | 0x4E:3185573888 | 0x52:8
+  middle_section_size: 86
+  name_actual_len: 14
+  name_end_offset: 38
+  name_length: 15
+  rsz_offset: 0x8BDA0
+  rsz_offset_int: 572832
+  type_name: via.navigation.map.ContentGroupTriangle
+  type_name_len_prefix: 40 at 0x7C
+  type_name_offset: 0x80
+
+============================================================
+location_orphanapproach_dog_around.aimap.27
+============================================================
+  calculated_name_end: 0x3C
+  filename: location_orphanapproach_dog_around.aimap.27
+  filesize: 1524
+  guid_at_0x3C: 01000000999c9ef18332844eb23ff630
+  guid_at_0x40: 999c9ef18332844eb23ff63034110a0c
+  map_name: OrphanApproach_Dog_Around
+  middle_fields: 0x3C:1 | 0x40:4053703833 | 0x44:1317286531 | 0x48:821444530 | 0x4C:201986356 | 0x50:0 | 0x54:816 | 0x58:0 | 0x5C:1328 | 0x60:0 | 0x64:1504 | 0x68:0
+  middle_section_size: 84
+  name_actual_len: 25
+  name_end_offset: 60
+  name_length: 26
+  rsz_offset: 0x530
+  rsz_offset_int: 1328
+  type_name: via.navigation.map.ContentGroupMapPoint
+  type_name_len_prefix: 40 at 0x90
+  type_name_offset: 0x94
+
+============================================================
+location_orphanasylum.aimap.27
+============================================================
+  calculated_name_end: 0x22
+  filename: location_orphanasylum.aimap.27
+  filesize: 178052
+  guid_at_0x22: 00000000000087214b997201c74c9f74
+  guid_at_0x26: 000087214b997201c74c9f74938e6052
+  guid_at_0x28: 87214b997201c74c9f74938e60529218
+  map_name: OrphanAsylum
+  middle_fields: 0x22:0 | 0x26:562495488 | 0x2A:24287563 | 0x2E:1956596935 | 0x32:1382059667 | 0x36:71826 | 0x3A:3039821824 | 0x3E:2 | 0x42:3073376256 | 0x46:2 | 0x4A:3077570560 | 0x4E:2
+  middle_section_size: 86
+  name_actual_len: 12
+  name_end_offset: 34
+  name_length: 13
+  rsz_offset: 0x2B730
+  rsz_offset_int: 177968
+  type_name: via.navigation.map.ContentGroupTriangle
+  type_name_len_prefix: 40 at 0x78
+  type_name_offset: 0x7C
+
+============================================================
+location_orphanasylum_dog_around.aimap.27
+============================================================
+  calculated_name_end: 0x38
+  filename: location_orphanasylum_dog_around.aimap.27
+  filesize: 2228
+  guid_at_0x38: 010000009a0ac88152c0aa418917a87f
+  guid_at_0x3C: 9a0ac88152c0aa418917a87f2e36c787
+  map_name: OrphanAsylum_Dog_Around
+  middle_fields: 0x38:1 | 0x3C:2177370778 | 0x40:1101709394 | 0x44:2141722505 | 0x48:2277979694 | 0x4C:0 | 0x50:1472 | 0x54:0 | 0x58:1984 | 0x5C:0 | 0x60:2208 | 0x64:0
+  middle_section_size: 84
+  name_actual_len: 23
+  name_end_offset: 56
+  name_length: 24
+  rsz_offset: 0x7C0
+  rsz_offset_int: 1984
+  type_name: via.navigation.map.ContentGroupMapPoint
+  type_name_len_prefix: 40 at 0x8C
+  type_name_offset: 0x90
+
+============================================================
+location_rpd.aimap.27
+============================================================
+  calculated_name_end: 0x10
+  filename: location_rpd.aimap.27
+  filesize: 951076
+  guid_at_0x10: 000000002850e8164878c446b1d825f4
+  guid_at_0x14: 2850e8164878c446b1d825f45c0e09f0
+  map_name: RPD
+  middle_fields: 0x10:0 | 0x14:384323624 | 0x18:1187280968 | 0x1C:4096121009 | 0x20:4027125340 | 0x24:1 | 0x28:950480 | 0x2C:0 | 0x30:950992 | 0x34:0 | 0x38:951056 | 0x3C:0
+  middle_section_size: 84
+  name_actual_len: 3
+  name_end_offset: 16
+  name_length: 4
+  rsz_offset: 0xE82D0
+  rsz_offset_int: 950992
+  type_name: via.navigation.map.ContentGroupTriangle
+  type_name_len_prefix: 40 at 0x64
+  type_name_offset: 0x68
+
+============================================================
+location_rpd_b1.aimap.27
+============================================================
+  calculated_name_end: 0x16
+  filename: location_rpd_b1.aimap.27
+  filesize: 712484
+  guid_at_0x16: 000000000000a498565a604e4441a0fa
+  guid_at_0x18: 00000000a498565a604e4441a0fa2342
+  guid_at_0x1A: 0000a498565a604e4441a0fa23428532
+  map_name: RPD_B1
+  middle_fields: 0x16:0 | 0x1A:2560884736 | 0x1E:1314937430 | 0x22:4204806468 | 0x26:847594019 | 0x2A:100726 | 0x2E:3704619008 | 0x32:10 | 0x36:3738173440 | 0x3A:10 | 0x3E:3742367744 | 0x42:10
+  middle_section_size: 86
+  name_actual_len: 6
+  name_end_offset: 22
+  name_length: 7
+  rsz_offset: 0xADED0
+  rsz_offset_int: 712400
+  type_name: via.navigation.map.ContentGroupTriangle
+  type_name_len_prefix: 40 at 0x6C
+  type_name_offset: 0x70
+
+============================================================
+location_rpd_b1_licker.aimap.27
+============================================================
+  calculated_name_end: 0x24
+  filename: location_rpd_b1_licker.aimap.27
+  filesize: 181956
+  guid_at_0x24: 0000000004da30d675e5a34da4e6cb1f
+  guid_at_0x28: 04da30d675e5a34da4e6cb1f14df8c7b
+  map_name: RPD_B1_Licker
+  middle_fields: 0x24:0 | 0x28:3593525764 | 0x2C:1302586741 | 0x30:533456548 | 0x34:2072829716 | 0x38:2 | 0x3C:181360 | 0x40:0 | 0x44:181872 | 0x48:0 | 0x4C:181936 | 0x50:0
+  middle_section_size: 84
+  name_actual_len: 13
+  name_end_offset: 36
+  name_length: 14
+  rsz_offset: 0x2C670
+  rsz_offset_int: 181872
+  type_name: via.navigation.map.ContentGroupTriangle
+  type_name_len_prefix: 40 at 0x78
+  type_name_offset: 0x7C
+
+============================================================
+location_rpd_b1_licker_around.aimap.27
+============================================================
+  calculated_name_end: 0x32
+  filename: location_rpd_b1_licker_around.aimap.27
+  filesize: 11908
+  guid_at_0x32: 000001000000033fb83a0dbaf4478164
+  guid_at_0x36: 0000033fb83a0dbaf4478164e0486a68
+  guid_at_0x38: 033fb83a0dbaf4478164e0486a68071a
+  map_name: RPD_B1_Licker_Around
+  middle_fields: 0x32:65536 | 0x36:1057161216 | 0x3A:3121429176 | 0x3E:1686194164 | 0x42:1751795936 | 0x46:6663 | 0x4A:569376768 | 0x4E:0 | 0x52:602931200 | 0x56:0 | 0x5A:779091968 | 0x5E:0
+  middle_section_size: 86
+  name_actual_len: 20
+  name_end_offset: 50
+  name_length: 21
+  rsz_offset: 0x23F0
+  rsz_offset_int: 9200
+  type_name: via.navigation.map.ContentGroupMapPoint
+  type_name_len_prefix: 40 at 0x88
+  type_name_offset: 0x8C
+
+============================================================
+location_rpd_dog_around.aimap.27
+============================================================
+  calculated_name_end: 0x26
+  filename: location_rpd_dog_around.aimap.27
+  filesize: 2564
+  guid_at_0x26: 000001000000d0990a4343fa9e4eaab4
+  guid_at_0x28: 01000000d0990a4343fa9e4eaab4b399
+  guid_at_0x2A: 0000d0990a4343fa9e4eaab4b3993896
+  map_name: RPD_Dog_Around
+  middle_fields: 0x26:65536 | 0x2A:2580545536 | 0x2E:4198712074 | 0x32:3031060126 | 0x36:2520291763 | 0x3A:22011 | 0x3E:111149056 | 0x42:0 | 0x46:144703488 | 0x4A:0 | 0x4E:166723584 | 0x52:0
+  middle_section_size: 86
+  name_actual_len: 14
+  name_end_offset: 38
+  name_length: 15
+  rsz_offset: 0x8A0
+  rsz_offset_int: 2208
+  type_name: via.navigation.map.ContentGroupMapPoint
+  type_name_len_prefix: 40 at 0x7C
+  type_name_offset: 0x80
+
+============================================================
+location_rpd_licker.aimap.27
+============================================================
+  calculated_name_end: 0x1E
+  filename: location_rpd_licker.aimap.27
+  filesize: 264788
+  guid_at_0x1E: 000000000000aa1c39cc45185940991c
+  guid_at_0x20: 00000000aa1c39cc45185940991c9185
+  guid_at_0x22: 0000aa1c39cc45185940991c91853d14
+  map_name: RPD_Licker
+  middle_fields: 0x1E:0 | 0x22:480903168 | 0x26:407227449 | 0x2A:479805529 | 0x2E:339576209 | 0x32:140289 | 0x36:134217728 | 0x3A:4 | 0x3E:167772160 | 0x42:4 | 0x46:171966464 | 0x4A:4
+  middle_section_size: 86
+  name_actual_len: 10
+  name_end_offset: 30
+  name_length: 11
+  rsz_offset: 0x40A00
+  rsz_offset_int: 264704
+  type_name: via.navigation.map.ContentGroupTriangle
+  type_name_len_prefix: 40 at 0x74
+  type_name_offset: 0x78
+
+============================================================
+location_rpd_licker_around.aimap.27
+============================================================
+  calculated_name_end: 0x2C
+  filename: location_rpd_licker_around.aimap.27
+  filesize: 27028
+  guid_at_0x2C: 01000000e591e8952d03254986a3b4a7
+  guid_at_0x30: e591e8952d03254986a3b4a7e1b2d852
+  map_name: RPD_Licker_Around
+  middle_fields: 0x2C:1 | 0x30:2515046885 | 0x34:1227162413 | 0x38:2813633414 | 0x3C:1389933281 | 0x40:0 | 0x44:20208 | 0x48:0 | 0x4C:20720 | 0x50:0 | 0x54:27008 | 0x58:0
+  middle_section_size: 84
+  name_actual_len: 17
+  name_end_offset: 44
+  name_length: 18
+  rsz_offset: 0x50F0
+  rsz_offset_int: 20720
+  type_name: via.navigation.map.ContentGroupMapPoint
+  type_name_len_prefix: 40 at 0x80
+  type_name_offset: 0x84
+
+============================================================
+location_rpd_tyrant_around.aimap.27
+============================================================
+  calculated_name_end: 0x2C
+  filename: location_rpd_tyrant_around.aimap.27
+  filesize: 18916
+  guid_at_0x2C: 01000000d83bad5bde1c794da2b8f7db
+  guid_at_0x30: d83bad5bde1c794da2b8f7dbb09a952f
+  map_name: RPD_Tyrant_Around
+  middle_fields: 0x2C:1 | 0x30:1538079704 | 0x34:1299782878 | 0x38:3690444962 | 0x3C:798333616 | 0x40:0 | 0x44:15808 | 0x48:0 | 0x4C:16320 | 0x50:0 | 0x54:18896 | 0x58:0
+  middle_section_size: 84
+  name_actual_len: 17
+  name_end_offset: 44
+  name_length: 18
+  rsz_offset: 0x3FC0
+  rsz_offset_int: 16320
+  type_name: via.navigation.map.ContentGroupMapPoint
+  type_name_len_prefix: 40 at 0x80
+  type_name_offset: 0x84
+
+============================================================
+location_wastewater.aimap.27
+============================================================
+  calculated_name_end: 0x1E
+  filename: location_wastewater.aimap.27
+  filesize: 794948
+  guid_at_0x1E: 000000000000bfad525a40d9524d9558
+  guid_at_0x20: 00000000bfad525a40d9524d955842c6
+  guid_at_0x22: 0000bfad525a40d9524d955842c6e7aa
+  map_name: WasteWater
+  middle_fields: 0x1E:0 | 0x22:2914975744 | 0x26:3644873298 | 0x2A:1486179666 | 0x2E:2867316290 | 0x32:106100 | 0x36:519045120 | 0x3A:12 | 0x3E:552599552 | 0x42:12 | 0x46:556793856 | 0x4A:12
+  middle_section_size: 86
+  name_actual_len: 10
+  name_end_offset: 30
+  name_length: 11
+  rsz_offset: 0xC20F0
+  rsz_offset_int: 794864
+  type_name: via.navigation.map.ContentGroupTriangle
+  type_name_len_prefix: 40 at 0x74
+  type_name_offset: 0x78
+
+============================================================
+location_wastewater_around.aimap.27
+============================================================
+  calculated_name_end: 0x2C
+  filename: location_wastewater_around.aimap.27
+  filesize: 1956
+  guid_at_0x2C: 01000000937bb0608294604a89b79441
+  guid_at_0x30: 937bb0608294604a89b7944194696a5c
+  map_name: WasteWater_Around
+  middle_fields: 0x2C:1 | 0x30:1622178707 | 0x34:1247843458 | 0x38:1100265353 | 0x3C:1550477716 | 0x40:0 | 0x44:1200 | 0x48:0 | 0x4C:1712 | 0x50:0 | 0x54:1936 | 0x58:0
+  middle_section_size: 84
+  name_actual_len: 17
+  name_end_offset: 44
+  name_length: 18
+  rsz_offset: 0x6B0
+  rsz_offset_int: 1712
+  type_name: via.navigation.map.ContentGroupMapPoint
+  type_name_len_prefix: 40 at 0x80
+  type_name_offset: 0x84

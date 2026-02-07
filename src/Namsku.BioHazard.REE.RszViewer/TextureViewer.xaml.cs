@@ -5,7 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
-using Namsku.BioHazard.REE.RszTga.Core;
+using IntelOrca.Biohazard.REE.Textures;
 
 namespace RszViewer
 {

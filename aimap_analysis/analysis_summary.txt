@@ -1,0 +1,148 @@
+AIMAP ANALYSIS SUMMARY
+================================================================================
+
+File: location_laboratory_licker_around.aimap.27
+  Size: 5444 bytes
+  guid: 6f0075006e0064000000000001000000
+  magic: AIMP
+  map_name: Laboratory_Licker_Atound
+  name_end_offset: 8
+  rsz_match: False
+  rsz_offset_found: 4288
+  type_name: <invalid len: 0>
+  val_0x2C: 7602241
+  val_0x40: 386454981
+  val_0x44: 1119360853
+  val_0x48: 1519387821
+  val_0x4C: 3340338279
+  val_0x50: 0
+  val_0x54: 3776
+  val_0x58: 0
+  val_0x5C: 4288
+  val_0x60: 0
+  val_0x64: 5424
+  val_0x68: 0
+  val_0x6C: 140
+  val_0x70: 0
+  val_0x74: 3552
+  val_0x78: 0
+  val_0x7C: 0
+  val_0x80: 0
+  version: 25
+
+File: location_laboratory_tyrant_around.aimap.27
+  Size: 1412 bytes
+  guid: 6f0075006e0064000000000001000000
+  magic: AIMP
+  map_name: Laboratory_Tyrant_Around
+  name_end_offset: 8
+  rsz_match: False
+  rsz_offset_found: 1248
+  type_name: <invalid len: 0>
+  val_0x2C: 7471169
+  val_0x40: 3889511401
+  val_0x44: 1173590580
+  val_0x48: 3148274077
+  val_0x4C: 3396218213
+  val_0x50: 0
+  val_0x54: 736
+  val_0x58: 0
+  val_0x5C: 1248
+  val_0x60: 0
+  val_0x64: 1392
+  val_0x68: 0
+  val_0x6C: 140
+  val_0x70: 0
+  val_0x74: 720
+  val_0x78: 0
+  val_0x7C: 0
+  val_0x80: 0
+  version: 25
+
+File: location_orphanapproach_dog_around.aimap.27
+  Size: 1524 bytes
+  guid: 72006f0075006e006400000001000000
+  magic: AIMP
+  map_name: OrphanApproach_Dog_Around
+  name_end_offset: 8
+  rsz_match: False
+  rsz_offset_found: 1328
+  type_name: <invalid len: 0>
+  val_0x2C: 4259935
+  val_0x40: 4053703833
+  val_0x44: 1317286531
+  val_0x48: 821444530
+  val_0x4C: 201986356
+  val_0x50: 0
+  val_0x54: 816
+  val_0x58: 0
+  val_0x5C: 1328
+  val_0x60: 0
+  val_0x64: 1504
+  val_0x68: 0
+  val_0x6C: 140
+  val_0x70: 0
+  val_0x74: 784
+  val_0x78: 0
+  val_0x7C: 0
+  val_0x80: 0
+  version: 26
+
+File: location_orphanasylum_dog_around.aimap.27
+  Size: 2228 bytes
+  guid: 75006e0064000000010000009a0ac881
+  magic: AIMP
+  map_name: OrphanAsylum_Dog_Around
+  name_end_offset: 8
+  rsz_match: False
+  rsz_offset_found: 1984
+  type_name: <invalid len: 0>
+  val_0x2C: 7274610
+  val_0x40: 1101709394
+  val_0x44: 2141722505
+  val_0x48: 2277979694
+  val_0x4C: 0
+  val_0x50: 1472
+  val_0x54: 0
+  val_0x58: 1984
+  val_0x5C: 0
+  val_0x60: 2208
+  val_0x64: 0
+  val_0x68: 136
+  val_0x6C: 0
+  val_0x70: 1440
+  val_0x74: 0
+  val_0x78: 0
+  val_0x7C: 0
+  val_0x80: 0
+  version: 24
+
+File: location_rpd_tyrant_around.aimap.27
+  Size: 18916 bytes
+  guid: d83bad5bde1c794da2b8f7dbb09a952f
+  magic: AIMP
+  map_name: RPD_Tyrant_Around
+  name_end_offset: 42
+  rsz_match: True
+  rsz_offset_found: 16320
+  type_name: via.navigation.map.ContentGroupMapPoint
+  val_0x2C: 1
+  val_0x40: 0
+  val_0x44: 15808
+  val_0x48: 0
+  val_0x4C: 16320
+  val_0x50: 0
+  val_0x54: 18896
+  val_0x58: 0
+  val_0x5C: 124
+  val_0x60: 0
+  val_0x64: 15296
+  val_0x68: 0
+  val_0x6C: 0
+  val_0x70: 0
+  val_0x74: 0
+  val_0x78: 0
+  val_0x7C: 1
+  val_0x80: 40
+  version: 18
+

@@ -20,6 +20,8 @@ namespace RszViewer
         public string? SpreadsheetPath { get; set; }
         public List<string> RecentFolders { get; set; } = new List<string>();
         public bool IsExplorerVisible { get; set; } = true;
+        public List<string> OpenedTabPaths { get; set; } = new List<string>();
+        public int SelectedTabIndex { get; set; } = 0;
 
         private static readonly string ConfigPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

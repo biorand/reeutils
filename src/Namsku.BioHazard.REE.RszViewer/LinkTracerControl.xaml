@@ -52,7 +52,17 @@
             <TreeView Name="TreeResults" Background="Transparent" BorderThickness="0">
                 <TreeView.ItemTemplate>
                     <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                        <StackPanel Orientation="Horizontal" Margin="0,2" 
+                                    MouseLeftButtonDown="LinkResult_MouseLeftButtonDown"
+                                    ToolTip="{Binding FilePath}">
+                            <StackPanel.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Open File" Click="LinkResult_OpenFile_Click"/>
+                                    <MenuItem Header="Open in Explorer" Click="LinkResult_OpenExplorer_Click"/>
+                                    <Separator/>
+                                    <MenuItem Header="Copy Full Path" Click="LinkResult_CopyPath_Click"/>
+                                </ContextMenu>
+                            </StackPanel.ContextMenu>
                             <TextBlock Text="{Binding LinkType, Converter={StaticResource LinkIconConverter}}" Margin="0,0,5,0" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding FilePath, Converter={StaticResource PathToNameConverter}}" Foreground="#CCCCCC" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding ObjectName}" Foreground="#569CD6" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center"/>

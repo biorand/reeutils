@@ -1,3 +1,9 @@
+#if NET6_0_OR_GREATER
+using System;
+using System.IO;
+using System.Text;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using BCnEncoder.Shared;
 using BCnEncoder.Decoder;
@@ -7,7 +13,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 
-namespace Namsku.BioHazard.REE.RszTga.Core;
+namespace IntelOrca.Biohazard.REE.Textures;
 
 public class ReTextureFile
 {
@@ -376,3 +382,4 @@ public class ReTextureFile
         };
     }
 }
+#endif

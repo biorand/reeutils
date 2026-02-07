@@ -75,7 +75,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return string.Empty;
         }
 
-        private ImmutableArray<RszInstance> ReadInstanceList(RszTypeRepository repository)
+        public ImmutableArray<RszInstance> ReadInstanceList(RszTypeRepository repository)
         {
             var instanceInfoList = InstanceInfoList;
             var instanceRszTypes = new RszType[instanceInfoList.Length];

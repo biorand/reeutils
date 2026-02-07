@@ -102,7 +102,7 @@ namespace RszViewer
         public RszSheetTab(string name) : base(name, "", "Sheet")
         {
             Name = name;
-            Icon = "📑";
+            Icon = "\uE8A5"; // Document icon
         }
     }
 }

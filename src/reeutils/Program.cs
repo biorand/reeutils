@@ -35,6 +35,10 @@ namespace IntelOrca.Biohazard.REEUtils
                 config.AddCommand<InspectCommand>("inspect")
                     .WithDescription("Looks through every file in a pak to find paths for a pak list.")
                     .WithExample("inspect", "-g", "re4", "input.pak");
+                config.AddCommand<TextureCommand>("texture")
+                    .WithDescription("Convert between RE Engine Texture (.tex) and TGA/Image formats.")
+                    .WithExample("texture", "-o", "output.tga", "input.tex.28")
+                    .WithExample("texture", "-g", "re4", "-o", "output.tex.36", "input.png");
             });
             return app.Run(args);
         }
