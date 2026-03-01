@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
@@ -357,6 +358,61 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
                 return node;
             });
+        }
+
+        public static RszScene Add(
+            this RszScene scene,
+            RszTypeRepository repo,
+            SceneHierachyPath hier,
+            RszGameObject gameObject)
+        {
+            var folders = hier.Folders;
+            var updatedRoot = AddToNode(scene, 0);
+            return (RszScene)updatedRoot;
+
+            IRszSceneNode AddToNode(
+                IRszSceneNode node,
+                int index)
+            {
+                if (index >= folders.Count)
+                {
+                    // No more folders, add the game object here
+                    return node.WithChildren(node.Children.Add(gameObject));
+                }
+
+                // Find or add folder
+                var folderName = folders[index];
+                var childIndex = FindIndex(node.Children, x => x is RszFolder f && f.Name == folderName);
+                var child = childIndex != -1
+                    ? node.Children[childIndex]
+                    : new RszFolder(
+                        repo.Create("via.Folder")
+                            .Set("Name", folderName)
+                            .Set("Update", true)
+                            .Set("Draw", true)
+                            .Set("Startup", true),
+                        []);
+
+                // Add sub folders/game object
+                child = AddToNode(child, index + 1);
+
+                // Rebuild root
+                return childIndex != -1
+                    ? node.WithChildren(node.Children.SetItem(childIndex, child))
+                    : node.WithChildren(node.Children.Add(child));
+            }
+
+            static int FindIndex<T>(ImmutableArray<T> arr, Func<T, bool> predicate)
+            {
+                for (var i = 0; i < arr.Length; i++)
+                {
+                    if (predicate(arr[i]))
+                    {
+                        return i;
+                    }
+                }
+                return -1;
+            }
         }
     }
 }
