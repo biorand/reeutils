@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using IntelOrca.Biohazard.REE.Rsz;
 
 namespace IntelOrca.Biohazard.REE.Tests
@@ -58,6 +58,12 @@ namespace IntelOrca.Biohazard.REE.Tests
         public void Rebuild_RE8_C02_4_ENEMYSET_BOSS()
         {
             AssertRebuild(GameNames.RE8, "natives/stm/Spawn/Enemy/scene/c02_4/c02_4_enemyset_boss.scn.20");
+        }
+
+        [Fact]
+        public void Rebuild_RE9_CHAP1_01_WEAPONPOOL()
+        {
+            AssertRebuild(GameNames.RE9, "natives/stm/gameassets/character/scene/chap1_01/chap1_01_weaponpool.scn.21");
         }
 
         private void AssertRebuild(string gameName, string path, int? expectedLength = null)

@@ -77,6 +77,7 @@ namespace IntelOrca.Biohazard.REE.Tests
                 GameNames.RE3 => @"M:\git\reasy\resources\data\dumps\rszre3.json",
                 GameNames.RE4 => @"M:\git\reasy\resources\data\dumps\rszre4.json",
                 GameNames.RE8 => @"M:\git\reasy\resources\data\dumps\rszre8.json",
+                GameNames.RE9 => @"M:\git\reasy\resources\data\dumps\rszre9.json",
                 _ => throw new NotImplementedException()
             };
             var json = File.ReadAllBytes(jsonPath);

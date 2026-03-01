@@ -1,4 +1,4 @@
-﻿using IntelOrca.Biohazard.REE.Rsz;
+using IntelOrca.Biohazard.REE.Rsz;
 
 namespace IntelOrca.Biohazard.REE.Tests
 {
@@ -27,6 +27,12 @@ namespace IntelOrca.Biohazard.REE.Tests
         public void Rebuild_RE4_WEAPONEQUIPPARAMCATALOGUSERDATA()
         {
             AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/appsystem/weapon/weaponequipparamcataloguserdata.user.2");
+        }
+
+        [Fact]
+        public void Rebuild_RE9_SHOPSETTINGUSERDATA()
+        {
+            AssertRebuild(GameNames.RE9, "natives/stm/leveldesign/shop/userdata/shopsettinguserdata.user.3");
         }
 
         private void AssertRebuild(string gameName, string path)
