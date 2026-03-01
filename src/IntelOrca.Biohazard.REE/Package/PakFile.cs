@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
@@ -15,6 +15,12 @@ namespace IntelOrca.Biohazard.REE.Package
     {
         internal const uint g_magic = 0x414B504B;
         internal const uint g_zstd = 0xFD2FB528;
+
+        private const uint g_feature04 = 4;
+        private const uint g_featureEncrypted = 8;
+        private const uint g_feature10 = 16;
+        private const uint g_featureChunked = 32;
+        private const uint g_supportedFeatures = g_feature04 | g_featureEncrypted | g_feature10 | g_featureChunked;
 
         private readonly Stream _stream;
         private readonly BinaryReader _br;
@@ -46,10 +52,14 @@ namespace IntelOrca.Biohazard.REE.Package
             if (!SupportsVersion(_header.MajorVersion, _header.MinorVersion))
                 throw new InvalidDataException($"Unsupported PAK version: {_header.MajorVersion}.{_header.MinorVersion}");
 
-            if (_header.Feature != 0 && _header.Feature != 8)
-                throw new InvalidDataException("Unsupported PAK encryption");
+            if ((_header.Feature & ~g_supportedFeatures) != 0)
+                throw new InvalidDataException("Unsupported PAK feature");
 
             _entries = ReadEntries(in _header, _br);
+            if ((_header.Feature & g_featureChunked) != 0)
+            {
+                ReadChunks(_br);
+            }
 
             var dict = new Dictionary<ulong, int>();
             for (var i = 0; i < _entries.Length; i++)
@@ -155,7 +165,11 @@ namespace IntelOrca.Biohazard.REE.Package
             else if (compressionType == CompressionKind.Deflate || compressionType == CompressionKind.Zstd)
             {
                 var src = ReadBytes(entry.Offset, entry.CompressedSize);
-                if (entry.EncryptionType > 0)
+                if ((entry.EncryptionFlags & 1) != 0)
+                {
+                    throw new NotImplementedException();
+                }
+                else if (entry.EncryptionType > 0)
                 {
                     src = ResourceCipher.DecryptData(src);
                 }
@@ -203,14 +217,58 @@ namespace IntelOrca.Biohazard.REE.Package
                 return true;
             if (major == 4 && minor == 1)
                 return true;
+            if (major == 4 && minor == 2)
+                return true;
             return false;
+        }
+
+        private static ImmutableArray<Chunk> ReadChunks(BinaryReader br)
+        {
+            var dwMaxBlockSize = br.ReadInt32();
+            var dwChunksCount = br.ReadInt32();
+
+            var dwOffsets = new uint[dwChunksCount];
+            var dwSizes = new uint[dwChunksCount];
+
+            for (int i = 0; i < dwChunksCount; i++)
+            {
+                dwOffsets[i] = br.ReadUInt32();
+                dwSizes[i] = br.ReadUInt32();
+            }
+
+            ulong dwHigh = 0;
+            uint dwPrevOffset = 0;
+
+            var table = ImmutableArray.CreateBuilder<Chunk>();
+            for (var i = 0; i < dwChunksCount; i++)
+            {
+                if (i > 0 && dwOffsets[i] < dwPrevOffset)
+                {
+                    dwHigh += 1UL << 32;
+                }
+
+                table.Add(new Chunk
+                {
+                    ChunkOffset = dwHigh | dwOffsets[i],
+                    ChunkSize = dwSizes[i] >> 10
+                });
+
+                dwPrevOffset = dwOffsets[i];
+            }
+            return table.ToImmutable();
         }
 
         private static ImmutableArray<Entry> ReadEntries(in Header header, BinaryReader br)
         {
             var entrySize = header.MajorVersion <= 2 ? 24 : 48;
             var tableData = br.ReadBytes(header.TotalFiles * entrySize);
-            if (header.Feature == 8)
+
+            if ((header.Feature & g_feature10) != 0)
+                br.ReadBytes(4);
+            if ((header.Feature & g_feature04) != 0)
+                br.ReadBytes(9);
+
+            if ((header.Feature & g_featureEncrypted) != 0)
             {
                 var key = br.ReadBytes(128);
                 tableData = PakCipher.DecryptData(tableData, key);
@@ -304,6 +362,12 @@ namespace IntelOrca.Biohazard.REE.Package
                     HashNameUpper = (uint)(value >> 32);
                 }
             }
+        }
+
+        private struct Chunk
+        {
+            public ulong ChunkOffset { get; set; }
+            public uint ChunkSize { get; set; }
         }
     }
 }

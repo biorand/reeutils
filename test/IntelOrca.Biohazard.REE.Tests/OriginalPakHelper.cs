@@ -1,4 +1,4 @@
-﻿using IntelOrca.Biohazard.REE.Package;
+using IntelOrca.Biohazard.REE.Package;
 using IntelOrca.Biohazard.REE.Rsz;
 
 namespace IntelOrca.Biohazard.REE.Tests
@@ -51,6 +51,8 @@ namespace IntelOrca.Biohazard.REE.Tests
                     @"G:\biorand\re4r\vanilla"),
                 GameNames.RE8 => FindFirstExisting(
                     @"G:\biorand\re8\vanilla"),
+                GameNames.RE9 => FindFirstExisting(
+                    @"F:\games\steamapps\common\RESIDENT EVIL requiem BIOHAZARD requiem"),
                 _ => throw new NotSupportedException()
             };
         }

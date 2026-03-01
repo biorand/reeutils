@@ -16,7 +16,7 @@ namespace IntelOrca.Biohazard.REE.Tests
         [InlineData("natives/stm/_chainsaw/appsystem/ui/userdata/itemcraftsettinguserdata.user.2", 1398412279)]
         [InlineData("natives/stm/_chainsaw/appsystem/weapon/lasersight/playerlasersightcontrolleruserdata.user.2", -891513479)]
         [InlineData("natives/stm/_chainsaw/appsystem/weaponcustom/weapondetailcustomuserdata.user.2", 98088230)]
-        [InlineData("natives/stm/_chainsaw/appsystem/ui/userdata/guiparamholdersettinguserdata.user.2", -946285964)]
+        [InlineData("natives/stm/_chainsaw/appsystem/ui/userdata/guiparamholdersettinguserdata.user.2", 470148227)]
         public void Checksum(string path, int expected)
         {
             var fileData = _pakHelper.GetFileData(GameNames.RE4, path)!;
@@ -61,6 +61,15 @@ namespace IntelOrca.Biohazard.REE.Tests
                 var data = await File.ReadAllBytesAsync(discPath);
                 Assert.Equal(expectedHash, MurMur3.HashData(data));
             }
+        }
+
+        [Theory]
+        [InlineData("natives/stm/leveldesign/shop/userdata/shopsettinguserdata.user.3", 409745692)]
+        public void PakVersion_4_2(string path, int expected)
+        {
+            var fileData = _pakHelper.GetFileData(GameNames.RE9, path)!;
+            var actual = MurMur3.HashData(fileData);
+            Assert.Equal(expected, actual);
         }
     }
 }
