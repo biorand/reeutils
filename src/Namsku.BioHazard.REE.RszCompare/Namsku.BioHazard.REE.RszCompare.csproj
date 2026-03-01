@@ -15,6 +15,7 @@
     <Copyright>Copyright © 2026 namsku</Copyright>
     <Version>1.0.0</Version>
     <ApplicationIcon>Resources\icon.ico</ApplicationIcon>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <ItemGroup>
