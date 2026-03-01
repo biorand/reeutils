@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -6,7 +6,6 @@ using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using IntelOrca.Biohazard.REE.Rsz.Native;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
@@ -198,8 +197,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.Mat4 => MemoryMarshal.Read<Matrix4x4>(node.Data.Span),
                 RszFieldType.Quaternion => MemoryMarshal.Read<Quaternion>(node.Data.Span),
                 RszFieldType.Guid or RszFieldType.GameObjectRef => MemoryMarshal.Read<Guid>(node.Data.Span),
-                RszFieldType.Range => MemoryMarshal.Read<Native.Range>(node.Data.Span),
-                RszFieldType.KeyFrame => MemoryMarshal.Read<KeyFrame>(node.Data.Span),
+                RszFieldType.Range => MemoryMarshal.Read<via.Range>(node.Data.Span),
+                RszFieldType.KeyFrame => MemoryMarshal.Read<via.KeyFrame>(node.Data.Span),
+                RszFieldType.Capsule => MemoryMarshal.Read<via.Capsule>(node.Data.Span),
                 _ => node.Data
             };
         }
@@ -256,8 +256,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.Mat4 => new RszValueNode(type, ToMemory<Matrix4x4>(obj)),
                 RszFieldType.Quaternion => new RszValueNode(type, ToMemory<Quaternion>(obj)),
                 RszFieldType.Guid or RszFieldType.GameObjectRef => new RszValueNode(type, ToMemory<Guid>(obj)),
-                RszFieldType.Range => new RszValueNode(type, ToMemory<Native.Range>(obj)),
-                RszFieldType.KeyFrame => new RszValueNode(type, ToMemory<KeyFrame>(obj)),
+                RszFieldType.Range => new RszValueNode(type, ToMemory<via.Range>(obj)),
+                RszFieldType.KeyFrame => new RszValueNode(type, ToMemory<via.KeyFrame>(obj)),
+                RszFieldType.Capsule => new RszValueNode(type, ToMemory<via.Capsule>(obj)),
                 RszFieldType.String => obj is RszStringNode stringNode
                     ? stringNode
                     : new RszStringNode((string)obj),

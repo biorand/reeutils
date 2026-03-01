@@ -1,6 +1,6 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 
-namespace IntelOrca.Biohazard.REE.Rsz.Native
+namespace via
 {
     [StructLayout(LayoutKind.Sequential)]
     public readonly struct Range
