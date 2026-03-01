@@ -1,4 +1,3 @@
-﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
@@ -41,7 +40,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public void AddType(RszType type)
         {
             _idToTypeMap.Add(type.Id, type);
-            
+
             if (!_nameToTypeMap.ContainsKey(type.Name))
             {
                 _nameToTypeMap.Add(type.Name, type);
@@ -54,6 +53,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public RszObjectNode Create(string name)
         {
             return FromName(name)!.Create();
+        }
+
+        public RszObjectNode Serialize<T>(T obj)
+        {
+            return (RszObjectNode)RszSerializer.Serialize(
+                FromName(obj!.GetType().FullName!)!,
+                obj);
         }
     }
 }

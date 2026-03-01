@@ -31,6 +31,25 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public static RszGameObject? FindGameObject(this IRszSceneNode node, Guid guid) => FindGameObject(node, go => go.Guid == guid);
         public static RszGameObject? FindGameObject(this IRszSceneNode node, string name) => FindGameObject(node, go => go.Name == name);
 
+        public static RszObjectNode? FindComponent(this IRszSceneNode sceneNode, Guid gameObjectGuid, string componentName)
+        {
+            var gameObject = sceneNode.FindGameObject(gameObjectGuid);
+            return gameObject?.FindComponent(componentName);
+        }
+
+        public static T? FindComponent<T>(this RszGameObject gameObject)
+        {
+            var objectNode = gameObject.FindComponent(typeof(T).FullName!);
+            return objectNode == null ? default : RszSerializer.Deserialize<T>(objectNode);
+        }
+
+        public static RszGameObject AddOrUpdateComponent<T>(this RszGameObject gameObject, T component)
+        {
+            var typeRepository = gameObject.Settings.Type.Repository;
+            var componentNode = typeRepository.Serialize(component);
+            return gameObject.AddOrUpdateComponent(componentNode);
+        }
+
         public static T UpdateGameObject<T>(this T node, RszGameObject newGameObject) where T : IRszSceneNode
         {
             if (node.Children.IsDefaultOrEmpty)
