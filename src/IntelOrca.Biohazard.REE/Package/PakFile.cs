@@ -16,11 +16,11 @@ namespace IntelOrca.Biohazard.REE.Package
         internal const uint g_magic = 0x414B504B;
         internal const uint g_zstd = 0xFD2FB528;
 
-        private const uint g_feature04 = 4;
-        private const uint g_featureEncrypted = 8;
-        private const uint g_feature10 = 16;
-        private const uint g_featureChunked = 32;
-        private const uint g_supportedFeatures = g_feature04 | g_featureEncrypted | g_feature10 | g_featureChunked;
+        internal const uint g_feature04 = 4;
+        internal const uint g_featureEncrypted = 8;
+        internal const uint g_feature10 = 16;
+        internal const uint g_featureChunked = 32;
+        internal const uint g_supportedFeatures = g_feature04 | g_featureEncrypted | g_feature10 | g_featureChunked;
 
         private readonly Stream _stream;
         private readonly BinaryReader _br;

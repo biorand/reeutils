@@ -11,6 +11,11 @@
     "import": {
       "commandName": "Project",
       "commandLineArgs": "import -g re4 test.json -o test.user.2"
+    },
+    "pack": {
+      "commandName": "Project",
+      "commandLineArgs": "pack -o re_chunk_000.pak.sub_002.pak natives",
+      "workingDirectory": "F:\\games\\steamapps\\common\\RESIDENT EVIL requiem BIOHAZARD requiem"
     }
   }
 }

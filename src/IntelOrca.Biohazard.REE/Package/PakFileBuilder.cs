@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -69,18 +69,19 @@ namespace IntelOrca.Biohazard.REE.Package
             }
         }
 
-        public void Save(string path, CompressionKind CompressionKind = CompressionKind.Zstd)
+        public void Save(string path, CompressionKind CompressionKind = CompressionKind.Zstd, byte[]? encryptionKey = null)
         {
-            using var stream = File.OpenWrite(path);
-            Save(stream, CompressionKind);
+            using var stream = new FileStream(path, FileMode.Create, FileAccess.Write);
+            Save(stream, CompressionKind, encryptionKey);
         }
 
-        public void Save(Stream stream, CompressionKind CompressionKind = CompressionKind.Zstd)
+        public void Save(Stream stream, CompressionKind CompressionKind = CompressionKind.Zstd, byte[]? encryptionKey = null)
         {
             var header = new PakFile.Header
             {
                 wMagic = PakFile.g_magic,
                 MajorVersion = 4,
+                Feature = (short)(encryptionKey == null ? 0 : PakFile.g_featureEncrypted),
                 TotalFiles = _entries.Count,
                 Hash = 0xDEC0ADDE
             };
@@ -97,6 +98,11 @@ namespace IntelOrca.Biohazard.REE.Package
             bw.Write(header.Hash);
             bw.Seek(header.TotalFiles * 48, SeekOrigin.Current);
 
+            if (encryptionKey != null)
+            {
+                bw.Write(encryptionKey);
+            }
+
             // Write entries
             var index = 0;
             foreach (var entry in _entries)
@@ -106,7 +112,11 @@ namespace IntelOrca.Biohazard.REE.Package
 
                 var pakEntry = new PakFile.Entry();
                 string pakEntryPath;
-                if (entryPath.Contains("__Unknown"))
+                if (entryPath.StartsWith("__HASH__"))
+                {
+                    pakEntry.HashName = ulong.Parse(entryPath.Substring(8));
+                }
+                else if (entryPath.Contains("__Unknown"))
                 {
                     pakEntryPath = Path.GetFileNameWithoutExtension(entryPath);
                     pakEntry.HashName = Convert.ToUInt64(pakEntryPath, 16);
@@ -139,6 +149,7 @@ namespace IntelOrca.Biohazard.REE.Package
                     {
                         var buffer = CompressionKind switch
                         {
+                            CompressionKind.None => entryData,
                             CompressionKind.Deflate => Deflate.CompressData(entryData),
                             CompressionKind.Zstd => Zstd.CompressData(entryData),
                             _ => throw new ArgumentException("CompressionKind not supported")
@@ -165,7 +176,15 @@ namespace IntelOrca.Biohazard.REE.Package
 
             // Write entry table
             bw.Seek(16, SeekOrigin.Begin);
-            var sortedPakEntries = pakEntries.OrderBy(e => e.HashName).ToArray();
+            var table = GetEntryTable(pakEntries, encryptionKey);
+            bw.Write(table);
+        }
+
+        private byte[] GetEntryTable(IEnumerable<PakFile.Entry> entries, byte[]? encryptionKey)
+        {
+            var ms = new MemoryStream();
+            var bw = new BinaryWriter(ms);
+            var sortedPakEntries = entries.OrderBy(e => e.HashName).ToArray();
             foreach (var pakEntry in sortedPakEntries)
             {
                 bw.Write(pakEntry.HashName);
@@ -179,6 +198,10 @@ namespace IntelOrca.Biohazard.REE.Package
                 bw.Write(pakEntry.Reserved);
                 bw.Write(pakEntry.Checksum);
             }
+            var result = ms.ToArray();
+            return encryptionKey != null
+                ? PakCipher.DecryptData(result, encryptionKey)
+                : result;
         }
 
         public byte[] ToByteArray()
