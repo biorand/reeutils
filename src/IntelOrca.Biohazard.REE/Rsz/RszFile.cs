@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -75,7 +75,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return string.Empty;
         }
 
-        private ImmutableArray<RszInstance> ReadInstanceList(RszTypeRepository repository)
+        internal ImmutableArray<RszInstance> ReadInstanceList(RszTypeRepository repository)
         {
             var instanceInfoList = InstanceInfoList;
             var instanceRszTypes = new RszType[instanceInfoList.Length];
@@ -94,100 +94,100 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             if (Version < 16)
             {
-                    var userDataInfoList = EmbeddedUserDataInfoList;
-                    for (var i = 0; i < userDataInfoList.Length; i++)
-                    {
-                        var instanceIndex = userDataInfoList[i].InstanceId;
-                        if (instanceIndex >= 0 && instanceIndex < result.Count)
-                        {
-                            var rszType = instanceRszTypes[instanceIndex];
-                            var rszFile = new RszFile(Data.Slice((int)userDataInfoList[i].Offset, (int)userDataInfoList[i].Size));
-                            result[instanceIndex] = new RszInstance(
-                                new RszInstanceId(instanceIndex),
-                                new RszEmbeddedUserValueNode(rszType, (int)userDataInfoList[i].JsonPathHash, rszFile));
-                        }
-                    }
-                }
-                else
+                var userDataInfoList = EmbeddedUserDataInfoList;
+                for (var i = 0; i < userDataInfoList.Length; i++)
                 {
-                    var userDataInfoList = UserDataInfoList;
-                    for (var i = 0; i < userDataInfoList.Length; i++)
+                    var instanceIndex = userDataInfoList[i].InstanceId;
+                    if (instanceIndex >= 0 && instanceIndex < result.Count)
                     {
-                        var instanceIndex = userDataInfoList[i].InstanceId;
-                        if (instanceIndex >= 0 && instanceIndex < result.Count)
-                        {
-                            var rszType = instanceRszTypes[instanceIndex];
-                            var path = GetString(userDataInfoList[i].PathOffset);
-                            result[instanceIndex] = new RszInstance(new RszInstanceId(instanceIndex), new RszUserDataNode(rszType, path));
-                        }
+                        var rszType = instanceRszTypes[instanceIndex];
+                        var rszFile = new RszFile(Data.Slice((int)userDataInfoList[i].Offset, (int)userDataInfoList[i].Size));
+                        result[instanceIndex] = new RszInstance(
+                            new RszInstanceId(instanceIndex),
+                            new RszEmbeddedUserValueNode(rszType, (int)userDataInfoList[i].JsonPathHash, rszFile));
                     }
                 }
-
-                var rszDataReader = new RszDataReader(repository, new SpanReader(InstanceData));
-                for (var i = 0; i < instanceInfoList.Length; i++)
+            }
+            else
+            {
+                var userDataInfoList = UserDataInfoList;
+                for (var i = 0; i < userDataInfoList.Length; i++)
                 {
-                    if (i < result.Count && result[i].Id.Index != 0)
-                        continue;
-
-                    var rszType = instanceRszTypes[i];
-
-                    if (rszType == null) continue;
-                    var rszValue = rszType.Id == 0 ? new RszNullNode() : (IRszNode)rszDataReader.ReadStruct(rszType);
-                    if (i < result.Count)
+                    var instanceIndex = userDataInfoList[i].InstanceId;
+                    if (instanceIndex >= 0 && instanceIndex < result.Count)
                     {
-                        result[i] = new RszInstance(new RszInstanceId(i), rszValue);
+                        var rszType = instanceRszTypes[instanceIndex];
+                        var path = GetString(userDataInfoList[i].PathOffset);
+                        result[instanceIndex] = new RszInstance(new RszInstanceId(instanceIndex), new RszUserDataNode(rszType, path));
                     }
                 }
+            }
 
-    #if DEBUG_RSZ
+            var rszDataReader = new RszDataReader(repository, new SpanReader(InstanceData));
+            for (var i = 0; i < instanceInfoList.Length; i++)
+            {
+                if (i < result.Count && result[i].Id.Index != 0)
+                    continue;
+
+                var rszType = instanceRszTypes[i];
+
+                if (rszType == null) continue;
+                var rszValue = rszType.Id == 0 ? new RszNullNode() : (IRszNode)rszDataReader.ReadStruct(rszType);
+                if (i < result.Count)
+                {
+                    result[i] = new RszInstance(new RszInstanceId(i), rszValue);
+                }
+            }
+
+#if DEBUG_RSZ
                 var instanceIds = Enumerable.Range(0, instanceInfoList.Length).ToHashSet();
-    #endif
-                for (var i = 0; i < instanceInfoList.Length; i++)
+#endif
+            for (var i = 0; i < instanceInfoList.Length; i++)
+            {
+                var value = result[i].Value;
+                if (value is IRszNodeContainer container)
                 {
-                    var value = result[i].Value;
-                    if (value is IRszNodeContainer container)
+                    result[i] = new RszInstance(result[i].Id, container.Visit(node =>
                     {
-                        result[i] = new RszInstance(result[i].Id, container.Visit(node =>
+                        if (node is RszValueNode valueNode)
                         {
-                            if (node is RszValueNode valueNode)
+                            if (valueNode.Type == RszFieldType.Object)
                             {
-                                if (valueNode.Type == RszFieldType.Object)
-                                {
-                                    var instanceId = valueNode.AsInt32();
-    #if DEBUG_RSZ
+                                var instanceId = valueNode.AsInt32();
+#if DEBUG_RSZ
                                     if (!instanceIds.Remove(instanceId))
                                     {
                                         Console.WriteLine("HMM");
                                     }
-    #endif
-                                    if (instanceId >= 0 && instanceId < result.Count)
-                                    {
-                                        return result[instanceId].Value;
-                                    }
-                                    return new RszNullNode();
-                                }
-                                else if (valueNode.Type == RszFieldType.UserData)
+#endif
+                                if (instanceId >= 0 && instanceId < result.Count)
                                 {
-                                    var instanceId = valueNode.AsInt32();
-    #if DEBUG_RSZ
-                                    if (!instanceIds.Remove(instanceId))
-                                    {
-                                        Console.WriteLine("HMM");
-                                    }
-    #endif
-                                    if (instanceId == 0) return new RszUserDataNode();
-                                    
-                                    if (instanceId > 0 && instanceId < result.Count)
-                                    {
-                                        return result[instanceId].Value;
-                                    }
-                                    return new RszUserDataNode();
+                                    return result[instanceId].Value;
                                 }
+                                return new RszNullNode();
                             }
-                            return node;
-                        }));
-                    }
+                            else if (valueNode.Type == RszFieldType.UserData)
+                            {
+                                var instanceId = valueNode.AsInt32();
+#if DEBUG_RSZ
+                                    if (!instanceIds.Remove(instanceId))
+                                    {
+                                        Console.WriteLine("HMM");
+                                    }
+#endif
+                                if (instanceId == 0) return new RszUserDataNode();
+
+                                if (instanceId > 0 && instanceId < result.Count)
+                                {
+                                    return result[instanceId].Value;
+                                }
+                                return new RszUserDataNode();
+                            }
+                        }
+                        return node;
+                    }));
                 }
+            }
 
 #if DEBUG_RSZ
             foreach (var o in ObjectInstanceIds)

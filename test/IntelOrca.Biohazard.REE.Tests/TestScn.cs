@@ -66,6 +66,12 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertRebuild(GameNames.RE9, "natives/stm/gameassets/character/scene/chap1_01/chap1_01_weaponpool.scn.21");
         }
 
+        [Fact]
+        public void Rebuild_RE9_CHAPX_JCT001_ITEM()
+        {
+            AssertRebuild(GameNames.RE9, "natives/stm/leveldesign/item/scene/junction/chapx_jct001_item.scn.21");
+        }
+
         private void AssertRebuild(string gameName, string path, int? expectedLength = null)
         {
             var repo = _pakHelper.GetTypeRepository(gameName);
@@ -74,8 +80,24 @@ namespace IntelOrca.Biohazard.REE.Tests
             var output = inputBuilder.Build();
             var outputBuilder = output.ToBuilder(repo);
 
+#if INVESTIGATE
+            var inputInstances = input.Rsz.ReadInstanceList(repo);
+            var outputInstances = output.Rsz.ReadInstanceList(repo);
+            for (var i = 0; i < inputInstances.Length; i++)
+            {
+                if (inputInstances[i].ToString() != outputInstances[i].ToString())
+                {
+                    ; // INVESTIGATE
+                }
+            }
+#endif
+
             if (input.Data.Length == output.Data.Length)
             {
+#if INVESTIGATE
+                File.WriteAllBytes(@"M:\temp\input.dat", input.Data.Span);
+                File.WriteAllBytes(@"M:\temp\output.dat", output.Data.Span);
+#endif
                 Assert.True(input.Data.Span.SequenceEqual(output.Data.Span));
             }
             Assert.Equal(expectedLength ?? input.Data.Length, output.Data.Length);

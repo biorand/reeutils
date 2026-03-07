@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
@@ -21,7 +21,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         private ReadOnlySpan<PrefabInfo> PrefabInfoList => data.Get<PrefabInfo>(Header.PrefabOffset, Header.PrefabCount);
         private ReadOnlySpan<ResourceInfo> ResourceInfoList => data.Get<ResourceInfo>(Header.ResourceOffset, Header.ResourceCount);
         private ReadOnlySpan<UserDataInfo> UserDataInfoList => data.Get<UserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
-        private RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
+        internal RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
 
         public int InstanceCount => Rsz.InstanceCount;
 
