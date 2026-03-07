@@ -79,44 +79,49 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             RszScene BuildRoot()
             {
-                var children = ImmutableArray.CreateBuilder<IRszSceneNode>();
-                for (var i = 0; i < gameObjectInfoList.Length; i++)
-                {
-                    if (gameObjectInfoList[i].ParentId == -1)
-                    {
-                        children.Add(BuildGameObject(i));
-                    }
-                }
-                for (var i = 0; i < folderInfoList.Length; i++)
-                {
-                    if (folderInfoList[i].ParentId == -1)
-                    {
-                        children.Add(BuildFolder(i));
-                    }
-                }
-                return new RszScene(children.ToImmutable());
+                return new RszScene(CollectChildren(-1));
             }
 
             RszFolder BuildFolder(int id)
             {
                 var info = folderInfoList[id];
-                var settings = (RszObjectNode)objectList[info.ObjectId];
+                var settings = objectList[info.ObjectId];
+                return new RszFolder(settings, CollectChildren(info.ObjectId));
+            }
+
+            ImmutableArray<IRszSceneNode> CollectChildren(int parentId)
+            {
                 var children = ImmutableArray.CreateBuilder<IRszSceneNode>();
-                for (var i = 0; i < folderInfoList.Length; i++)
+                int fi = 0;
+                int gi = 0;
+
+                while (fi < folderInfoList.Length || gi < gameObjectInfoList.Length)
                 {
-                    if (folderInfoList[i].ParentId == info.ObjectId)
+                    while (fi < folderInfoList.Length && folderInfoList[fi].ParentId != parentId)
+                        fi++;
+
+                    while (gi < gameObjectInfoList.Length && gameObjectInfoList[gi].ParentId != parentId)
+                        gi++;
+
+                    bool hasFolder = fi < folderInfoList.Length;
+                    bool hasGameObject = gi < gameObjectInfoList.Length;
+
+                    if (!hasFolder && !hasGameObject)
+                        break;
+
+                    if (hasFolder && (!hasGameObject || folderInfoList[fi].ObjectId < gameObjectInfoList[gi].ObjectId))
                     {
-                        children.Add(BuildFolder(i));
+                        children.Add(BuildFolder(fi));
+                        fi++;
+                    }
+                    else
+                    {
+                        children.Add(BuildGameObject(gi));
+                        gi++;
                     }
                 }
-                for (var i = 0; i < gameObjectInfoList.Length; i++)
-                {
-                    if (gameObjectInfoList[i].ParentId == info.ObjectId)
-                    {
-                        children.Add(BuildGameObject(i));
-                    }
-                }
-                return new RszFolder(settings, children.ToImmutable());
+
+                return children.ToImmutable();
             }
 
             RszGameObject BuildGameObject(int id)
