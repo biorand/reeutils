@@ -1,4 +1,5 @@
 using System.Text.Json;
+using IntelOrca.Biohazard.REE.Package;
 using IntelOrca.Biohazard.REE.Rsz;
 
 namespace IntelOrca.Biohazard.REE.Tests
@@ -72,6 +73,25 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertRebuild(GameNames.RE9, "natives/stm/leveldesign/item/scene/junction/chapx_jct001_item.scn.21");
         }
 
+        [Fact]
+        public void Rebuild_RE9_CHAP3_02_CHARACTERSPAWNPARAM_03()
+        {
+            AssertRebuild(GameNames.RE9, "natives/stm/gameassets/character/scene/chap3_02/chap3_02_characterspawnparam_03.scn.21");
+        }
+
+        [Fact]
+        public void Rebuild_RE9_ST30_031_GIMMICK_COMMON()
+        {
+            var pakList = PakList.FromFile(@"G:\apps\reasy\resources\data\lists\RE9_STM.list");
+            foreach (var listing in pakList.Entries)
+            {
+                if (listing.StartsWith("natives/stm/leveldesign/gimmick/scene", StringComparison.OrdinalIgnoreCase))
+                {
+                    AssertRebuildInstanceCount(GameNames.RE9, listing);
+                }
+            }
+        }
+
         private void AssertRebuild(string gameName, string path, int? expectedLength = null)
         {
             var repo = _pakHelper.GetTypeRepository(gameName);
@@ -80,24 +100,9 @@ namespace IntelOrca.Biohazard.REE.Tests
             var output = inputBuilder.Build();
             var outputBuilder = output.ToBuilder(repo);
 
-#if INVESTIGATE
-            var inputInstances = input.Rsz.ReadInstanceList(repo);
-            var outputInstances = output.Rsz.ReadInstanceList(repo);
-            for (var i = 0; i < inputInstances.Length; i++)
-            {
-                if (inputInstances[i].ToString() != outputInstances[i].ToString())
-                {
-                    ; // INVESTIGATE
-                }
-            }
-#endif
-
+            Investigate(repo, input, output);
             if (input.Data.Length == output.Data.Length)
             {
-#if INVESTIGATE
-                File.WriteAllBytes(@"M:\temp\input.dat", input.Data.Span);
-                File.WriteAllBytes(@"M:\temp\output.dat", output.Data.Span);
-#endif
                 Assert.True(input.Data.Span.SequenceEqual(output.Data.Span));
             }
             Assert.Equal(expectedLength ?? input.Data.Length, output.Data.Length);
@@ -109,7 +114,26 @@ namespace IntelOrca.Biohazard.REE.Tests
             var input = new ScnFile(FileVersion.FromPath(path), _pakHelper.GetFileData(gameName, path));
             var inputBuilder = input.ToBuilder(repo);
             var output = inputBuilder.Build();
+
+            Investigate(repo, input, output);
             Assert.Equal(input.InstanceCount, output.InstanceCount);
+        }
+
+        private void Investigate(RszTypeRepository repo, ScnFile input, ScnFile output)
+        {
+#if INVESTIGATE
+            var inputInstances = input.Rsz.ReadInstanceList(repo);
+            var outputInstances = output.Rsz.ReadInstanceList(repo);
+            for (var i = 0; i < inputInstances.Length; i++)
+            {
+                if (inputInstances[i].ToString() != outputInstances[i].ToString())
+                {
+                    ; // INVESTIGATE
+                }
+            }
+            File.WriteAllBytes(@"M:\temp\input.scn.21", input.Data.Span);
+            File.WriteAllBytes(@"M:\temp\output.scn.21", output.Data.Span);
+#endif
         }
 
         private void AssertRebuildScene(string gameName, string path, int? expectedLength = null)
