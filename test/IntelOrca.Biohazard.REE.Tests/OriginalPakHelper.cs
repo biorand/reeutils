@@ -49,6 +49,8 @@ namespace IntelOrca.Biohazard.REE.Tests
                     @"F:\games\steamapps\common\RE3"),
                 GameNames.RE4 => FindFirstExisting(
                     @"G:\biorand\re4r\vanilla"),
+                GameNames.RE7 => FindFirstExisting(
+                    @"F:\games\steamapps\common\RESIDENT EVIL 7 biohazard"),
                 GameNames.RE8 => FindFirstExisting(
                     @"G:\biorand\re8\vanilla"),
                 GameNames.RE9 => FindFirstExisting(
@@ -76,6 +78,7 @@ namespace IntelOrca.Biohazard.REE.Tests
                 GameNames.RE2 => @"M:\git\reasy\resources\data\dumps\rszre2.json",
                 GameNames.RE3 => @"M:\git\reasy\resources\data\dumps\rszre3.json",
                 GameNames.RE4 => @"M:\git\reasy\resources\data\dumps\rszre4.json",
+                GameNames.RE7 => @"M:\git\reasy\resources\data\dumps\rszre7rt.json",
                 GameNames.RE8 => @"M:\git\reasy\resources\data\dumps\rszre8.json",
                 GameNames.RE9 => @"M:\git\reasy\resources\data\dumps\rszre9.json",
                 _ => throw new NotImplementedException()
