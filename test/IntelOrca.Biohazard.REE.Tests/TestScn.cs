@@ -92,6 +92,20 @@ namespace IntelOrca.Biohazard.REE.Tests
             }
         }
 
+        [Fact]
+        public void Rebuild_RE7_C03_TRAILERHOUSE()
+        {
+            AssertRebuild(GameNames.RE7, "natives/stm/environment/scene/chapter3/c03_trailerhouse.scn.20");
+        }
+
+#if INVESTIGATE
+        [Fact]
+        public void Rebuild_INVESTIGATE()
+        {
+            AssertRebuild(GameNames.RE9, "natives/stm/gameassets/character/scene/chap1_01/chap1_01_characterpool_cp_b200.scn.21");
+        }
+#endif
+
         private void AssertRebuild(string gameName, string path, int? expectedLength = null)
         {
             var repo = _pakHelper.GetTypeRepository(gameName);
