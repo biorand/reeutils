@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -84,10 +85,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
             var children = node.Children;
 
             var count = fields.Length;
+            var written = new HashSet<string>(StringComparer.Ordinal);
             for (var i = 0; i < count; i++)
             {
-                var field = fields[i];
-                writer.WritePropertyName(field.Name);
+                var name = fields[i].Name;
+                if (!written.Add(name))
+                    name = $"v{i}";
+
+                writer.WritePropertyName(name);
                 WriteNode(writer, children[i], options);
             }
         }
@@ -104,12 +109,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
             }
             else if (node is RszArrayNode arrayNode)
             {
-                writer.WriteStartObject();
+                writer.WriteStartArray();
                 foreach (var child in arrayNode.Children)
                 {
                     WriteNode(writer, child, options);
                 }
-                writer.WriteEndObject();
+                writer.WriteEndArray();
             }
             else if (node is RszStringNode stringNode)
             {
