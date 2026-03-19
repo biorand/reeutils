@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace IntelOrca.Biohazard.REE.Extensions
 {
@@ -75,6 +76,20 @@ namespace IntelOrca.Biohazard.REE.Extensions
                 bw.Write((ushort)value[i]);
             }
             bw.Write((ushort)0);
+        }
+
+        public static void WriteOffsetString(this BinaryWriter bw, string? value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                bw.Write((long)0);
+                return;
+            }
+
+            var strBytes = Encoding.Unicode.GetBytes(value + '\0');
+            var offset = bw.BaseStream.Position;
+            bw.Write(offset);
+            bw.Write(strBytes);
         }
     }
 }

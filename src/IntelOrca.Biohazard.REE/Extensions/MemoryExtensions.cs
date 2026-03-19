@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Buffers.Binary;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace IntelOrca.Biohazard.REE.Extensions
 {
@@ -15,6 +17,18 @@ namespace IntelOrca.Biohazard.REE.Extensions
             if (count == 0)
                 return [];
             return MemoryMarshal.Cast<byte, T>(data.Span.Slice((int)offset)).Slice(0, (int)count);
+        }
+
+        public static string ReadWString(this ReadOnlyMemory<byte> data, int offset)
+            => ReadWString(data.Span, offset);
+
+        public static string ReadWString(this ReadOnlySpan<byte> data, int offset)
+        {
+            int len = 0;
+            while (BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(offset + len, 2)) != 0)
+                len += 2;
+
+            return Encoding.Unicode.GetString(data.Slice(offset, len));
         }
     }
 }
