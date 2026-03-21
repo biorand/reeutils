@@ -7,15 +7,13 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using IntelOrca.Biohazard.REE.Cryptography;
 using IntelOrca.Biohazard.REE.Extensions;
+using IntelOrca.Biohazard.REE.Rsz;
 
-namespace IntelOrca.Biohazard.REE.Rsz.Rcol
+namespace IntelOrca.Biohazard.REE.Rsz
 {
-    // Adapted from https://github.com/kagenocookie/RE-Engine-Lib/blob/master/REE-Lib/RszFile/RcolFile.cs.
-
     /// <summary>
     /// RequestSet Collider (RCOL) file.
     /// Contains hitboxes, damage values, stun, impact, damage type, special attack flags and other hitbox-related data.
-    /// TODO: Fully support all versions. Currently only fully supports version 20.
     /// </summary>
     /// <param name="version">File version. Valid values: 2, 11, 20, >= 25</param>
     /// <param name="data">RCOL file data</param>
@@ -23,9 +21,8 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
     {
         private const uint MAGIC = 0x4C4F4352;
 
-        public ReadOnlyMemory<byte> Data => data;
-
         public int Version => version;
+        public ReadOnlyMemory<byte> Data => data;
 
         private readonly RcolHeader Header = new(version, data[..RcolHeader.GetSize(version)]);
 
@@ -46,6 +43,8 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
             }
         }
 
+        public RszFile Rsz => new(data.Slice((int)Header.DataOffset, Header.UserDataSize));
+
         private ReadOnlySpan<RequestSetInfo> RequestSets
         {
             get
@@ -64,252 +63,6 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
         }
 
         private ReadOnlySpan<IgnoreTagInfo> IgnoreTags => Data.Get<IgnoreTagInfo>(Header.IgnoreTagOffset, Header.NumIgnoreTags);
-
-        public RszFile Rsz => new(data.Slice((int)Header.DataOffset, Header.UserDataSize));
-
-        public readonly struct RcolGroupInfo(int version, ReadOnlyMemory<byte> data)
-        {
-            public Guid Guid => new(data.Span.Slice(0, 16));
-            public long NameOffset => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(16, 8));
-
-            public int NumShapes
-            {
-                get
-                {
-                    if (version >= 25)
-                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(28, 4));
-                    else if (version >= 3)
-                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(32, 4));
-                    else
-                        return BinaryPrimitives.ReadInt16LittleEndian(data.Span.Slice(30, 2));
-                }
-            }
-
-            public int NumExtraShapes
-            {
-                get
-                {
-                    if (version >= 25)
-                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(32, 4));
-                    return 0;
-                }
-            }
-
-            public int NumMaskGuids
-            {
-                get
-                {
-                    if (version >= 25)
-                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(36, 4));
-                    else if (version >= 3)
-                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(36, 4));
-                    else
-                        return 0;
-                }
-            }
-
-            public long ShapesOffset
-            {
-                get
-                {
-                    if (version >= 3)
-                        return BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(40, 8));
-                    return BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(32, 8));
-                }
-            }
-
-            public int LayerIndex
-            {
-                get
-                {
-                    if (version >= 3)
-                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(48, 4));
-                    return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(40, 4));
-                }
-            }
-
-            public int MaskBits
-            {
-                get
-                {
-                    if (version >= 3)
-                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(52, 4));
-                    return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(44, 4));
-                }
-            }
-
-            public long MaskGuidOffset
-            {
-                get
-                {
-                    if (version >= 3)
-                        return BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(56, 8));
-                    return 0;
-                }
-            }
-
-            public Guid LayerGuid
-            {
-                get
-                {
-                    if (version >= 3)
-                        return new(data.Span.Slice(64, 16));
-                    return default;
-                }
-            }
-
-            public static int GetSize(int version)
-            {
-                if (version >= 3)
-                    return 40 + (8 + 4 + 4) + (8 + 16);
-                return 32 + (8 + 4 + 4);
-            }
-        }
-
-        public readonly struct RcolShapeInfo(int version, ReadOnlyMemory<byte> data)
-        {
-            public Guid Guid => new(data.Span.Slice(0, 16));
-            public long NameOffset => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(16, 8));
-            public int NameHash => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(24, 4));
-            public int UserDataIndex => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(28, 4));
-            public int LayerIndex => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(32, 4));
-            public int Attribute => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(36, 4));
-
-            public int SkipIdBits => version >= 3 ? BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(40, 4)) : 0;
-            public RcolShapeType Type => version switch
-            {
-                _ when version >= 27 => (RcolShapeType)BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(44, 8)),
-                _ when version >= 3 => (RcolShapeType)BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(72, 8)),
-                _ => (RcolShapeType)BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(64, 8)),
-            };
-            public int IgnoreTagBits => version switch
-            {
-                _ when version >= 27 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(48, 8)),
-                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(44, 8)),
-                _ => 0
-            };
-            public long PrimaryJointNameOffset => version switch
-            {
-                _ when version >= 27 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(52, 8)),
-                _ when version >= 3 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(48, 8)),
-                _ => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(40, 8)),
-            };
-            public long SecondaryJointNameOffset => version switch
-            {
-                _ when version >= 27 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(60, 8)),
-                _ when version >= 3 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(56, 8)),
-                _ => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(48, 8)),
-            };
-            public int PrimaryJointNameHash => version switch
-            {
-                _ when version >= 27 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(68, 4)),
-                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(64, 4)),
-                _ => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(56, 4)),
-            };
-            public int SecondaryJointNameHash => version switch
-            {
-                _ when version >= 27 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(72, 4)),
-                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(68, 4)),
-                _ => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(60, 4)),
-            };
-
-            public ReadOnlySpan<byte> Data => version switch
-            {
-                _ when version >= 27 => data.Span.Slice(0x60, 0x50),
-                _ => data.Span.Slice(0x50, 0x50),
-            };
-
-            public static int GetSize(int version) => version switch
-            {
-                _ when version >= 28 => 0x60 + 0x50,
-                _ when version >= 27 => 0x50 + 0x50,
-                _ when version >= 3 => 0x50 + 0x50,
-                _ => 0x50 + 0x50,
-            };
-        }
-
-        public readonly struct RequestSetInfo(int version, ReadOnlyMemory<byte> data)
-        {
-            public int Id => version switch
-            {
-                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(0, 4)),
-                _ => 0
-            };
-
-            public int GroupIndex => version switch
-            {
-                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(4, 4)),
-                _ => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(0, 4))
-            };
-
-            public int ShapeOffset => version switch
-            {
-                _ when version >= 25 => 0,
-                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(8, 4)),
-                _ => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(4, 4))
-            };
-
-            public int Status => version switch
-            {
-                _ when version >= 25 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(24, 4)),
-                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(12, 4)),
-                _ => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(8, 4))
-            };
-
-            public int UserDataIndex => version switch
-            {
-                _ when version >= 25 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(8, 4)),
-                _ => 0
-            };
-
-            public int GroupUserDataIndex => version switch
-            {
-                _ when version >= 25 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(12, 4)),
-                _ => 0
-            };
-
-            public long NameOffset => version switch
-            {
-                _ when version >= 25 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(32, 8)),
-                _ when version >= 3 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(16, 8)),
-                _ => 0
-            };
-
-            public long KeyOffset => version switch
-            {
-                _ when version >= 25 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(40, 8)),
-                _ when version >= 3 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(32, 8)),
-                _ => 0
-            };
-
-            public int NameHash => version switch
-            {
-                _ when version >= 25 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(48, 4)),
-                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(24, 4)),
-                _ => 0
-            };
-
-            public int KeyHash => version switch
-            {
-                _ when version >= 25 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(52, 4)),
-                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(36, 4)),
-                _ => 0
-            };
-
-            public static int GetSize(int version) => version switch
-            {
-                _ when version >= 25 => 0x38,
-                _ when version >= 3 => 0x30,
-                _ => 0x10,
-            };
-        }
-
-        [StructLayout(LayoutKind.Sequential, Size = 16)]
-        public struct IgnoreTagInfo
-        {
-            public long NameOffset;
-            public int NameHash;
-        }
 
         private ReadOnlySpan<RcolShapeInfo> GetShapes(long offset, int count)
         {
@@ -694,6 +447,397 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
 
                 return new RcolFile(Version, ms.ToArray());
             }
+        }
+
+        private readonly struct RcolHeader(int version, ReadOnlyMemory<byte> data)
+        {
+            private readonly ReadOnlyMemory<byte> _data = data;
+
+            public int Version { get; } = version;
+
+            private ReadOnlySpan<byte> Span => _data.Span;
+
+            public uint Magic => BinaryPrimitives.ReadUInt32LittleEndian(Span.Slice(0, 4));
+
+            public int NumGroups =>
+                Version == 2
+                    ? Span[4]
+                    : BinaryPrimitives.ReadInt32LittleEndian(Span.Slice(4, 4));
+
+            public int NumShapes =>
+                Version == 2
+                    ? Span[5]
+                    : Version >= 25
+                        ? 0
+                        : BinaryPrimitives.ReadInt32LittleEndian(Span.Slice(8, 4));
+
+            public int NumUserData =>
+                Version >= 25
+                    ? BinaryPrimitives.ReadInt32LittleEndian(Span.Slice(8, 4))
+                    : 0;
+
+            public int UknCount =>
+                Version == 2
+                    ? BinaryPrimitives.ReadInt16LittleEndian(Span.Slice(6, 2))
+                    : BinaryPrimitives.ReadInt32LittleEndian(Span.Slice(Version >= 25 ? 12 : 12, 4));
+
+            public int NumRequestSets =>
+                Version == 2
+                    ? BinaryPrimitives.ReadInt16LittleEndian(Span.Slice(8, 2))
+                    : BinaryPrimitives.ReadInt32LittleEndian(Span.Slice(Version >= 25 ? 16 : 16, 4));
+
+            public uint MaxRequestSetId =>
+                Version == 2
+                    ? BinaryPrimitives.ReadUInt16LittleEndian(Span.Slice(10, 2))
+                    : BinaryPrimitives.ReadUInt32LittleEndian(Span.Slice(Version >= 25 ? 20 : 20, 4));
+
+            private int OffsetAfterHeaderCounts => Version == 2 ? 12 : 24;
+
+            private int OffsetAfterOptionalCounts =>
+                Version > 11
+                    ? OffsetAfterHeaderCounts + 8
+                    : OffsetAfterHeaderCounts;
+
+            public int NumIgnoreTags =>
+                Version > 11
+                    ? BinaryPrimitives.ReadInt32LittleEndian(Span.Slice(OffsetAfterHeaderCounts, 4))
+                    : 0;
+
+            public int NumAutoGenerateJoints =>
+                Version > 11
+                    ? BinaryPrimitives.ReadInt32LittleEndian(Span.Slice(OffsetAfterHeaderCounts + 4, 4))
+                    : 0;
+
+            public int UserDataSize =>
+                BinaryPrimitives.ReadInt32LittleEndian(Span.Slice(OffsetAfterOptionalCounts, 4));
+
+            public int Status =>
+                BinaryPrimitives.ReadInt32LittleEndian(Span.Slice(OffsetAfterOptionalCounts + 4, 4));
+
+            private int OffsetAfterStatus =>
+                OffsetAfterOptionalCounts + 8 + (Version == 2 ? 4 : 0);
+
+            public ulong UknRe3_A =>
+                Version == 11
+                    ? BinaryPrimitives.ReadUInt64LittleEndian(Span.Slice(OffsetAfterStatus, 8))
+                    : 0;
+
+            public ulong UknRe3_B =>
+                Version == 11
+                    ? BinaryPrimitives.ReadUInt64LittleEndian(Span.Slice(OffsetAfterStatus + 8, 8))
+                    : 0;
+
+            private int OffsetAfterRe3 =>
+                Version == 11
+                    ? OffsetAfterStatus + 16
+                    : OffsetAfterStatus;
+
+            public uint Ukn1 =>
+                Version >= 20
+                    ? BinaryPrimitives.ReadUInt32LittleEndian(Span.Slice(OffsetAfterRe3, 4))
+                    : 0;
+
+            public uint Ukn2 =>
+                Version >= 20
+                    ? BinaryPrimitives.ReadUInt32LittleEndian(Span.Slice(OffsetAfterRe3 + 4, 4))
+                    : 0;
+
+            private int OffsetAfterUkn12 =>
+                Version >= 20
+                    ? OffsetAfterRe3 + 8
+                    : OffsetAfterRe3;
+
+            public long GroupsPtrOffset =>
+                BinaryPrimitives.ReadInt64LittleEndian(Span.Slice(OffsetAfterUkn12, 8));
+
+            public long DataOffset =>
+                BinaryPrimitives.ReadInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 8, 8));
+
+            public long RequestSetOffset =>
+                BinaryPrimitives.ReadInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 16, 8));
+
+            public long IgnoreTagOffset =>
+                Version > 11
+                    ? BinaryPrimitives.ReadInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 24, 8))
+                    : 0;
+
+            public long AutoGenerateJointDescOffset =>
+                Version > 11
+                    ? BinaryPrimitives.ReadInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 32, 8))
+                    : 0;
+
+            public long RequestSetIDLookupsOffset =>
+                Version == 2
+                    ? BinaryPrimitives.ReadInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 24, 8))
+                    : 0;
+
+            public ulong UknRe3 =>
+                Version == 11
+                    ? BinaryPrimitives.ReadUInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 24, 8))
+                    : 0;
+
+            public long UnknPtr0 =>
+                Version >= 20
+                    ? BinaryPrimitives.ReadInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + (Version > 11 ? 40 : 24), 8))
+                    : 0;
+
+            public long UnknPtr1 =>
+                Version >= 20
+                    ? BinaryPrimitives.ReadInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + (Version > 11 ? 48 : 32), 8))
+                    : 0;
+
+            public static int GetSize(int version) => version switch
+            {
+                2 => 56, // RE7
+                11 => -1, // TODO: RE3R
+                20 => 0x70, // RE7RT
+                >= 25 => 90, // RE4R (and later?)
+                _ => throw new ArgumentException($"Invalid version {version}!")
+            };
+        }
+
+        private readonly struct RcolGroupInfo(int version, ReadOnlyMemory<byte> data)
+        {
+            public Guid Guid => new(data.Span.Slice(0, 16));
+            public long NameOffset => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(16, 8));
+
+            public int NumShapes
+            {
+                get
+                {
+                    if (version >= 25)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(28, 4));
+                    else if (version >= 3)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(32, 4));
+                    else
+                        return BinaryPrimitives.ReadInt16LittleEndian(data.Span.Slice(30, 2));
+                }
+            }
+
+            public int NumExtraShapes
+            {
+                get
+                {
+                    if (version >= 25)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(32, 4));
+                    return 0;
+                }
+            }
+
+            public int NumMaskGuids
+            {
+                get
+                {
+                    if (version >= 25)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(36, 4));
+                    else if (version >= 3)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(36, 4));
+                    else
+                        return 0;
+                }
+            }
+
+            public long ShapesOffset
+            {
+                get
+                {
+                    if (version >= 3)
+                        return BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(40, 8));
+                    return BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(32, 8));
+                }
+            }
+
+            public int LayerIndex
+            {
+                get
+                {
+                    if (version >= 3)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(48, 4));
+                    return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(40, 4));
+                }
+            }
+
+            public int MaskBits
+            {
+                get
+                {
+                    if (version >= 3)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(52, 4));
+                    return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(44, 4));
+                }
+            }
+
+            public long MaskGuidOffset
+            {
+                get
+                {
+                    if (version >= 3)
+                        return BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(56, 8));
+                    return 0;
+                }
+            }
+
+            public Guid LayerGuid
+            {
+                get
+                {
+                    if (version >= 3)
+                        return new(data.Span.Slice(64, 16));
+                    return default;
+                }
+            }
+
+            public static int GetSize(int version)
+            {
+                if (version >= 3)
+                    return 40 + (8 + 4 + 4) + (8 + 16);
+                return 32 + (8 + 4 + 4);
+            }
+        }
+
+        private readonly struct RcolShapeInfo(int version, ReadOnlyMemory<byte> data)
+        {
+            public Guid Guid => new(data.Span.Slice(0, 16));
+            public long NameOffset => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(16, 8));
+            public int NameHash => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(24, 4));
+            public int UserDataIndex => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(28, 4));
+            public int LayerIndex => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(32, 4));
+            public int Attribute => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(36, 4));
+
+            public int SkipIdBits => version >= 3 ? BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(40, 4)) : 0;
+            public RcolShapeType Type => version switch
+            {
+                _ when version >= 27 => (RcolShapeType)BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(44, 8)),
+                _ when version >= 3 => (RcolShapeType)BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(72, 8)),
+                _ => (RcolShapeType)BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(64, 8)),
+            };
+            public int IgnoreTagBits => version switch
+            {
+                _ when version >= 27 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(48, 8)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(44, 8)),
+                _ => 0
+            };
+            public long PrimaryJointNameOffset => version switch
+            {
+                _ when version >= 27 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(52, 8)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(48, 8)),
+                _ => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(40, 8)),
+            };
+            public long SecondaryJointNameOffset => version switch
+            {
+                _ when version >= 27 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(60, 8)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(56, 8)),
+                _ => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(48, 8)),
+            };
+            public int PrimaryJointNameHash => version switch
+            {
+                _ when version >= 27 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(68, 4)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(64, 4)),
+                _ => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(56, 4)),
+            };
+            public int SecondaryJointNameHash => version switch
+            {
+                _ when version >= 27 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(72, 4)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(68, 4)),
+                _ => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(60, 4)),
+            };
+
+            public ReadOnlySpan<byte> Data => version switch
+            {
+                _ when version >= 27 => data.Span.Slice(0x60, 0x50),
+                _ => data.Span.Slice(0x50, 0x50),
+            };
+
+            public static int GetSize(int version) => version switch
+            {
+                _ when version >= 28 => 0x60 + 0x50,
+                _ when version >= 27 => 0x50 + 0x50,
+                _ when version >= 3 => 0x50 + 0x50,
+                _ => 0x50 + 0x50,
+            };
+        }
+
+        private readonly struct RequestSetInfo(int version, ReadOnlyMemory<byte> data)
+        {
+            public int Id => version switch
+            {
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(0, 4)),
+                _ => 0
+            };
+
+            public int GroupIndex => version switch
+            {
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(4, 4)),
+                _ => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(0, 4))
+            };
+
+            public int ShapeOffset => version switch
+            {
+                _ when version >= 25 => 0,
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(8, 4)),
+                _ => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(4, 4))
+            };
+
+            public int Status => version switch
+            {
+                _ when version >= 25 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(24, 4)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(12, 4)),
+                _ => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(8, 4))
+            };
+
+            public int UserDataIndex => version switch
+            {
+                _ when version >= 25 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(8, 4)),
+                _ => 0
+            };
+
+            public int GroupUserDataIndex => version switch
+            {
+                _ when version >= 25 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(12, 4)),
+                _ => 0
+            };
+
+            public long NameOffset => version switch
+            {
+                _ when version >= 25 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(32, 8)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(16, 8)),
+                _ => 0
+            };
+
+            public long KeyOffset => version switch
+            {
+                _ when version >= 25 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(40, 8)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(32, 8)),
+                _ => 0
+            };
+
+            public int NameHash => version switch
+            {
+                _ when version >= 25 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(48, 4)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(24, 4)),
+                _ => 0
+            };
+
+            public int KeyHash => version switch
+            {
+                _ when version >= 25 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(52, 4)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(36, 4)),
+                _ => 0
+            };
+
+            public static int GetSize(int version) => version switch
+            {
+                _ when version >= 25 => 0x38,
+                _ when version >= 3 => 0x30,
+                _ => 0x10,
+            };
+        }
+
+        [StructLayout(LayoutKind.Sequential, Size = 16)]
+        private struct IgnoreTagInfo
+        {
+            public long NameOffset;
+            public int NameHash;
         }
     }
 
