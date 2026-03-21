@@ -351,8 +351,6 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
                 for (var i = 0; i < groupInfos.Length; i++)
                 {
                     var groupInfo = groupInfos[i];
-                    Console.WriteLine($"Group {groupInfo.Guid}:");
-
                     var reuseOffsetForMaskGuids = false;
                     for (var j = 0; j < i; j++)
                     {
@@ -376,9 +374,6 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
                     foreach (var shapeInfo in rcol.GetShapes(groupInfo.ShapesOffset, groupInfo.NumShapes))
                     {
                         group.Shapes.Add(GetShape(shapeInfo));
-
-                        Console.WriteLine($"  Shape {shapeInfo.Guid}:");
-                        Console.WriteLine($"    UserData: {shapeInfo.UserDataIndex}");
                     }
                     Groups.Add(group);
                 }
@@ -399,7 +394,7 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
                         Status = requestSetInfo.Status,
                         UserData = rcol.Version >= 25
                             ? rsz.Objects[requestSetInfo.UserDataIndex]
-                            : rsz.Objects[0]
+                            : rsz.Objects[i]
                     };
 
                     var shapeInfos = rcol.GetShapes(groupInfo.ShapesOffset, groupInfo.NumShapes);
@@ -410,13 +405,6 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
                         requestShape.ShapeUserData = requestShape.ShapeUserData.Add(userData);
                     }
                     RequestSets.Add(requestShape);
-
-                    Console.WriteLine($"Request Set: {requestSetInfo.Id}");
-                    Console.WriteLine($"  Group: {requestSetInfo.GroupIndex}");
-                    foreach (var shapeInfo in shapeInfos)
-                    {
-                        Console.WriteLine($"    Shape Offset: {requestSetInfo.ShapeOffset} [{shapeInfo.UserDataIndex + requestSetInfo.ShapeOffset}]");
-                    }
                 }
 
                 foreach (var ignoreTag in rcol.IgnoreTags)
