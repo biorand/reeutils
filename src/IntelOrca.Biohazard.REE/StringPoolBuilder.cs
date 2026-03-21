@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 
 namespace IntelOrca.Biohazard.REE
@@ -70,6 +71,7 @@ namespace IntelOrca.Biohazard.REE
             _stream.Position = backupPosition;
         }
 
+        [DebuggerDisplay("{Str}")]
         private struct Entry
         {
             public string Str;
