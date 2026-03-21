@@ -1,12 +1,12 @@
-﻿using IntelOrca.Biohazard.REE.Cryptography;
-using IntelOrca.Biohazard.REE.Extensions;
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
-using System.Numerics;
 using System.Runtime.InteropServices;
+using IntelOrca.Biohazard.REE.Cryptography;
+using IntelOrca.Biohazard.REE.Extensions;
 
 namespace IntelOrca.Biohazard.REE.Rsz.Rcol
 {
@@ -29,22 +29,31 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
 
         private readonly RcolHeader Header = new(version, data[..RcolHeader.GetSize(version)]);
 
-        private ReadOnlySpan<GroupInfo> GroupInfoList => data.Get<GroupInfo>(Header.GroupsPtrOffset, (uint)Header.NumGroups);
-        private ReadOnlySpan<RequestSetInfo> RequestSetInfoList => data.Get<RequestSetInfo>(Header.RequestSetOffset, (uint)Header.NumRequestSets);
-        private ReadOnlySpan<IgnoreTag> IgnoreTagList => data.Get<IgnoreTag>(Header.IgnoreTagOffset, (uint)Header.NumIgnoreTags);
-        public List<string>? AutoGenerateJointDescs { get; private set; } = [];
-
-        public RszFile Rsz => new(data.Slice((int)Header.DataOffset));
-
-        public int InstanceCount => Rsz.InstanceCount;
-
-        public ImmutableArray<RcolGroup> Groups
+        private ReadOnlySpan<GroupInfo> GroupInfoList
         {
             get
             {
-                return []; // TODO
+                var size = GroupInfo.GetSize(Version);
+                var count = Header.NumGroups;
+                var result = new GroupInfo[count];
+                var offset = Header.GroupsPtrOffset;
+                for (var i = 0; i < count; i++)
+                {
+                    result[i] = new GroupInfo(version, data.Slice((int)offset, size));
+                    offset += size;
+                }
+                return result;
             }
         }
+
+        private ReadOnlySpan<IgnoreTagInfo> IgnoreTags => Data.Get<IgnoreTagInfo>(Header.IgnoreTagOffset, Header.NumIgnoreTags);
+
+        private ReadOnlySpan<RequestSetInfo> RequestSetInfoList => data.Get<RequestSetInfo>(Header.RequestSetOffset, (uint)Header.NumRequestSets);
+        public List<string>? AutoGenerateJointDescs { get; private set; } = [];
+
+        public RszFile Rsz => new(data[(int)Header.DataOffset..]);
+
+        public int InstanceCount => Rsz.InstanceCount;
 
         public ImmutableArray<RequestSet> RequestSets
         {
@@ -54,275 +63,165 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
             }
         }
 
-        public ImmutableArray<IgnoreTag> IgnoreTags
+        public readonly struct GroupInfo(int version, ReadOnlyMemory<byte> data)
         {
-            get
+            public Guid Guid => new(data.Span.Slice(0, 16));
+            public long NameOffset => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(16, 8));
+
+            public int NumShapes
             {
-                return []; // TODO
-            }
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct GroupInfo
-        {
-            public Guid Guid;
-            public string Name;
-            public uint NameHash;
-            public uint Padding;
-            public int NumShapes;
-            public int NumMaskGuids;
-            public long ShapesOffset;
-            public int LayerIndex;
-            public uint MaskBits;
-            public long MaskGuidsOffset;
-            public Guid LayerGuid;
-
-            public List<Guid> MaskGuids { get; set; }
-
-            internal long ShapesOffsetStart;
-
-            public void Read(BinaryReader reader)
-            {
-                Guid = new Guid(reader.ReadBytes(16));
-                Name = reader.ReadString();
-                NameHash = reader.ReadUInt32();
-                reader.ReadBytes(4); // Padding
-                NumShapes = reader.ReadInt32();
-                NumMaskGuids = reader.ReadInt32();
-
-                ShapesOffset = reader.ReadInt64();
-                LayerIndex = reader.ReadInt32();
-                MaskBits = reader.ReadUInt32();
-                MaskGuidsOffset = reader.ReadInt32();
-                LayerGuid = new Guid(reader.ReadBytes(16));
-
-                reader.BaseStream.Seek(MaskGuidsOffset, SeekOrigin.Begin);
-                for (int i = 0; i < NumMaskGuids; i++)
+                get
                 {
-                    MaskGuids.Add(new Guid(reader.ReadBytes(16)));
-                }
-            }
-
-            public void Write(BinaryWriter writer, int numShapesOnWrite)
-            {
-                NameHash = (uint)MurMur3.HashData(Name);
-                NumMaskGuids = MaskGuids.Count;
-                writer.Write(Guid.ToByteArray());
-                writer.WriteOffsetString(Name);
-                writer.Write(NameHash);
-                writer.WriteZeros(4); // Padding
-                writer.Write(numShapesOnWrite);
-                writer.Write(NumMaskGuids);
-
-                ShapesOffsetStart = writer.BaseStream.Position;
-                writer.Write(ShapesOffset);
-                writer.Write(LayerIndex);
-                writer.Write(MaskBits);
-
-                foreach (var guid in MaskGuids)
-                {
-                    writer.Write(guid.ToByteArray());
-                }
-                writer.Write(MaskGuidsOffset);
-                writer.Write(LayerGuid.ToByteArray());
-            }
-
-            public override readonly string ToString() => Name;
-        }
-
-        public class RcolGroup
-        {
-            public GroupInfo Info { get; } = new();
-
-            public List<RcolShape> Shapes { get; } = new();
-
-            public void ReadInfo(BinaryReader reader)
-            {
-                Info.Read(reader);
-            }
-
-            public void Read(BinaryReader reader)
-            {
-                Shapes.Clear();
-                if (Info.NumShapes > 0)
-                {
-                    reader.BaseStream.Position = Info.ShapesOffset;
-                    for (int i = 0; i < Info.NumShapes; i++)
-                    {
-                        var shape = new RcolShape();
-                        shape.Read(reader);
-                        Shapes.Add(shape);
-                    }
-                }
-            }
-
-            public void Write(BinaryWriter writer)
-            {
-                if (Info.NumShapes > 0)
-                {
-                    long shapesOffset = writer.BaseStream.Position;
-
-                    if (Info.ShapesOffsetStart > 0)
-                    {
-                        long returnPos = writer.BaseStream.Position;
-                        writer.BaseStream.Seek(shapesOffset, SeekOrigin.Begin);
-                        writer.Write(shapesOffset);
-                        writer.BaseStream.Seek(returnPos, SeekOrigin.Begin);
-                    }
+                    if (version >= 25)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(28, 4));
+                    else if (version >= 3)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(32, 4));
                     else
-                    {
-                        throw new InvalidOperationException("Should WriteInfo first");
-                    }
-
-                    foreach (var shape in Shapes)
-                    {
-                        shape.Write(writer);
-                    }
+                        return BinaryPrimitives.ReadInt16LittleEndian(data.Span.Slice(30, 2));
                 }
             }
 
-            public override string ToString() => Info.Name;
-        }
-
-        public enum ShapeType
-        {
-            Aabb = 0x0,
-            Sphere = 0x1,
-            ContinuousSphere = 0x2,
-            Capsule = 0x3,
-            ContinuousCapsule = 0x4,
-            Box = 0x5,
-            Mesh = 0x6,
-            HeightField = 0x7,
-            StaticCompound = 0x8,
-            Area = 0x9,
-            Triangle = 0xA,
-            SkinningMesh = 0xB,
-            Cylinder = 0xC,
-            DeformableMesh = 0xD,
-            Invalid = 0xE,
-            Max = 0xF,
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct RcolShapeInfo
-        {
-            public Guid Guid;
-            public string Name;
-            public uint NameHash;
-            public int UserDataIndex;
-            public int LayerIndex;
-            public int Attribute;
-            public uint SkipIdBits;
-            public uint IgnoreTagBits;
-            public string primaryJointNameStr;
-            public string secondaryJointNameStr;
-            public uint PrimaryJointNameHash;
-            public uint SecondaryJointNameHash;
-            public ShapeType shapeType;
-
-            public void Read(BinaryReader reader)
+            public int NumExtraShapes
             {
-                Guid = new Guid(reader.ReadBytes(16));
-                Name = reader.ReadString();
-                NameHash = reader.ReadUInt32();
-                UserDataIndex = reader.ReadInt32();
-                LayerIndex = reader.ReadInt32();
-                Attribute = reader.ReadInt32();
-
-                SkipIdBits = reader.ReadUInt32();
-                IgnoreTagBits = reader.ReadUInt32();
-                primaryJointNameStr = reader.ReadString();
-                secondaryJointNameStr = reader.ReadString();
-                PrimaryJointNameHash = reader.ReadUInt32();
-                SecondaryJointNameHash = reader.ReadUInt32();
-                shapeType = (ShapeType)reader.ReadUInt32();
-                reader.ReadBytes(4);
-            }
-
-            public readonly void Write(BinaryWriter writer)
-            {
-                writer.Write(Guid);
-                writer.WriteOffsetString(Name);
-                writer.Write(MurMur3.HashData(Name));
-                writer.Write(UserDataIndex);
-                writer.Write(LayerIndex);
-                writer.Write(Attribute);
-                writer.Write(SkipIdBits);
-                writer.Write(IgnoreTagBits);
-                writer.WriteOffsetString(primaryJointNameStr);
-                writer.WriteOffsetString(secondaryJointNameStr);
-                writer.Write(MurMur3.HashData(primaryJointNameStr));
-                writer.Write(MurMur3.HashData(secondaryJointNameStr));
-                writer.Write((uint)shapeType);
-            }
-        }
-
-        public class RcolShape
-        {
-            public RcolShapeInfo Info { get; } = new();
-            public object? shape = new AABB(Vector3.Zero, Vector3.One);
-
-            public RszInstance? DefaultInstance { get; set; }
-
-            public void UpdateShapeType()
-            {
-                switch (Info.shapeType)
+                get
                 {
-                    case ShapeType.Aabb: if (shape is not AABB) shape = new AABB(new Vector3(-0.5f), new Vector3(0.5f)); break;
-                    case ShapeType.Sphere or ShapeType.ContinuousSphere: if (shape is not Sphere) shape = new Sphere(); break;
-                    case ShapeType.Capsule or ShapeType.ContinuousCapsule: if (shape is not Capsule) shape = new Capsule(); break;
-                    case ShapeType.Box: if (shape is not OBB) shape = new OBB(); break;
-                    case ShapeType.Area: if (shape is not Area) shape = new Area(); break;
-                    case ShapeType.Triangle: if (shape is not Triangle) shape = new Triangle(); break;
-                    case ShapeType.Cylinder: if (shape is not Cylinder) shape = new Cylinder(); break;
-                    default:
-                        throw new Exception($"Illegal ShapeType '{Info.shapeType}' for shape '{Info.Name}'");
+                    if (version >= 25)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(32, 4));
+                    return 0;
                 }
             }
 
-            public void Read(BinaryReader reader)
+            public int NumMaskGuids
             {
-                Info.Read(reader);
-
-                shape = Info.shapeType switch
+                get
                 {
-                    ShapeType.Aabb => reader.ByteToType<AABB>(),
-                    ShapeType.Sphere => reader.ByteToType<Sphere>(),
-                    ShapeType.Capsule => reader.ByteToType<Capsule>(),
-                    ShapeType.Box => reader.ByteToType<OBB>(),
-                    ShapeType.Area => reader.ByteToType<Area>(),
-                    ShapeType.Triangle => reader.ByteToType<Triangle>(),
-                    ShapeType.Cylinder => reader.ByteToType<Cylinder>(),
-                    ShapeType.ContinuousSphere => reader.ByteToType<Sphere>(),
-                    ShapeType.ContinuousCapsule => reader.ByteToType<Capsule>(),
-                    _ => throw new Exception("Unsupported RCOL shape type " + Info.shapeType),
-                };
-
-                reader.BaseStream.Position += sizeof(float) * 4 * 5;
-            }
-
-            public void Write(BinaryWriter writer)
-            {
-                Info.Write(writer);
-
-                switch (Info.shapeType)
-                {
-                    case ShapeType.Aabb: writer.Write((AABB)shape!); break;
-                    case ShapeType.Sphere: writer.Write((Sphere)shape!); break;
-                    case ShapeType.Capsule: writer.Write((Capsule)shape!); break;
-                    case ShapeType.Box: writer.Write((OBB)shape!); break;
-                    case ShapeType.Area: writer.Write((Area)shape!); break;
-                    case ShapeType.Triangle: writer.Write((Triangle)shape!); break;
-                    case ShapeType.Cylinder: writer.Write((Cylinder)shape!); break;
-                    case ShapeType.ContinuousSphere: writer.Write((Sphere)shape!); break;
-                    case ShapeType.ContinuousCapsule: writer.Write((Capsule)shape!); break;
-                    default: throw new Exception("Unsupported RCOL shape type " + Info.shapeType);
+                    if (version >= 25)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(36, 4));
+                    else if (version >= 3)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(36, 4));
+                    else
+                        return 0;
                 }
-                writer.BaseStream.Position += sizeof(float) * 4 * 5;
             }
 
-            public override string ToString() => (shape == null ? Info.Name : $"{Info.Name} <{shape}>");
+            public long ShapesOffset
+            {
+                get
+                {
+                    if (version >= 3)
+                        return BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(40, 8));
+                    return BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(32, 8));
+                }
+            }
+
+            public int LayerIndex
+            {
+                get
+                {
+                    if (version >= 3)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(48, 4));
+                    return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(40, 4));
+                }
+            }
+
+            public int MaskBits
+            {
+                get
+                {
+                    if (version >= 3)
+                        return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(52, 4));
+                    return BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(44, 4));
+                }
+            }
+
+            public long MaskGuidOffset
+            {
+                get
+                {
+                    if (version >= 3)
+                        return BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(56, 8));
+                    return 0;
+                }
+            }
+
+            public Guid LayerGuid
+            {
+                get
+                {
+                    if (version >= 3)
+                        return new(data.Span.Slice(64, 16));
+                    return default;
+                }
+            }
+
+            public static int GetSize(int version)
+            {
+                if (version >= 3)
+                    return 40 + (8 + 4 + 4) + (8 + 16);
+                return 32 + (8 + 4 + 4);
+            }
+        }
+
+        public readonly struct RcolShapeInfo(int version, ReadOnlyMemory<byte> data)
+        {
+            public Guid Guid => new(data.Span.Slice(0, 16));
+            public long NameOffset => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(16, 8));
+            public int NameHash => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(24, 4));
+            public int UserDataIndex => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(28, 4));
+            public int LayerIndex => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(32, 4));
+            public int Attribute => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(36, 4));
+
+            public int SkipIdBits => version >= 3 ? BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(40, 4)) : 0;
+            public RcolShapeType Type => version switch
+            {
+                _ when version >= 27 => (RcolShapeType)BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(44, 8)),
+                _ when version >= 3 => (RcolShapeType)BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(72, 8)),
+                _ => (RcolShapeType)BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(64, 8)),
+            };
+            public int IgnoreTagBits => version switch
+            {
+                _ when version >= 27 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(48, 8)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(44, 8)),
+                _ => 0
+            };
+            public long PrimaryJointNameOffset => version switch
+            {
+                _ when version >= 27 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(52, 8)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(48, 8)),
+                _ => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(40, 8)),
+            };
+            public long SecondaryJointNameOffset => version switch
+            {
+                _ when version >= 27 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(60, 8)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(56, 8)),
+                _ => BinaryPrimitives.ReadInt64LittleEndian(data.Span.Slice(48, 8)),
+            };
+            public int PrimaryJointNameHash => version switch
+            {
+                _ when version >= 27 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(68, 4)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(64, 4)),
+                _ => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(56, 4)),
+            };
+            public int SecondaryJointNameHash => version switch
+            {
+                _ when version >= 27 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(72, 4)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(68, 4)),
+                _ => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(60, 4)),
+            };
+
+            public ReadOnlySpan<byte> Data => version switch
+            {
+                _ when version >= 27 => data.Span.Slice(0x60, 0x50),
+                _ => data.Span.Slice(0x50, 0x50),
+            };
+
+            public static int GetSize(int version) => version switch
+            {
+                _ when version >= 28 => 0x60 + 0x50,
+                _ when version >= 27 => 0x50 + 0x50,
+                _ when version >= 3 => 0x50 + 0x50,
+                _ => 0x50 + 0x50,
+            };
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -381,34 +280,26 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
             public override string ToString() => $"[{Info.ID:00000000}] {Info.Name}";
         }
 
-        [StructLayout(LayoutKind.Sequential)]
-        public struct IgnoreTag
+        [StructLayout(LayoutKind.Sequential, Size = 16)]
+        public struct IgnoreTagInfo
         {
-            public string Tag;
-            public uint Hash;
-
-            public void Read(BinaryReader reader)
-            {
-                Tag = reader.ReadString();
-                Hash = reader.ReadUInt32();
-
-                if (Hash != MurMur3.HashData(Tag))
-                {
-                    throw new Exception($"IgnoreTag hash mismatch for tag '{Tag}' (expected {Hash:X8}, got {MurMur3.HashData(Tag):X8})");
-                }
-
-                reader.ReadBytes(4);
-            }
-
-            public void Write(BinaryWriter writer)
-            {
-                writer.WriteOffsetString(Tag);
-                writer.Write(Hash);
-                writer.WriteZeros(4);
-            }
-
-            public override readonly string ToString() => Tag;
+            public long NameOffset;
+            public int NameHash;
         }
+
+        private ReadOnlySpan<RcolShapeInfo> GetShapes(long offset, int count)
+        {
+            var size = RcolShapeInfo.GetSize(Version);
+            var result = new RcolShapeInfo[count];
+            for (var i = 0; i < count; i++)
+            {
+                result[i] = new RcolShapeInfo(version, data.Slice((int)offset, size));
+                offset += size;
+            }
+            return result;
+        }
+
+        private string GetString(long offset) => offset != 0 ? Data.ReadWString((int)offset) : string.Empty;
 
         public Builder ToBuilder(RszTypeRepository repository)
         {
@@ -420,24 +311,59 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
             public RszTypeRepository Repository { get; }
             public int Version { get; }
             public int RszVersion { get; }
-            public RszFile Rsz { get; }
             public List<RcolGroup> Groups { get; } = new();
             public List<RequestSet> RequestSets { get; } = new();
-            public List<IgnoreTag> IgnoreTags { get; } = new();
+            public List<string> IgnoreTags { get; } = new();
             public List<string>? AutoGenerateJointDescs { get; } = new();
 
-            public Builder(RszTypeRepository repository, RcolFile instance)
+            public Builder(RszTypeRepository repository, RcolFile rcol)
             {
                 Repository = repository;
-                Version = instance.Version;
-                Rsz = instance.Rsz;
-                RszVersion = instance.Rsz.Version;
-                Groups = instance.Groups.ToList();
-                RequestSets = instance.RequestSets.ToList();
-                IgnoreTags = instance.IgnoreTags.ToList();
+                Version = rcol.Version;
+                RszVersion = rcol.Rsz.Version;
+
+                var rsz = rcol.Rsz.ToBuilder(repository);
+                foreach (var groupInfo in rcol.GroupInfoList)
+                {
+                    var group = new RcolGroup()
+                    {
+                        Guid = groupInfo.Guid,
+                        Name = rcol.GetString(groupInfo.NameOffset),
+                        LayerIndex = groupInfo.LayerIndex,
+                        MaskBits = groupInfo.MaskBits,
+                        LayerGuid = groupInfo.LayerGuid,
+                        MaskGuids = rcol.Data.Get<Guid>(groupInfo.MaskGuidOffset, groupInfo.NumMaskGuids).ToList()
+                    };
+                    foreach (var shapeInfo in rcol.GetShapes(groupInfo.ShapesOffset, groupInfo.NumShapes))
+                    {
+                        var shape = new RcolShape()
+                        {
+                            Guid = shapeInfo.Guid,
+                            Type = shapeInfo.Type,
+                            Name = rcol.GetString(shapeInfo.NameOffset),
+                            Attribute = shapeInfo.Attribute,
+                            SkipIdBits = shapeInfo.SkipIdBits,
+                            IgnoreTagBits = shapeInfo.IgnoreTagBits,
+                            LayerIndex = shapeInfo.LayerIndex,
+                            PrimaryJointName = rcol.GetString(shapeInfo.PrimaryJointNameOffset),
+                            SecondaryJointName = rcol.GetString(shapeInfo.SecondaryJointNameOffset),
+                            UserData = rsz.Objects[shapeInfo.UserDataIndex],
+                            Data = shapeInfo.Data.ToImmutableArray()
+                        };
+                        group.Shapes.Add(shape);
+                    }
+                    Groups.Add(group);
+                }
+
+                RequestSets = rcol.RequestSets.ToList();
+
+                foreach (var ignoreTag in rcol.IgnoreTags)
+                {
+                    IgnoreTags.Add(rcol.GetString(ignoreTag.NameOffset));
+                }
             }
 
-            public RszObjectNode CreateDefaultUserdata() => 
+            public RszObjectNode CreateDefaultUserdata() =>
                 Repository.Create("via.physics.RequestSetColliderUserData");
 
             public Builder AddGroup(RcolGroup group)
@@ -452,128 +378,196 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
                 return this;
             }
 
-            public Builder AddIgnoreTag(IgnoreTag tag)
-            {
-                IgnoreTags.Add(tag);
-                return this;
-            }
-
             public RcolFile Build()
             {
                 using var ms = new MemoryStream();
                 using var bw = new BinaryWriter(ms);
+                var stringTable = new StringPoolBuilder(ms);
+                var userDataObjects = new List<RszObjectNode>();
 
-                // Reserve space for header
                 bw.WriteZeros(RcolHeader.GetSize(Version));
+                bw.Align(16);
 
-                foreach (var requestSet in RequestSets)
-                {
-                    if(requestSet.Group == null)
-                    {
-                        throw new InvalidDataException($"Request Set {requestSet.Info.Name} is missing shape group assignment");
-                    }
+                var groupsOffset = ms.Position;
+                var shapesOffset = groupsOffset + GroupInfo.GetSize(Version) * Groups.Count;
+                var rszOffset = (long)0x07F0;
+                var maskGuidsOffset = (long)0x1F90;
+                var ignoreTagsOffset = (long)0x2040;
 
-                    requestSet.Instance ??= CreateDefaultUserdata();
+                var currentGroupOffset = groupsOffset;
+                var currentShapesOffset = shapesOffset;
+                var currentMaskGuidsOffset = maskGuidsOffset;
 
-                    while(requestSet.ShapeUserdata.Count < requestSet.Group.Shapes.Count)
-                    {
-                        requestSet.ShapeUserdata.Add(CreateDefaultUserdata());
-                    }
-                    
-                    if(requestSet.ShapeUserdata.Count > requestSet.Group.Shapes.Count)
-                    {
-                        requestSet.ShapeUserdata.RemoveRange(requestSet.Group.Shapes.Count, requestSet.ShapeUserdata.Count);
-                    }
-                }
+                var shapeCount = 0;
+                var maskGuidCount = 0;
 
-                var setGroupDict = new Dictionary<RcolGroup, List<RequestSet>>();
-                foreach (var requestSet in RequestSets)
-                {
-                    if (!setGroupDict.TryGetValue(requestSet.Group!, out var setlist))
-                    {
-                        setGroupDict[requestSet.Group!] = setlist = new();
-                    }
-                    setlist.Add(requestSet);
-                    if (requestSet.Group != null && !Groups.Contains(requestSet.Group))
-                    {
-                        Groups.Add(requestSet.Group);
-                    }
-                }
-
-                int shapeCount = 0;
-                //foreach (var group in Groups)
-                //{
-                //    if (!setGroupDict.TryGetValue(group, out var setlist))
-                //    {
-                //        foreach (var shape in group.Shapes)
-                //        {
-                //            shape.Info.UserDataIndex = RSZ.ObjectList.Count;
-                //            Rsz.AddToObjectTable(shape.DefaultInstance ??= CreateDefaultUserdata());
-                //        }
-                //        continue;
-                //    }
-
-                    
-                //    foreach (var set in setlist)
-                //    {
-                //        set.Info.ShapeOffset = shapeCount;
-                //        foreach (var ud in set.ShapeUserdata)
-                //        {
-                //            if (set == setlist[0])
-                //            {
-                //                group.Shapes[shapeCount].Info.UserDataIndex = RSZ.ObjectList.Count;
-                //            }
-
-                //            Rsz.AddToObjectTable(ud);
-                //            shapeCount++;
-                //        }
-                //    }
-                //}
-
-                int groupCount = Groups.Count;
-                int requestSetCount = RequestSets.Count;
-                int ignoreTagsCount = IgnoreTags.Count;
-                int autoGenerateJointCount = AutoGenerateJointDescs?.Count ?? 0;
-                uint maxRequestSetId = requestSetCount == 0 ? uint.MaxValue : (uint)RequestSets.Max(s => s.Info.ID);
-                int numUserData = RequestSets.Sum(s => s.ShapeUserdata.Count);
-
+                // Groups
                 foreach (var group in Groups)
                 {
-                    group.Info.Write(bw, group.Shapes.Count);
-                }
+                    ms.Position = currentGroupOffset;
 
-                foreach (var group in Groups)
-                {
-                    group.Write(bw);
+                    bw.Write(group.Guid);
+                    stringTable.WriteStringOffset64(group.Name);
+                    bw.Write(MurMur3.HashData(group.Name));
+                    if (Version >= 25)
+                    {
+                        bw.Write(group.Shapes.Count);
+                        bw.Write(group.ExtraShapes.Count);
+                        bw.Write(group.MaskGuids.Count);
+                    }
+                    else if (Version >= 3)
+                    {
+                        bw.Write(0);
+                        bw.Write(group.Shapes.Count);
+                        bw.Write(group.MaskGuids.Count);
+                    }
+                    else
+                    {
+                        bw.Write((short)0);
+                        bw.Write((short)group.Shapes.Count);
+                    }
+                    bw.Write(currentShapesOffset);
+                    bw.Write(group.LayerIndex);
+                    bw.Write(group.MaskBits);
+                    if (Version >= 3)
+                    {
+                        bw.Write(currentMaskGuidsOffset);
+                        bw.Write(group.LayerGuid);
+                    }
+
+                    currentGroupOffset = ms.Position;
+
+                    foreach (var shape in group.Shapes)
+                    {
+                        ms.Position = currentShapesOffset;
+
+                        userDataObjects.Add(shape.UserData!);
+
+                        bw.Write(shape.Guid);
+                        stringTable.WriteStringOffset64(shape.Name);
+                        bw.Write(MurMur3.HashData(shape.Name));
+                        bw.Write(userDataObjects.Count);
+                        bw.Write(shape.LayerIndex);
+                        bw.Write(shape.Attribute);
+                        bw.Write(shape.SkipIdBits);
+                        bw.Write(shape.IgnoreTagBits);
+                        stringTable.WriteStringOffset64(shape.PrimaryJointName);
+                        stringTable.WriteStringOffset64(shape.SecondaryJointName);
+                        bw.Write(MurMur3.HashData(shape.PrimaryJointName));
+                        bw.Write(MurMur3.HashData(shape.SecondaryJointName));
+                        bw.Write(shape.Type);
+                        bw.Write(0);
+                        bw.Write(shape.Data.AsSpan());
+
+                        currentShapesOffset = ms.Position;
+                    }
+
+                    foreach (var maskGuid in group.MaskGuids)
+                    {
+                        ms.Position = currentMaskGuidsOffset;
+                        bw.Write(maskGuid);
+                        currentMaskGuidsOffset = ms.Position;
+                    }
+
                     shapeCount += group.Shapes.Count;
+                    maskGuidCount += group.MaskGuids.Count;
                 }
+
+                // RSZ
+                ms.Position = rszOffset;
+                var rszBuilder = new RszFile.Builder(Repository, RszVersion)
+                {
+                    Objects = userDataObjects.ToImmutableArray()
+                };
+                bw.Write(rszBuilder.Build().Data.Span);
+
+                // Ignore tags
+                ms.Position = ignoreTagsOffset;
+                foreach (var ignoreTag in IgnoreTags)
+                {
+                    stringTable.WriteStringOffset64(ignoreTag);
+                    bw.Write(MurMur3.HashData(ignoreTag));
+                    bw.Write(0);
+                }
+
+                // String table
+                bw.Align(16);
+                ms.Position = 0x2040; // TEMP
+                stringTable.WriteStrings();
 
                 // Header
                 ms.Position = 0;
                 bw.Write(MAGIC);
-
-                bw.Write(groupCount);
+                bw.Write(Groups.Count);
+                bw.Write(0);
                 bw.Write(shapeCount);
-                bw.Write(groupCount); // Unknown count
-                bw.Write(requestSetCount);
-                bw.Write(maxRequestSetId);
-                bw.Write(ignoreTagsCount);
-                bw.Write(autoGenerateJointCount);
-                bw.Write(Rsz.InstanceCount);
-                bw.Write(0); // Status
-                bw.Write(0); // ukn1
-                bw.Write(0); // ukn2
-
-                //bw.Write(groupsPtrOffset);
-                //bw.Write(dataOffset);
-                //bw.Write(requestSetOffset);
-                //    bw.Write(ignoreTagOffset);
-                //    bw.Write(autoGenerateJointDescOffset);
-                //    bw.Write(unknPtr0);
-                //    bw.Write(unknPtr1);
+                bw.Write(0);
+                bw.Write(0);
+                bw.Write(0);
+                bw.Write(0);
+                bw.Write(0);
+                bw.Write(0);
+                bw.Write(0);
+                bw.Write(0);
+                bw.Write(groupsOffset);
+                bw.Write(rszOffset);
+                bw.Write(0L); // request set
+                bw.Write(ignoreTagsOffset);
+                bw.Write(0L);
+                bw.Write(0L);
+                bw.Write(0L);
+                bw.Write(0L);
 
                 return new RcolFile(Version, ms.ToArray());
             }
         }
+    }
+
+    public class RcolGroup
+    {
+        public Guid Guid { get; set; }
+        public string Name { get; set; } = "";
+        public int LayerIndex { get; set; }
+        public int MaskBits { get; set; }
+        public Guid LayerGuid { get; set; }
+        public List<RcolShape> Shapes { get; set; } = [];
+        public List<RcolShape> ExtraShapes { get; set; } = [];
+        public List<Guid> MaskGuids { get; set; } = [];
+    }
+
+
+    public class RcolShape
+    {
+        public Guid Guid { get; set; }
+        public RcolShapeType Type { get; set; }
+        public string Name { get; set; } = "";
+        public string PrimaryJointName { get; set; } = "";
+        public string SecondaryJointName { get; set; } = "";
+        public RszObjectNode? UserData { get; set; }
+        public int LayerIndex { get; set; }
+        public int Attribute { get; set; }
+        public int SkipIdBits { get; set; }
+        public int IgnoreTagBits { get; set; }
+        public ImmutableArray<byte> Data { get; set; } = [];
+    }
+
+    public enum RcolShapeType
+    {
+        Aabb = 0x0,
+        Sphere = 0x1,
+        ContinuousSphere = 0x2,
+        Capsule = 0x3,
+        ContinuousCapsule = 0x4,
+        Box = 0x5,
+        Mesh = 0x6,
+        HeightField = 0x7,
+        StaticCompound = 0x8,
+        Area = 0x9,
+        Triangle = 0xA,
+        SkinningMesh = 0xB,
+        Cylinder = 0xC,
+        DeformableMesh = 0xD,
+        Invalid = 0xE,
+        Max = 0xF,
     }
 }

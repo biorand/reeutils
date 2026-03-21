@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
 
 namespace IntelOrca.Biohazard.REE.Rsz.Rcol
@@ -102,8 +102,8 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
                 ? OffsetAfterRe3 + 8
                 : OffsetAfterRe3;
 
-        public ulong GroupsPtrOffset =>
-            BinaryPrimitives.ReadUInt64LittleEndian(Span.Slice(OffsetAfterUkn12, 8));
+        public long GroupsPtrOffset =>
+            BinaryPrimitives.ReadInt64LittleEndian(Span.Slice(OffsetAfterUkn12, 8));
 
         public ulong DataOffset =>
             BinaryPrimitives.ReadUInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 8, 8));
@@ -111,9 +111,9 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
         public ulong RequestSetOffset =>
             BinaryPrimitives.ReadUInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 16, 8));
 
-        public ulong IgnoreTagOffset =>
+        public long IgnoreTagOffset =>
             Version > 11
-                ? BinaryPrimitives.ReadUInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 24, 8))
+                ? BinaryPrimitives.ReadInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 24, 8))
                 : 0;
 
         public long AutoGenerateJointDescOffset =>
@@ -145,7 +145,7 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
         {
             2 => 56, // RE7
             11 => -1, // TODO: RE3R
-            20 => 88, // RE7RT
+            20 => 0x70, // RE7RT
             >= 25 => 90, // RE4R (and later?)
             _ => throw new ArgumentException($"Invalid version {version}!")
         };

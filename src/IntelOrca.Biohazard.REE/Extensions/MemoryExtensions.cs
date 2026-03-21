@@ -1,5 +1,7 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -8,6 +10,11 @@ namespace IntelOrca.Biohazard.REE.Extensions
     internal static class MemoryExtensions
     {
         public static ReadOnlySpan<T> Get<T>(this ReadOnlyMemory<byte> data, ulong offset, uint count) where T : struct
+        {
+            return Get<T>(data, (int)offset, (int)count);
+        }
+
+        public static ReadOnlySpan<T> Get<T>(this ReadOnlyMemory<byte> data, long offset, int count) where T : struct
         {
             return Get<T>(data, (int)offset, (int)count);
         }
@@ -29,6 +36,11 @@ namespace IntelOrca.Biohazard.REE.Extensions
                 len += 2;
 
             return Encoding.Unicode.GetString(data.Slice(offset, len));
+        }
+
+        public static List<T> ToList<T>(this ReadOnlySpan<T> data) where T : struct
+        {
+            return data.ToArray().ToList();
         }
     }
 }
