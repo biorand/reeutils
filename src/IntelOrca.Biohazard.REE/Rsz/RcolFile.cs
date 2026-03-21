@@ -264,7 +264,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 bw.Write(rsz.Data.Span);
 
                 // Reserve space for request set table
-                ms.Position = 0x1AE0;
+                bw.Align(16);
                 var requestSetOffset = ms.Position;
                 bw.WriteZeros(RequestSets.Count * RequestSetInfo.GetSize(Version));
 
