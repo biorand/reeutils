@@ -88,6 +88,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public RszTypeRepository Repository { get; }
             public int Version { get; }
             public int RszVersion { get; }
+            public int Var0C { get; set; }
             public List<RcolGroup> Groups { get; } = [];
             public List<RequestSet> RequestSets { get; } = [];
             public List<string> IgnoreTags { get; } = [];
@@ -98,6 +99,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 Repository = repository;
                 Version = rcol.Version;
                 RszVersion = rcol.Rsz.Version;
+                Var0C = rcol.Header.UknCount;
 
                 var rsz = rcol.Rsz.ToBuilder(repository);
                 var groupInfos = rcol.Groups;
@@ -143,7 +145,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         Group = group,
                         Shape = null!,
                         Name = rcol.GetString(requestSetInfo.NameOffset),
+                        CompatNamePadding = requestSetInfo.NameHashPadding,
                         Key = rcol.GetString(requestSetInfo.KeyOffset),
+                        CompatKeyPadding = requestSetInfo.KeyHashPadding,
                         Status = requestSetInfo.Status,
                         UserData = rcol.Version >= 25
                             ? rsz.Objects[requestSetInfo.UserDataIndex]
@@ -237,20 +241,42 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         // Default via.physics.RequestSetColliderUserData
                         shapeToUserDataOffset[shape] = userDataObjects.Count;
                         userDataObjects.Add(shape.UserData!);
+                    }
 
-                        // All additional via.physics.RequestSetColliderUserData
-                        foreach (var requestSet in RequestSets)
+                    // All additional via.physics.RequestSetColliderUserData
+                    foreach (var requestSet in RequestSets)
+                    {
+                        if (requestSet.Group == group)
                         {
-                            if (requestSet.Group == group)
+                            var firstShapeUserDataIndex = shapeToUserDataOffset[group.Shapes[0]];
+                            var useDefault = true;
+                            for (var shapeIndex = 0; shapeIndex < group.Shapes.Count; shapeIndex++)
                             {
+                                var shape = group.Shapes[shapeIndex];
+                                var shapeUserDataIndex = shapeToUserDataOffset[shape];
+
+                                var defaultShapeUserData = shape.UserData;
                                 var requestShapeUserData = requestSet.ShapeUserData[shapeIndex];
 
                                 // Add request shape data if different from default shape data
-                                if (shape.UserData != requestShapeUserData)
+                                if (requestShapeUserData != defaultShapeUserData)
                                 {
+                                    useDefault = false;
+                                }
+                            }
+                            if (useDefault)
+                            {
+                                requestSetShapeOffset[requestSet] = 0;
+                            }
+                            else
+                            {
+                                var startIndex = userDataObjects.Count;
+                                for (var shapeIndex = 0; shapeIndex < group.Shapes.Count; shapeIndex++)
+                                {
+                                    var requestShapeUserData = requestSet.ShapeUserData[shapeIndex];
                                     userDataObjects.Add(requestShapeUserData);
                                 }
-                                requestSetShapeOffset[requestSet] = userDataObjects.Count - 1 - shapeUserDataIndex;
+                                requestSetShapeOffset[requestSet] = startIndex - firstShapeUserDataIndex;
                             }
                         }
                     }
@@ -295,7 +321,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 bw.Write(MAGIC);
                 bw.Write(Groups.Count);
                 bw.Write(totalShapes);
-                bw.Write(Math.Max(0, RequestSets.Count - 1));
+                bw.Write(Var0C);
                 bw.Write(RequestSets.Count);
                 bw.Write(RequestSets.Count > 0 ? RequestSets.Max(x => x.Id) : 0);
                 bw.Write(IgnoreTags.Count);
@@ -415,13 +441,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         bw.Write(requestSet.Status);
                         stringTable.WriteStringOffset64(requestSet.Name);
                         bw.Write(MurMur3.HashData(requestSet.Name));
-
-                        // Potentially bug with capcom's writer, it writes ID out again instead of 0 for padding
-                        bw.Write(requestSet.Id);
-
+                        bw.Write(requestSet.CompatNamePadding);
                         stringTable.WriteStringOffset64(requestSet.Key);
                         bw.Write(MurMur3.HashData(requestSet.Key));
-                        bw.Write(0);
+                        bw.Write(requestSet.CompatKeyPadding);
                     }
                     else
                     {
@@ -818,10 +841,24 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 _ => 0
             };
 
+            public int NameHashPadding => version switch
+            {
+                _ when version >= 25 => 0,
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(28, 4)),
+                _ => 0
+            };
+
             public int KeyHash => version switch
             {
                 _ when version >= 25 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(52, 4)),
-                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(36, 4)),
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(40, 4)),
+                _ => 0
+            };
+
+            public int KeyHashPadding => version switch
+            {
+                _ when version >= 25 => 0,
+                _ when version >= 3 => BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(44, 4)),
                 _ => 0
             };
 
@@ -885,6 +922,16 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public int Status { get; init; }
         public RszObjectNode? UserData { get; set; }
         public ImmutableArray<RszObjectNode> ShapeUserData { get; set; } = [];
+
+        /// <summary>
+        /// The contents of the padding after the name field. For producing identical results when rebuilding.
+        /// </summary>
+        public int CompatNamePadding { get; set; }
+
+        /// <summary>
+        /// The contents of the padding after the name field. For producing identical results when rebuilding.
+        /// </summary>
+        public int CompatKeyPadding { get; set; }
     }
 
     public enum RcolShapeType

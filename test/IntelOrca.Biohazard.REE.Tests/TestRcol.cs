@@ -17,6 +17,12 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertRebuild(GameNames.RE7, "natives/stm/collision/collider/weapon/defaultbullet.rcol.20");
         }
 
+        [Fact]
+        public void Rebuild_RE7_EM4100()
+        {
+            AssertRebuild(GameNames.RE7, "natives/stm/ch8/collision/collider/enemy/em4100/em4100.rcol.20");
+        }
+
         private void AssertRebuild(string gameName, string path)
         {
             var repo = _pakHelper.GetTypeRepository(gameName);
