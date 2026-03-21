@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -9,10 +9,11 @@ namespace IntelOrca.Biohazard.REE
     /// after writing the strings to the end of the stream.
     /// </summary>
     /// <param name="stream"></param>
-    internal sealed class StringPoolBuilder(Stream stream)
+    internal sealed class StringPoolBuilder(Stream stream, bool reuseOffsets = false)
     {
         private readonly Stream _stream = stream;
         private readonly List<Entry> _entries = [];
+        private readonly Dictionary<string, int> _reuse = [];
 
         public void WriteStringOffset32(string s) => WriteStringOffset(s, 4);
         public void WriteStringOffset64(string s) => WriteStringOffset(s, 8);
@@ -26,6 +27,7 @@ namespace IntelOrca.Biohazard.REE
                 RefOffset = streamPosition,
                 Length = length
             });
+            _reuse.TryAdd(s, _entries.Count - 1);
             _stream.Position = streamPosition + length;
         }
 
@@ -49,10 +51,19 @@ namespace IntelOrca.Biohazard.REE
             foreach (var e in _entries)
             {
                 _stream.Position = e.RefOffset;
+                var strOffset = e.StrOffset;
+                if (reuseOffsets)
+                {
+                    if (_reuse.TryGetValue(e.Str, out var firstEntryIndex))
+                    {
+                        strOffset = _entries[firstEntryIndex].StrOffset;
+                    }
+                }
+
                 if (e.Length == 4)
-                    bw.Write((uint)e.StrOffset);
+                    bw.Write((uint)strOffset);
                 else if (e.Length == 8)
-                    bw.Write(e.StrOffset);
+                    bw.Write(strOffset);
                 else
                     throw new Exception("Unexpected reference offset length.");
             }

@@ -105,11 +105,11 @@ namespace IntelOrca.Biohazard.REE.Rsz.Rcol
         public long GroupsPtrOffset =>
             BinaryPrimitives.ReadInt64LittleEndian(Span.Slice(OffsetAfterUkn12, 8));
 
-        public ulong DataOffset =>
-            BinaryPrimitives.ReadUInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 8, 8));
+        public long DataOffset =>
+            BinaryPrimitives.ReadInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 8, 8));
 
-        public ulong RequestSetOffset =>
-            BinaryPrimitives.ReadUInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 16, 8));
+        public long RequestSetOffset =>
+            BinaryPrimitives.ReadInt64LittleEndian(Span.Slice(OffsetAfterUkn12 + 16, 8));
 
         public long IgnoreTagOffset =>
             Version > 11
