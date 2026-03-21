@@ -67,8 +67,32 @@ namespace IntelOrca.Biohazard.REE.Tests
                 {
                     return p;
                 }
+
+                var alt = NormalizePathForPlatform(p);
+                if (!string.Equals(alt, p, StringComparison.Ordinal) && Directory.Exists(alt))
+                {
+                    return alt;
+                }
             }
             throw new Exception("No defined path exists for this game.");
+        }
+
+        private static string NormalizePathForPlatform(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return path;
+            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+            {
+                return path.Replace('/', '\\');
+            }
+
+            var p = path.Replace('\\', '/');
+            if (p.Length >= 2 && p[1] == ':')
+            {
+                var drive = char.ToLowerInvariant(p[0]);
+                var rest = p.Substring(2).TrimStart('/');
+                return $"/mnt/{drive}/{rest}";
+            }
+            return p;
         }
 
         public RszTypeRepository GetTypeRepository(string gameName)
@@ -83,6 +107,8 @@ namespace IntelOrca.Biohazard.REE.Tests
                 GameNames.RE9 => @"M:\git\reasy\resources\data\dumps\rszre9.json",
                 _ => throw new NotImplementedException()
             };
+
+            jsonPath = NormalizePathForPlatform(jsonPath);
             var json = File.ReadAllBytes(jsonPath);
             var repo = RszRepositorySerializer.Default.FromJson(json);
             return repo;
