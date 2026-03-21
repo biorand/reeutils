@@ -33,12 +33,30 @@ namespace IntelOrca.Biohazard.REE.Tests
 
         public static IEnumerable<object[]> RcolFiles()
         {
-            var pakList = PakList.FromFile(@"M:\git\biorand-re7\src\Biohazard.BioRand.RE7\data\pakcontentsrt.txt.gz");
+            var pakList = PakList.FromFile(NormalizePathForPlatform(@"M:\git\biorand-re7\src\Biohazard.BioRand.RE7\data\pakcontentsrt.txt.gz"));
             var rcols = pakList.Entries.Where(x => x.Contains(".rcol.")).Order().ToArray();
             foreach (var rcol in rcols)
             {
                 yield return new object[] { GameNames.RE7, rcol };
             }
+        }
+
+        private static string NormalizePathForPlatform(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return path;
+            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+            {
+                return path.Replace('/', '\\');
+            }
+
+            var p = path.Replace('\\', '/');
+            if (p.Length >= 2 && p[1] == ':')
+            {
+                var drive = char.ToLowerInvariant(p[0]);
+                var rest = p.Substring(2).TrimStart('/');
+                return $"/mnt/{drive}/{rest}";
+            }
+            return p;
         }
 
         private void AssertRebuild(string gameName, string path)
@@ -52,8 +70,15 @@ namespace IntelOrca.Biohazard.REE.Tests
             var inputBuilder = input.ToBuilder(repo);
             var output = inputBuilder.Build();
 
-            File.WriteAllBytes(@"M:\temp\input.rcol.20", input.Data.Span);
-            File.WriteAllBytes(@"M:\temp\output.rcol.20", output.Data.Span);
+            var inputPath = NormalizePathForPlatform(@"M:\temp\input.rcol.20");
+            var outputPath = NormalizePathForPlatform(@"M:\temp\output.rcol.20");
+            var inputDir = System.IO.Path.GetDirectoryName(inputPath);
+            if (!string.IsNullOrEmpty(inputDir))
+            {
+                System.IO.Directory.CreateDirectory(inputDir);
+            }
+            System.IO.File.WriteAllBytes(inputPath, input.Data.Span);
+            System.IO.File.WriteAllBytes(outputPath, output.Data.Span);
 
             var outputBuilder = output.ToBuilder(repo);
 
