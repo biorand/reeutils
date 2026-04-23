@@ -15,18 +15,18 @@ namespace IntelOrca.Biohazard.REE.Tests
         [Fact]
         public void Rebuild_RE7_GLOBALVARIABLES()
         {
-            AssertRebuild(2, GameNames.RE7, "natives/stm/userdata/globalvariables.uvar.2");
+            AssertRebuild(GameNames.RE7, "natives/stm/userdata/globalvariables.uvar.2");
         }
 
         [Fact]
         public void Rebuild_RE4_GLOBALVARIABLES()
         {
-            AssertRebuild(3, GameNames.RE4, "natives/stm/_authoring/appsystem/globalvariables/globalvariables.uvar.3");
+            AssertRebuild(GameNames.RE4, "natives/stm/_authoring/appsystem/globalvariables/globalvariables.uvar.3");
         }
 
-        private void AssertRebuild(int version, string gameName, string path)
+        private void AssertRebuild(string gameName, string path)
         {
-            var input = new UvarFile(version, _pakHelper.GetFileData(gameName, path));
+            var input = new UvarFile(FileVersion.FromPath(path), _pakHelper.GetFileData(gameName, path));
             var inputBuilder = input.ToBuilder();
             var output = inputBuilder.Build();
             var outputBuilder = output.ToBuilder();
