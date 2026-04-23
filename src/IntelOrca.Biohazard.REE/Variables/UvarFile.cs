@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -9,27 +9,140 @@ using IntelOrca.Biohazard.REE.Extensions;
 namespace IntelOrca.Biohazard.REE.Variables
 {
     [DebuggerDisplay("{Name}")]
-    public unsafe class UvarFile(ReadOnlyMemory<byte> data)
+    public unsafe class UvarFile
     {
         private const uint MAGIC = 0x72617675;
+        private readonly int _version;
+        private readonly ReadOnlyMemory<byte> _data;
 
-        public ReadOnlyMemory<byte> Data => data;
+        public UvarFile(ReadOnlyMemory<byte> data)
+            : this((int)MemoryMarshal.Read<uint>(data.Span), data)
+        {
+        }
+
+        public UvarFile(int version, ReadOnlyMemory<byte> data)
+        {
+            _version = version;
+            _data = data;
+        }
+
+        public ReadOnlyMemory<byte> Data => _data;
 
         private ReadOnlySpan<T> GetSpan<T>(ulong offset, int count) where T : unmanaged
         {
-            return MemoryMarshal.Cast<byte, T>(data.Slice((int)offset, count * sizeof(T)).Span);
+            return MemoryMarshal.Cast<byte, T>(_data.Slice((int)offset, count * sizeof(T)).Span);
         }
 
-        private UvarHeader Header => MemoryMarshal.Read<UvarHeader>(data.Span);
-        private ulong ValuesOffset => Header.DataOffset + (Header.VariableCount * (ulong)sizeof(UvarHeader));
+        private UvarHeader Header => _version switch
+        {
+            2 => ToHeader(MemoryMarshal.Read<UvarHeaderV2>(_data.Span)),
+            _ => ToHeader(MemoryMarshal.Read<UvarHeaderV3>(_data.Span))
+        };
         private ReadOnlySpan<UvarVariable> Variables => GetSpan<UvarVariable>(Header.DataOffset, Header.VariableCount);
-        private ReadOnlySpan<float> Values => GetSpan<float>(ValuesOffset, Header.VariableCount);
         private ReadOnlySpan<ulong> EmbeddedOffsets => GetSpan<ulong>(Header.EmbedsInfoOffset, Header.EmbedCount);
         private ReadOnlySpan<ulong> HashDataOffsets => GetSpan<ulong>(Header.HashInfoOffset, 4);
         private ReadOnlySpan<Guid> HashDataGuids => GetSpan<Guid>(HashDataOffsets[0], Header.VariableCount);
         private ReadOnlySpan<int> HashDataGuidMap => GetSpan<int>(HashDataOffsets[1], Header.VariableCount);
         private ReadOnlySpan<uint> HashDataNameHashes => GetSpan<uint>(HashDataOffsets[2], Header.VariableCount);
         private ReadOnlySpan<int> HashDataNameHashMap => GetSpan<int>(HashDataOffsets[3], Header.VariableCount);
+
+        private static UvarHeader ToHeader(in UvarHeaderV2 header)
+        {
+            return new UvarHeader
+            {
+                Version = header.Version,
+                Magic = header.Magic,
+                StringsOffset = header.StringsOffset,
+                DataOffset = header.DataOffset,
+                EmbedsInfoOffset = header.EmbedsInfoOffset,
+                HashInfoOffset = header.HashInfoOffset,
+                UnknownHeaderValue = header.UnknownHeaderValue,
+                UvarHash = header.UvarHash,
+                VariableCount = header.VariableCount,
+                EmbedCount = header.EmbedCount
+            };
+        }
+
+        private static UvarHeader ToHeader(in UvarHeaderV3 header)
+        {
+            return new UvarHeader
+            {
+                Version = header.Version,
+                Magic = header.Magic,
+                StringsOffset = header.StringsOffset,
+                DataOffset = header.DataOffset,
+                EmbedsInfoOffset = header.EmbedsInfoOffset,
+                HashInfoOffset = header.HashInfoOffset,
+                UvarHash = header.UvarHash,
+                VariableCount = header.VariableCount,
+                EmbedCount = header.EmbedCount
+            };
+        }
+
+        private static int CompareOffsetEntries((int Index, ulong Offset) a, (int Index, ulong Offset) b)
+        {
+            var offsetComparison = a.Offset.CompareTo(b.Offset);
+            return offsetComparison != 0 ? offsetComparison : a.Index.CompareTo(b.Index);
+        }
+
+        private ulong GetSectionStartOffset(Func<UvarVariable, ulong> getOffset, ulong fallback)
+        {
+            var variables = Variables;
+            var minOffset = fallback;
+            for (var i = 0; i < variables.Length; i++)
+            {
+                var offset = getOffset(variables[i]);
+                if (offset != 0 && offset < minOffset)
+                {
+                    minOffset = offset;
+                }
+            }
+            return minOffset;
+        }
+
+        private byte[][] GetVariableData(Func<UvarVariable, ulong> getOffset, ulong endOffset)
+        {
+            var variables = Variables;
+            var result = new byte[variables.Length][];
+            var offsets = new List<(int Index, ulong Offset)>();
+            for (var i = 0; i < variables.Length; i++)
+            {
+                var offset = getOffset(variables[i]);
+                if (offset != 0)
+                {
+                    offsets.Add((i, offset));
+                }
+            }
+
+            offsets.Sort(CompareOffsetEntries);
+            for (var i = 0; i < offsets.Count; i++)
+            {
+                var start = offsets[i].Offset;
+                var end = i + 1 < offsets.Count ? offsets[i + 1].Offset : Header.StringsOffset;
+                if (end > endOffset)
+                {
+                    end = endOffset;
+                }
+                result[offsets[i].Index] = Data.Slice((int)start, (int)(end - start)).ToArray();
+            }
+
+            for (var i = 0; i < result.Length; i++)
+            {
+                result[i] ??= [];
+            }
+            return result;
+        }
+
+        private byte[][] GetVariableValueData()
+        {
+            var valueSectionEnd = GetSectionStartOffset(variable => variable.UknOffset, Header.StringsOffset);
+            return GetVariableData(variable => variable.FloatOffset, valueSectionEnd);
+        }
+
+        private byte[][] GetVariableExpressionData()
+        {
+            return GetVariableData(variable => variable.UknOffset, Header.StringsOffset);
+        }
 
         private string GetString(ulong offset)
         {
@@ -53,10 +166,10 @@ namespace IntelOrca.Biohazard.REE.Variables
                 throw new ArgumentOutOfRangeException(nameof(index));
 
             var offsets = EmbeddedOffsets;
-            return new UvarFile(Data.Slice((int)offsets[index]));
+            return new UvarFile(_version, Data.Slice((int)offsets[index]));
         }
 
-        public int Version => (int)Header.Version;
+        public int Version => _version;
         public int Hash => (int)Header.UvarHash;
         public int VariableCount => Header.VariableCount;
         public int EmbeddedCount => Header.EmbedCount;
@@ -70,17 +183,23 @@ namespace IntelOrca.Biohazard.REE.Variables
         [DebuggerDisplay("{Name}")]
         public class Builder
         {
+            public int Version { get; set; } = 3;
             public int Hash { get; set; }
             public string Name { get; set; } = "";
+            public ulong UnknownHeaderValue { get; set; }
             public List<Variable> Variables { get; } = [];
             public List<Builder> Children { get; } = [];
 
             public Builder(UvarFile instance)
             {
+                Version = instance.Version;
                 Hash = instance.Hash;
                 Name = instance.Name;
+                UnknownHeaderValue = instance.Header.UnknownHeaderValue;
+
                 var variables = instance.Variables;
-                var values = instance.Values;
+                var valueData = instance.GetVariableValueData();
+                var expressionData = instance.GetVariableExpressionData();
                 for (var i = 0; i < variables.Length; i++)
                 {
                     var variable = variables[i];
@@ -88,9 +207,15 @@ namespace IntelOrca.Biohazard.REE.Variables
                     {
                         Guid = variable.Guid,
                         Name = instance.GetString(variable.NameOffset),
-                        Value = values[i],
+                        Value = valueData[i].Length >= sizeof(float)
+                            ? BitConverter.ToSingle(valueData[i], 0)
+                            : 0,
                         TypeVal = variable.TypeVal,
-                        NumBits = variable.NumBits
+                        NumBits = variable.NumBits,
+                        ValueData = valueData[i],
+                        ValueOffset = variable.FloatOffset,
+                        ExpressionData = expressionData[i],
+                        ExpressionOffset = variable.UknOffset
                     });
                 }
 
@@ -105,8 +230,9 @@ namespace IntelOrca.Biohazard.REE.Variables
             {
                 var header = new UvarHeader
                 {
-                    Version = 3,
+                    Version = (uint)Version,
                     Magic = MAGIC,
+                    UnknownHeaderValue = UnknownHeaderValue,
                     UvarHash = (uint)Hash,
                     VariableCount = (ushort)Variables.Count,
                     EmbedCount = (ushort)Children.Count
@@ -127,17 +253,49 @@ namespace IntelOrca.Biohazard.REE.Variables
                 var bw = new BinaryWriter(ms);
 
                 // First pass
-                bw.WriteZeros<UvarHeader>();
+                if (Version == 2)
+                {
+                    bw.WriteZeros<UvarHeaderV2>();
+                }
+                else
+                {
+                    bw.WriteZeros<UvarHeaderV3>();
+                }
                 bw.Align(16);
 
                 header.DataOffset = (ulong)ms.Position;
                 bw.WriteZeros<UvarVariable>(Variables.Count);
+
+                var valueDataEntries = new List<(int Index, ulong Offset)>();
                 for (var i = 0; i < Variables.Count; i++)
                 {
-                    variables[i].FloatOffset = (ulong)ms.Position;
-                    bw.Write(Variables[i].Value);
+                    if (Variables[i].ValueOffset != 0)
+                    {
+                        valueDataEntries.Add((i, Variables[i].ValueOffset));
+                    }
+                }
+                valueDataEntries.Sort(CompareOffsetEntries);
+                foreach (var (index, _) in valueDataEntries)
+                {
+                    variables[index].FloatOffset = (ulong)ms.Position;
+                    bw.Write(GetValueBytes(Variables[index]));
                 }
                 bw.Align(16);
+
+                var expressionDataEntries = new List<(int Index, ulong Offset)>();
+                for (var i = 0; i < Variables.Count; i++)
+                {
+                    if (Variables[i].ExpressionOffset != 0)
+                    {
+                        expressionDataEntries.Add((i, Variables[i].ExpressionOffset));
+                    }
+                }
+                expressionDataEntries.Sort(CompareOffsetEntries);
+                foreach (var (index, _) in expressionDataEntries)
+                {
+                    variables[index].UknOffset = (ulong)ms.Position;
+                    bw.Write(Variables[index].ExpressionData);
+                }
 
                 header.StringsOffset = (ulong)ms.Position;
                 bw.WriteUTF16(Name);
@@ -148,13 +306,18 @@ namespace IntelOrca.Biohazard.REE.Variables
                 }
                 bw.Align(16);
 
-                header.EmbedsInfoOffset = (ulong)ms.Position;
-                bw.WriteZeros<ulong>(Children.Count);
-
-                for (var i = 0; i < Children.Count; i++)
+                if (Children.Count != 0)
                 {
-                    embedOffsets[i] = (ulong)ms.Position;
-                    bw.Write(Children[i].Build().Data.Span);
+                    bw.Align(16);
+                    header.EmbedsInfoOffset = (ulong)ms.Position;
+                    bw.WriteZeros<ulong>(Children.Count);
+
+                    for (var i = 0; i < Children.Count; i++)
+                    {
+                        bw.Align(16);
+                        embedOffsets[i] = (ulong)ms.Position;
+                        bw.Write(Children[i].Build().Data.Span);
+                    }
                 }
                 bw.Align(16);
 
@@ -203,15 +366,72 @@ namespace IntelOrca.Biohazard.REE.Variables
 
                 // Second pass
                 ms.Position = 0;
-                bw.Write(in header);
+                WriteHeader(bw, header);
 
                 ms.Position = (long)header.DataOffset;
                 bw.Write(variables);
 
-                ms.Position = (long)header.EmbedsInfoOffset;
-                bw.Write(embedOffsets);
+                if (embedOffsets.Length != 0)
+                {
+                    ms.Position = (long)header.EmbedsInfoOffset;
+                    bw.Write(embedOffsets);
+                }
 
-                return new UvarFile(ms.ToArray());
+                return new UvarFile(Version, ms.ToArray());
+            }
+
+            private void WriteHeader(BinaryWriter bw, in UvarHeader header)
+            {
+                if (Version == 2)
+                {
+                    var headerV2 = new UvarHeaderV2
+                    {
+                        Version = header.Version,
+                        Magic = header.Magic,
+                        StringsOffset = header.StringsOffset,
+                        DataOffset = header.DataOffset,
+                        EmbedsInfoOffset = header.EmbedsInfoOffset,
+                        HashInfoOffset = header.HashInfoOffset,
+                        UnknownHeaderValue = header.UnknownHeaderValue,
+                        UvarHash = header.UvarHash,
+                        VariableCount = header.VariableCount,
+                        EmbedCount = header.EmbedCount
+                    };
+                    bw.Write(in headerV2);
+                }
+                else
+                {
+                    var headerV3 = new UvarHeaderV3
+                    {
+                        Version = header.Version,
+                        Magic = header.Magic,
+                        StringsOffset = header.StringsOffset,
+                        DataOffset = header.DataOffset,
+                        EmbedsInfoOffset = header.EmbedsInfoOffset,
+                        HashInfoOffset = header.HashInfoOffset,
+                        UvarHash = header.UvarHash,
+                        VariableCount = header.VariableCount,
+                        EmbedCount = header.EmbedCount
+                    };
+                    bw.Write(in headerV3);
+                }
+            }
+
+            private static byte[] GetValueBytes(Variable variable)
+            {
+                if (variable.ValueData.Length == 0)
+                {
+                    return [];
+                }
+
+                if (variable.ValueData.Length == sizeof(float))
+                {
+                    var result = (byte[])variable.ValueData.Clone();
+                    BitConverter.TryWriteBytes(result, variable.Value);
+                    return result;
+                }
+
+                return variable.ValueData;
             }
 
             [DebuggerDisplay("{Name}")]
@@ -222,6 +442,10 @@ namespace IntelOrca.Biohazard.REE.Variables
                 public float Value { get; set; }
                 public int TypeVal { get; set; }
                 public int NumBits { get; set; }
+                public byte[] ValueData { get; set; } = [];
+                public ulong ValueOffset { get; set; }
+                public byte[] ExpressionData { get; set; } = [];
+                public ulong ExpressionOffset { get; set; }
             }
         }
     }

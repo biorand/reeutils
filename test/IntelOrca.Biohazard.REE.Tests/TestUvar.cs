@@ -13,6 +13,12 @@ namespace IntelOrca.Biohazard.REE.Tests
         }
 
         [Fact]
+        public void Rebuild_RE7_GLOBALVARIABLES()
+        {
+            AssertRebuild(GameNames.RE7, "natives/stm/userdata/globalvariables.uvar.2");
+        }
+
+        [Fact]
         public void Rebuild_RE4_GLOBALVARIABLES()
         {
             AssertRebuild(GameNames.RE4, "natives/stm/_authoring/appsystem/globalvariables/globalvariables.uvar.3");
@@ -20,7 +26,7 @@ namespace IntelOrca.Biohazard.REE.Tests
 
         private void AssertRebuild(string gameName, string path)
         {
-            var input = new UvarFile(_pakHelper.GetFileData(gameName, path));
+            var input = new UvarFile(FileVersion.FromPath(path), _pakHelper.GetFileData(gameName, path));
             var inputBuilder = input.ToBuilder();
             var output = inputBuilder.Build();
             var outputBuilder = output.ToBuilder();
