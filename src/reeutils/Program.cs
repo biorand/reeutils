@@ -41,6 +41,9 @@ namespace IntelOrca.Biohazard.REEUtils
                 config.AddCommand<LsCommand>("ls")
                     .WithDescription("Lists files and directories in a PAK file.")
                     .WithExample("ls", "--pak", "test.pak", "natives/stm");
+                config.AddCommand<FindCommand>("find")
+                    .WithDescription("Finds files in a PAK file matching the given patterns.")
+                    .WithExample("find", "--pak", "test.pak", "-g", "re9", "natives/stm/leveldesign");
             });
             return app.Run(args);
         }
