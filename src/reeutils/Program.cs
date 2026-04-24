@@ -44,6 +44,10 @@ namespace IntelOrca.Biohazard.REEUtils
                 config.AddCommand<FindCommand>("find")
                     .WithDescription("Finds files in a PAK file matching the given patterns.")
                     .WithExample("find", "--pak", "test.pak", "-g", "re9", "natives/stm/leveldesign");
+                config.AddCommand<TreeCommand>("tree")
+                    .WithDescription("Shows the object or scene tree of an REE file.")
+                    .WithExample("tree", "--path", "chap3_01_level.scn.21", "-g", "re9")
+                    .WithExample("tree", "--pak", "input.pak", "-g", "re9", "natives/stm/leveldesign/chapter/chap3_01/chap3_01_level.scn.21", "Main/LevelPlayerCreateController");
             });
             return app.Run(args);
         }
