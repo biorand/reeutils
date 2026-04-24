@@ -35,6 +35,9 @@ namespace IntelOrca.Biohazard.REEUtils
                 config.AddCommand<InspectCommand>("inspect")
                     .WithDescription("Looks through every file in a pak to find paths for a pak list.")
                     .WithExample("inspect", "-g", "re4", "input.pak");
+                config.AddCommand<GrepCommand>("grep")
+                    .WithDescription("Search files in a pak for properties/values matching a regex.")
+                    .WithExample("grep", "--pak", "input.pak", "--regex", "pattern", "natives/stm/**/enemy.user.2");
             });
             return app.Run(args);
         }
