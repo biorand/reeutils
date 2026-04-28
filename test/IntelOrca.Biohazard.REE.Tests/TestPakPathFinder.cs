@@ -5,7 +5,7 @@ namespace IntelOrca.Biohazard.REE.Tests
 {
     public class TestPakPathFinder
     {
-        [Fact]
+        [Fact(Skip = "Currently skipped until changed to vanilla test case")]
         public void Find()
         {
             var path = @"G:\temp\notime4death\NT4DST-1.0-No_Time_4_Death_ST\nt4dst.pak";

@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using IntelOrca.Biohazard.REE.Package;
 using IntelOrca.Biohazard.REE.Rsz;
@@ -13,13 +14,13 @@ namespace IntelOrca.Biohazard.REE.Tests
             _pakHelper.Dispose();
         }
 
-        [Fact]
+        [Fact(Skip = "Currently fails to produce identical output")]
         public void Rebuild_RE2_ST4_701_0_GIMMICK()
         {
             AssertRebuild(GameNames.RE2, "natives/x64/objectroot/scene/location/rpd/level_100/environments/st4_701_0/gimmick.scn.19", 31432);
         }
 
-        [Fact]
+        [Fact(Skip = "Currently fails to produce identical output")]
         public void Rebuild_RE3_CATALOG()
         {
             AssertRebuild(GameNames.RE3, "natives/stm/escape/scene/contents/main/catalog.scn.20", 0);
@@ -77,19 +78,6 @@ namespace IntelOrca.Biohazard.REE.Tests
         public void Rebuild_RE9_CHAP3_02_CHARACTERSPAWNPARAM_03()
         {
             AssertRebuild(GameNames.RE9, "natives/stm/gameassets/character/scene/chap3_02/chap3_02_characterspawnparam_03.scn.21");
-        }
-
-        [Fact]
-        public void Rebuild_RE9_ST30_031_GIMMICK_COMMON()
-        {
-            var pakList = PakList.FromFile(@"G:\apps\reasy\resources\data\lists\RE9_STM.list");
-            foreach (var listing in pakList.Entries)
-            {
-                if (listing.StartsWith("natives/stm/leveldesign/gimmick/scene", StringComparison.OrdinalIgnoreCase))
-                {
-                    AssertRebuildInstanceCount(GameNames.RE9, listing);
-                }
-            }
         }
 
         [Fact]

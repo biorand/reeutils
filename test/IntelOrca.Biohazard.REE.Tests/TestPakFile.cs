@@ -48,7 +48,7 @@ namespace IntelOrca.Biohazard.REE.Tests
             var dlcPath = Path.Combine(_pakHelper.GetInstallPath(GameNames.RE4), "dlc", "re_dlc_stm_2109314.pak");
             using var pakFile = new PakFile(dlcPath);
             using var tempFolder = new TempFolder();
-            await pakFile.ExtractAllAsync(pakList, tempFolder.Path);
+            await pakFile.ExtractAllAsync(pakList, tempFolder.Path, TestContext.Current.CancellationToken);
 
             var files = Directory.GetFiles(tempFolder.Path, "*", SearchOption.AllDirectories);
             Assert.Equal(15, files.Length);

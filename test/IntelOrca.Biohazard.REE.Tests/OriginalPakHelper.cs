@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using IntelOrca.Biohazard.REE.Package;
 using IntelOrca.Biohazard.REE.Rsz;
 
@@ -41,51 +42,56 @@ namespace IntelOrca.Biohazard.REE.Tests
 
         public string GetInstallPath(string game)
         {
-            return game switch
+            var streamDir = GetEnvironmentVariable("STEAM_DIR",
+                RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? @"F:\games\steamapps\common"
+                    : @"/mnt/f/games/steamapps/common");
+            var gameDirName = game switch
             {
-                GameNames.RE2 => FindFirstExisting(
-                    @"F:\games\steamapps\common\RESIDENT EVIL 2  BIOHAZARD RE2"),
-                GameNames.RE3 => FindFirstExisting(
-                    @"F:\games\steamapps\common\RE3"),
-                GameNames.RE4 => FindFirstExisting(
-                    @"G:\biorand\re4r\vanilla"),
-                GameNames.RE7 => FindFirstExisting(
-                    @"F:\games\steamapps\common\RESIDENT EVIL 7 biohazard"),
-                GameNames.RE8 => FindFirstExisting(
-                    @"G:\biorand\re8\vanilla"),
-                GameNames.RE9 => FindFirstExisting(
-                    @"F:\games\steamapps\common\RESIDENT EVIL requiem BIOHAZARD requiem"),
+                GameNames.RE2 => "RESIDENT EVIL 2  BIOHAZARD RE2",
+                GameNames.RE3 => "RE3",
+                GameNames.RE4 => "RESIDENT EVIL 4  BIOHAZARD RE4",
+                GameNames.RE7 => "RESIDENT EVIL 7 biohazard",
+                GameNames.RE8 => "Resident Evil Village BIOHAZARD VILLAGE",
+                GameNames.RE9 => "RESIDENT EVIL requiem BIOHAZARD requiem",
                 _ => throw new NotSupportedException()
             };
-        }
-
-        private static string FindFirstExisting(params string[] paths)
-        {
-            foreach (var p in paths)
-            {
-                if (Directory.Exists(p))
-                {
-                    return p;
-                }
-            }
-            throw new Exception("No defined path exists for this game.");
+            return Path.Combine(streamDir, gameDirName);
         }
 
         public RszTypeRepository GetTypeRepository(string gameName)
         {
+            var rszDir = GetEnvironmentVariable("REEUTILS_RSZ_DIR",
+                RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                    ? @"M:\git\reasy\resources\data\dumps"
+                    : @"/mnt/m/git/reasy/resources/data/dumps");
             var jsonPath = gameName switch
             {
-                GameNames.RE2 => @"M:\git\reasy\resources\data\dumps\rszre2.json",
-                GameNames.RE3 => @"M:\git\reasy\resources\data\dumps\rszre3.json",
-                GameNames.RE4 => @"M:\git\reasy\resources\data\dumps\rszre4.json",
-                GameNames.RE7 => @"M:\git\reasy\resources\data\dumps\rszre7rt.json",
-                GameNames.RE8 => @"M:\git\reasy\resources\data\dumps\rszre8.json",
-                GameNames.RE9 => @"M:\git\reasy\resources\data\dumps\rszre9.json",
+                GameNames.RE2 => "rszre2.json",
+                GameNames.RE3 => "rszre3.json",
+                GameNames.RE4 => "rszre4.json",
+                GameNames.RE7 => "rszre7rt.json",
+                GameNames.RE8 => "rszre8.json",
+                GameNames.RE9 => "rszre9.json",
                 _ => throw new NotImplementedException()
             };
-            var json = File.ReadAllBytes(jsonPath);
+            var json = File.ReadAllBytes(Path.Combine(rszDir, jsonPath));
             var repo = RszRepositorySerializer.Default.FromJson(json);
             return repo;
+        }
+
+        public PakList GetPakList(string gameName)
+        {
+            var paklistFileName = $"paklist.{gameName.ToLowerInvariant()}.txt.gz";
+            var dataPath = GetEnvironmentVariable("REEUTILS_PAKLIST_DIR",
+                 Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../../../../../src/reeutils/data")));
+            return PakList.FromFile(Path.Combine(dataPath, paklistFileName));
+        }
+
+        private static string GetEnvironmentVariable(string name, string defaultValue)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            return string.IsNullOrEmpty(value) ? defaultValue : value;
         }
     }
 }
