@@ -9,6 +9,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public int Align { get; init; }
         public int Size { get; init; }
         public bool IsArray { get; init; }
+        public bool IsNative { get; init; }
         public RszFieldType Type { get; init; }
         public RszType? ObjectType { get; init; }
 

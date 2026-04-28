@@ -81,6 +81,12 @@ namespace IntelOrca.Biohazard.REE.Tests
         }
 
         [Fact]
+        public void Rebuild_RE9_CHAP5_03_ITEM()
+        {
+            AssertRebuild(GameNames.RE9, "natives/stm/leveldesign/item/scene/chap5_03/chap5_03_item.scn.21");
+        }
+
+        [Fact]
         public void Rebuild_RE7_C03_TRAILERHOUSE()
         {
             AssertRebuild(GameNames.RE7, "natives/stm/environment/scene/chapter3/c03_trailerhouse.scn.20");

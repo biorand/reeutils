@@ -35,6 +35,18 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertRebuild(GameNames.RE9, "natives/stm/leveldesign/shop/userdata/shopsettinguserdata.user.3");
         }
 
+        [Fact]
+        public void Rebuild_RE9_BIKECOMMONANIMATIONUSERDATA()
+        {
+            AssertRebuild(GameNames.RE9, "natives/stm/appsystem/character/characterprefab/charactercommon/userdata/bikecommonanimationuserdata.user.3");
+        }
+
+        [Fact]
+        public void Rebuild_RE9_PLAYERLIGHTANIMATIONUSERDATA()
+        {
+            AssertRebuild(GameNames.RE9, "natives/stm/appsystem/character/characterprefab/playercommon/userdata/playerlightanimationuserdata.user.3");
+        }
+
         private void AssertRebuild(string gameName, string path)
         {
             var repo = _pakHelper.GetTypeRepository(gameName);

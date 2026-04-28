@@ -85,7 +85,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
                 else
                 {
-                    if (field.Type == RszFieldType.String)
+                    if (field.Type == RszFieldType.String || field.Type == RszFieldType.RuntimeType)
                     {
                         children.Add(new RszStringNode(""));
                     }

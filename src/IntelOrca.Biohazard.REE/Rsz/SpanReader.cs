@@ -53,6 +53,18 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return result;
         }
 
+        public string? ReadUtf8String()
+        {
+            var length = ReadInt32();
+            if (length == 0)
+                return null;
+
+            var bytes = _data[..(length - 1)];
+            var result = System.Text.Encoding.UTF8.GetString(bytes);
+            Seek(length);
+            return result;
+        }
+
         public byte[] ReadBytes(int size)
         {
             var result = new byte[size];

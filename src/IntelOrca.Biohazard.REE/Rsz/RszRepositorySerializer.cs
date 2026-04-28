@@ -92,6 +92,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         Size = f.Size,
                         Type = fieldType,
                         IsArray = f.Array,
+                        IsNative = f.Native,
                         ObjectType = string.IsNullOrEmpty(f.OriginalType) ? null : repo.FromName(f.OriginalType)
                     });
                 }

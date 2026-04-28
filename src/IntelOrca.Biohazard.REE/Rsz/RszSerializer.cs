@@ -211,7 +211,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 return type switch
                 {
                     RszFieldType.Object => new RszNullNode(),
-                    RszFieldType.String => new RszStringNode(),
+                    RszFieldType.String or RszFieldType.RuntimeType => new RszStringNode(),
                     RszFieldType.Resource => new RszResourceNode(),
                     RszFieldType.UserData => new RszUserDataNode(),
                     _ => throw new ArgumentNullException(nameof(obj))
@@ -259,7 +259,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.Range => new RszValueNode(type, ToMemory<via.Range>(obj)),
                 RszFieldType.KeyFrame => new RszValueNode(type, ToMemory<via.KeyFrame>(obj)),
                 RszFieldType.Capsule => new RszValueNode(type, ToMemory<via.Capsule>(obj)),
-                RszFieldType.String => obj is RszStringNode stringNode
+                RszFieldType.String or RszFieldType.RuntimeType => obj is RszStringNode stringNode
                     ? stringNode
                     : new RszStringNode((string)obj),
                 RszFieldType.Resource => obj is RszResourceNode resourceNode

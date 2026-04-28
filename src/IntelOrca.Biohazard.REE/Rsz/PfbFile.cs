@@ -120,7 +120,19 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         {
                             field.Id = gameObjectRefInfo.PropertyId;
                         }
-                        gameObjectGuid = RszSerializer.Deserialize<Guid>(sourceObject[i]);
+                        if (field.IsArray)
+                        {
+                            var arrayNode = (RszArrayNode)sourceObject[i];
+                            var arrayIndex = gameObjectRefInfo.ArrayIndex;
+                            if (arrayIndex >= 0 && arrayIndex < arrayNode.Children.Length)
+                            {
+                                gameObjectGuid = RszSerializer.Deserialize<Guid>(arrayNode.Children[arrayIndex]);
+                            }
+                        }
+                        else
+                        {
+                            gameObjectGuid = RszSerializer.Deserialize<Guid>(sourceObject[i]);
+                        }
                     }
                 }
 

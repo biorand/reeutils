@@ -29,7 +29,19 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/appsystem/prefab/shell/arrowshell.pfb.17", 4256);
         }
 
-        private void AssertRebuild(string gameName, string path, int expectedLength)
+        [Fact]
+        public void Rebuild_RE9_CH0200G6000()
+        {
+            AssertRebuild(GameNames.RE9, "natives/stm/animation/ch/ch02/ch0200/grapple/ch0200g6000/ch0200g6000.pfb.18");
+        }
+
+        [Fact]
+        public void Rebuild_RE9_IT10_00_006()
+        {
+            AssertRebuild(GameNames.RE9, "natives/stm/gameassets/item/prefab/layouter/it10_00_006.pfb.18");
+        }
+
+        private void AssertRebuild(string gameName, string path, int? expectedLength = null)
         {
             var repo = _pakHelper.GetTypeRepository(gameName);
             var input = new PfbFile(FileVersion.FromPath(path), _pakHelper.GetFileData(gameName, path));
@@ -42,7 +54,7 @@ namespace IntelOrca.Biohazard.REE.Tests
             {
                 Assert.True(input.Data.Span.SequenceEqual(output.Data.Span));
             }
-            Assert.Equal(expectedLength, output.Data.Length);
+            Assert.Equal(expectedLength ?? input.Data.Length, output.Data.Length);
         }
     }
 }

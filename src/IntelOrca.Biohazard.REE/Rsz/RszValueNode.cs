@@ -22,6 +22,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             ThrowIfType(RszFieldType.String, nameof(RszStringNode));
             ThrowIfType(RszFieldType.Resource, nameof(RszResourceNode));
+            ThrowIfType(RszFieldType.RuntimeType, nameof(RszStringNode));
 
             void ThrowIfType(RszFieldType t, string alternative)
             {
