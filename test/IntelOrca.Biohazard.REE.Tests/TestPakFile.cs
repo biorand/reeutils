@@ -13,10 +13,10 @@ namespace IntelOrca.Biohazard.REE.Tests
         }
 
         [Theory]
-        [InlineData("natives/stm/_chainsaw/appsystem/ui/userdata/itemcraftsettinguserdata.user.2", 1398412279)]
-        [InlineData("natives/stm/_chainsaw/appsystem/weapon/lasersight/playerlasersightcontrolleruserdata.user.2", -891513479)]
-        [InlineData("natives/stm/_chainsaw/appsystem/weaponcustom/weapondetailcustomuserdata.user.2", 98088230)]
-        [InlineData("natives/stm/_chainsaw/appsystem/ui/userdata/guiparamholdersettinguserdata.user.2", 470148227)]
+        [InlineData("natives/stm/_chainsaw/appsystem/ui/userdata/itemcraftsettinguserdata.user.2", 1063112078)]
+        [InlineData("natives/stm/_chainsaw/appsystem/weapon/lasersight/playerlasersightcontrolleruserdata.user.2", 1254177480)]
+        [InlineData("natives/stm/_chainsaw/appsystem/weaponcustom/weapondetailcustomuserdata.user.2", 1777441810)]
+        [InlineData("natives/stm/_chainsaw/appsystem/ui/userdata/guiparamholdersettinguserdata.user.2", 1802137233)]
         public void Checksum(string path, int expected)
         {
             var fileData = _pakHelper.GetFileData(GameNames.RE4, path)!;
