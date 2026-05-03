@@ -27,6 +27,7 @@ namespace IntelOrca.Biohazard.REE
                 0x44484B42 => FileKind.BKHD,
                 0x4853454D => FileKind.Mesh,
                 0x4C4F4352 => FileKind.RCOL,
+                0x4D534648 => FileKind.HFSM,
                 _ => BinaryPrimitives.ReadUInt32LittleEndian(data[4..]) switch
                 {
                     0x47534D47 => FileKind.Message,
@@ -45,6 +46,7 @@ namespace IntelOrca.Biohazard.REE
         BKHD,
         DDS,
         GUIR,
+        HFSM,
         AudioBank,
         Material,
         Mesh,

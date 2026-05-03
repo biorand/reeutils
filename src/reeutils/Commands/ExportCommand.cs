@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using IntelOrca.Biohazard.REE.Fsm;
 using IntelOrca.Biohazard.REE.Messages;
 using IntelOrca.Biohazard.REE.Package;
 using IntelOrca.Biohazard.REE.Rsz;
@@ -107,6 +108,19 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 var root = pfbFile.ReadScene(repo);
                 var rootJson = RszJsonSerializer.Serialize(root, jsonOptions);
                 await File.WriteAllTextAsync(settings.OutputPath!, rootJson);
+            }
+            else if (extension == ".fsm")
+            {
+                var hfsm = new HfsmFile(fileData);
+                var graph = HfsmGraphDocument.FromFile(hfsm);
+                if (settings.OutputPath!.EndsWith(".dot", StringComparison.OrdinalIgnoreCase))
+                {
+                    await File.WriteAllTextAsync(settings.OutputPath!, graph.ToDot());
+                }
+                else
+                {
+                    await File.WriteAllTextAsync(settings.OutputPath!, JsonSerializer.Serialize(graph, jsonOptions));
+                }
             }
             else
             {

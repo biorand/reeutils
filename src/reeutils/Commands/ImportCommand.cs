@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using IntelOrca.Biohazard.REE.Cryptography;
+using IntelOrca.Biohazard.REE.Fsm;
 using IntelOrca.Biohazard.REE.Messages;
 using IntelOrca.Biohazard.REE.Rsz;
 using Spectre.Console;
@@ -109,6 +110,13 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 var pfbFile = new PfbFile(17, EmbeddedData.GetFile("empty.pfb.17")!).ToBuilder(repo);
                 pfbFile.Scene = (RszScene)RszJsonSerializer.Deserialize(data);
                 await File.WriteAllBytesAsync(settings.OutputPath!, pfbFile.Build().Data);
+            }
+            else if (settings.OutputPath!.EndsWith(".fsm.16"))
+            {
+                var json = await File.ReadAllTextAsync(settings.InputPath);
+                var graph = JsonSerializer.Deserialize<HfsmGraphDocument>(json)
+                    ?? throw new InvalidDataException("Failed to deserialize HFSM graph.");
+                await File.WriteAllBytesAsync(settings.OutputPath!, graph.Build().Data);
             }
             else
             {

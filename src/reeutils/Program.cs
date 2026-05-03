@@ -21,11 +21,13 @@ namespace IntelOrca.Biohazard.REEUtils
                     .WithExample("unpack", "-g", "re4r", "-o", "output", "input.pak")
                     .WithExample("unpack", "-l", "mylist.txt", "-o", "output", "input.pak");
                 config.AddCommand<ExportCommand>("export")
-                    .WithDescription("Export an REE file to JSON.")
-                    .WithExample("export", "-o", "ch_mes_main_item_caption.msg.22.json", "ch_mes_main_item_caption.msg.22");
+                    .WithDescription("Export an REE file to JSON, or an HFSM file to DOT.")
+                    .WithExample("export", "-o", "ch_mes_main_item_caption.msg.22.json", "ch_mes_main_item_caption.msg.22")
+                    .WithExample("export", "-o", "fsm.dot", "input.fsm.16");
                 config.AddCommand<ImportCommand>("import")
                     .WithDescription("Import a JSON file and convert to an REE file.")
-                    .WithExample("import", "-o", "ch_mes_main_item_caption.msg.22", "ch_mes_main_item_caption.msg.22.json");
+                    .WithExample("import", "-o", "ch_mes_main_item_caption.msg.22", "ch_mes_main_item_caption.msg.22.json")
+                    .WithExample("import", "-o", "input.fsm.16", "input.fsm.16.json");
                 config.AddCommand<MsgCommand>("msg")
                     .WithDescription("Lists strings in an MSG file")
                     .WithExample("msg", "input.msg.22");
