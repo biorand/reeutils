@@ -10,11 +10,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public bool IsEmpty => string.IsNullOrEmpty(Path);
 
-        public ImmutableArray<IRszNode> Children
-        {
-            get => [];
-            set => throw new NotSupportedException();
-        }
+        public ImmutableArray<IRszNode> Children => [];
 
         public bool Equals(RszUserDataNode other) => other.Type == Type && other.Path == Path;
         public override bool Equals(object? obj) => obj is RszUserDataNode node && Equals(node);
@@ -23,16 +19,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public override string ToString() => $"Userdata({Path ?? "null"}): {Type?.Name ?? "null"}";
     }
 
-    public class RszEmbeddedUserValueNode(RszType type, int hash, RszFile embedded) : IRszNode
+    public sealed class RszEmbeddedUserValueNode(RszType type, int hash, RszFile embedded) : IRszNode
     {
         public RszType Type => type;
         public int Hash => hash;
         public RszFile Embedded => embedded;
 
-        public ImmutableArray<IRszNode> Children
-        {
-            get => [];
-            set => throw new NotSupportedException();
-        }
+        public ImmutableArray<IRszNode> Children => [];
     }
 }

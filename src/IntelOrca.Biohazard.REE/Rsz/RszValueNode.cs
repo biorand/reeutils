@@ -9,11 +9,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public RszFieldType Type { get; }
         public ReadOnlyMemory<byte> Data { get; }
 
-        public ImmutableArray<IRszNode> Children
-        {
-            get => [];
-            set => throw new InvalidOperationException();
-        }
+        public ImmutableArray<IRszNode> Children => [];
 
         public RszValueNode(RszFieldType type, ReadOnlyMemory<byte> data)
         {

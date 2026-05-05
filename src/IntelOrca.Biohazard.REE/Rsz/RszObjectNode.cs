@@ -7,7 +7,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
     public class RszObjectNode : IRszNodeContainer
     {
         public RszType Type { get; }
-        public ImmutableArray<IRszNode> Children { get; set; }
+        public ImmutableArray<IRszNode> Children { get; }
 
         public RszObjectNode(RszType type, ImmutableArray<IRszNode> children)
         {
@@ -18,13 +18,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public IRszNode this[int index]
         {
             get => Children[index];
-            set
-            {
-                var field = Type.Fields[index];
-                if (!Validate(field, value))
-                    throw new Exception($"Invalid value for field {field.Name}. Expected {field.Type}.");
-                Children = Children.SetItem(index, value);
-            }
         }
 
         public IRszNode this[string fieldName]
@@ -37,20 +30,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                 return Children[index];
             }
-            set
-            {
-                var index = Type.FindFieldIndex(fieldName);
-                if (index == -1)
-                    throw new ArgumentException($"{0} is not a field of {Type.Name}.");
-
-                this[index] = value;
-            }
-        }
-
-        private bool Validate(RszTypeField field, IRszNode node)
-        {
-            // TODO
-            return true;
         }
 
         public RszObjectNode SetField(string name, IRszNode value)

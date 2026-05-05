@@ -1,15 +1,10 @@
-﻿using System;
 using System.Collections.Immutable;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
     public readonly struct RszStringNode : IRszNode
     {
-        public ImmutableArray<IRszNode> Children
-        {
-            get => [];
-            set => throw new InvalidOperationException();
-        }
+        public ImmutableArray<IRszNode> Children => [];
         public string Value { get; }
 
         public RszStringNode(string value)

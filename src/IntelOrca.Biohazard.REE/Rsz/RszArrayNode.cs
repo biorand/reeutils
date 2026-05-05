@@ -7,8 +7,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
 {
     public class RszArrayNode : IRszNodeContainer, IEnumerable<IRszNode>
     {
-        public RszFieldType Type { get; set; }
-        public ImmutableArray<IRszNode> Children { get; set; }
+        public RszFieldType Type { get; }
+        public ImmutableArray<IRszNode> Children { get; }
 
         public RszArrayNode(RszFieldType type, ImmutableArray<IRszNode> children)
         {
@@ -21,7 +21,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public IRszNode this[int index]
         {
             get => Children[index];
-            set => Children = Children.SetItem(index, value);
         }
 
         public RszArrayNode Add(IRszNode node)
