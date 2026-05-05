@@ -1,6 +1,7 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using IntelOrca.Biohazard.REE.Rsz;
 
 namespace IntelOrca.Biohazard.REE.Tests
@@ -80,6 +81,125 @@ namespace IntelOrca.Biohazard.REE.Tests
                 var node = RszSerializer.Serialize(type, value);
                 var actual = RszSerializer.Deserialize<T>(node);
                 Assert.StrictEqual(value, actual);
+            }
+        }
+
+        [Fact]
+        public void Reserialize_NativeFieldType()
+        {
+            AssertReserialize(RszFieldType.Uint2, new via.Uint2 { x = 1, y = 2 });
+            AssertReserialize(RszFieldType.Uint3, new via.Uint3 { x = 1, y = 2, z = 3 });
+            AssertReserialize(RszFieldType.Uint4, new via.Uint4 { x = 1, y = 2, z = 3, w = 4 });
+            AssertReserialize(RszFieldType.Int2, new via.Int2(1, 2));
+            AssertReserialize(RszFieldType.Int3, new via.Int3 { x = 1, y = 2, z = 3 });
+            AssertReserialize(RszFieldType.Int4, new via.Int4 { x = 1, y = 2, z = 3, w = 4 });
+            AssertReserialize(RszFieldType.Color, new via.Color(0x44332211));
+            AssertReserialize(RszFieldType.AABB, new via.AABB(new Vector3(1, 2, 3), new Vector3(4, 5, 6)));
+            AssertReserializeCapsule(CreateValueNode(
+                RszFieldType.Capsule,
+                CreateBytes(
+                    new Vector3(1, 2, 3),
+                    16,
+                    new Vector3(4, 5, 6),
+                    16,
+                    7f,
+                    12)));
+            AssertReserialize(RszFieldType.TaperedCapsule, new via.TaperedCapsule { VertexRadiusA = new Vector4(1, 2, 3, 4), VertexRadiusB = new Vector4(5, 6, 7, 8) });
+            AssertReserialize(RszFieldType.Cone, new via.Cone(new Vector3(1, 2, 3), 4, new Vector3(5, 6, 7), 8));
+            AssertReserialize(RszFieldType.Line, new via.Line(new Vector3(1, 2, 3), new Vector3(4, 5, 6)));
+            AssertReserialize(RszFieldType.LineSegment, new via.LineSegment(new Vector3(1, 2, 3), new Vector3(4, 5, 6)));
+            AssertReserialize(RszFieldType.OBB, new via.OBB(Matrix4x4.CreateTranslation(1, 2, 3), new Vector3(4, 5, 6)));
+            AssertReserialize(RszFieldType.Plane, new via.Plane(1, 2, 3, 4));
+            AssertReserialize(RszFieldType.PlaneXZ, new via.PlaneXZ { dist = 5 });
+            AssertReserialize(RszFieldType.Point, new via.Point { x = 1, y = 2 });
+            AssertReserializeValue(RszFieldType.Range, CreateValueNode(RszFieldType.Range, CreateBytes(1f, 2f)));
+            AssertReserialize(RszFieldType.RangeI, new via.RangeI { r = 1, s = 2 });
+            AssertReserialize(RszFieldType.Ray, new via.Ray { from = new Vector3(1, 2, 3), dir = new Vector3(4, 5, 6) });
+            AssertReserialize(RszFieldType.RayY, new via.RayY { from = new Vector3(1, 2, 3), dir = 4 });
+            AssertReserialize(RszFieldType.Segment, new via.Segment { from = new Vector4(1, 2, 3, 4), dir = new Vector3(5, 6, 7) });
+            AssertReserialize(RszFieldType.Size, new via.Size { w = 1, h = 2 });
+            AssertReserialize(RszFieldType.Sphere, new via.Sphere(new Vector3(1, 2, 3), 4));
+            AssertReserialize(RszFieldType.Triangle, new via.Triangle { p0 = new Vector3(1, 2, 3), p1 = new Vector3(4, 5, 6), p2 = new Vector3(7, 8, 9) });
+            AssertReserialize(RszFieldType.Cylinder, new via.Cylinder(new Vector3(1, 2, 3), new Vector3(4, 5, 6), 7));
+            AssertReserialize(RszFieldType.Ellipsoid, new via.Ellipsoid { pos = new Vector3(1, 2, 3), r = new Vector3(4, 5, 6) });
+            AssertReserialize(RszFieldType.Area, new via.Area { p0 = new Vector2(1, 2), p1 = new Vector2(3, 4), p2 = new Vector2(5, 6), p3 = new Vector2(7, 8), height = 9, bottom = 10 });
+            AssertReserialize(RszFieldType.Torus, new via.Torus { pos = new Vector3(1, 2, 3), r = 4, axis = new Vector3(5, 6, 7), cr = 8 });
+            AssertReserialize(RszFieldType.Rect, new via.Rect(1, 2, 3, 4));
+            AssertReserialize(RszFieldType.Rect3D, new via.Rect3D { normal = new Vector3(1, 2, 3), sizeW = 4, center = new Vector3(5, 6, 7), sizeH = 8 });
+            AssertReserialize(RszFieldType.Frustum, new via.Frustum
+            {
+                plane0 = new via.Plane(1, 0, 0, 1),
+                plane1 = new via.Plane(0, 1, 0, 2),
+                plane2 = new via.Plane(0, 0, 1, 3),
+                plane3 = new via.Plane(-1, 0, 0, 4),
+                plane4 = new via.Plane(0, -1, 0, 5),
+                plane5 = new via.Plane(0, 0, -1, 6),
+            });
+            AssertReserializeValue(RszFieldType.KeyFrame, CreateValueNode(RszFieldType.KeyFrame, CreateBytes(1f, 2u, 3u, 4u)));
+            AssertReserialize(RszFieldType.Sfix, new via.sfix { v = 1 });
+            AssertReserialize(RszFieldType.Sfix2, new via.Sfix2 { x = new via.sfix { v = 1 }, y = new via.sfix { v = 2 } });
+            AssertReserialize(RszFieldType.Sfix3, new via.Sfix3 { x = new via.sfix { v = 1 }, y = new via.sfix { v = 2 }, z = new via.sfix { v = 3 } });
+            AssertReserialize(RszFieldType.Sfix4, new via.Sfix4 { x = new via.sfix { v = 1 }, y = new via.sfix { v = 2 }, z = new via.sfix { v = 3 }, w = new via.sfix { v = 4 } });
+            AssertReserialize(RszFieldType.Position, new via.Position { x = 1, y = 2, z = 3 });
+
+            static void AssertReserialize<T>(RszFieldType type, T value) where T : struct
+            {
+                var node = RszSerializer.Serialize(type, value);
+                var actual = RszSerializer.Deserialize<T>(node);
+                var reserialized = RszSerializer.Serialize(type, actual);
+                Assert.StrictEqual(node, reserialized);
+            }
+
+            static void AssertReserializeValue(RszFieldType type, RszValueNode node)
+            {
+                var actual = RszSerializer.Deserialize(node);
+                var reserialized = Assert.IsType<RszValueNode>(RszSerializer.Serialize(type, actual));
+                Assert.StrictEqual(node, reserialized);
+            }
+
+            static void AssertReserializeCapsule(RszValueNode node)
+            {
+                var actual = RszSerializer.Deserialize(node);
+                var reserialized = Assert.IsType<RszValueNode>(RszSerializer.Serialize(RszFieldType.Capsule, actual));
+                var roundTripped = RszSerializer.Deserialize(reserialized);
+
+                Assert.Equal(
+                    actual.GetType().GetField("Start")!.GetValue(actual),
+                    roundTripped.GetType().GetField("Start")!.GetValue(roundTripped));
+                Assert.Equal(
+                    actual.GetType().GetField("End")!.GetValue(actual),
+                    roundTripped.GetType().GetField("End")!.GetValue(roundTripped));
+                Assert.Equal(
+                    actual.GetType().GetField("Radius")!.GetValue(actual),
+                    roundTripped.GetType().GetField("Radius")!.GetValue(roundTripped));
+            }
+
+            static RszValueNode CreateValueNode(RszFieldType type, byte[] data) => new RszValueNode(type, data);
+
+            static byte[] CreateBytes(params object[] values)
+            {
+                var data = new List<byte>();
+                foreach (var value in values)
+                {
+                        switch (value)
+                        {
+                        case float f:
+                            data.AddRange(BitConverter.GetBytes(f));
+                            break;
+                        case uint u:
+                            data.AddRange(BitConverter.GetBytes(u));
+                            break;
+                        case Vector3 v3:
+                            data.AddRange(MemoryMarshal.AsBytes(new[] { v3 }.AsSpan()).ToArray());
+                            break;
+                        case int padding:
+                            data.AddRange(new byte[padding]);
+                            break;
+                        default:
+                            throw new NotSupportedException(value.GetType().FullName);
+                    }
+                }
+                return [.. data];
             }
         }
 

@@ -78,7 +78,7 @@ namespace IntelOrca.Biohazard.REE.Tests
                         internal class Setting
                         {
                             public int _Category { get; set; }
-                            public IntelOrca.Biohazard.REE.Rsz.Native.Range _Range { get; set; } = new();
+                            public via.Range _Range { get; set; } = new();
                             public float _Rate { get; set; }
                             public System.Collections.Generic.List<chainsaw.StabilityEvaluationSetting> _StabilityEvaluationSettings { get; set; } = [];
                             public System.Collections.Generic.List<chainsaw.SpCategoryEvaluationSettingBase> _SpCategoryEvaluationSettings { get; set; } = [];
@@ -141,6 +141,36 @@ namespace IntelOrca.Biohazard.REE.Tests
                     }
                 }
                 """);
+        }
+
+        [Fact]
+        public void Generate_NativeFieldTypes()
+        {
+            var repo = new RszTypeRepository();
+            var type = new RszType
+            {
+                Repository = repo,
+                Id = 1,
+                Crc = 0,
+                Name = "app.NativeFields",
+                Fields =
+                [
+                    new() { Name = "RangeField", Type = RszFieldType.Range },
+                    new() { Name = "ColorField", Type = RszFieldType.Color },
+                    new() { Name = "CapsuleField", Type = RszFieldType.Capsule },
+                    new() { Name = "PositionField", Type = RszFieldType.Position },
+                    new() { Name = "MatrixField", Type = RszFieldType.Mat4 },
+                ],
+            };
+            repo.AddType(type);
+
+            var output = new RszTypeCsharpWriter().Generate(type);
+
+            Assert.Contains("public via.Range RangeField { get; set; } = new();", output);
+            Assert.Contains("public via.Color ColorField { get; set; } = new();", output);
+            Assert.Contains("public via.Capsule CapsuleField { get; set; } = new();", output);
+            Assert.Contains("public via.Position PositionField { get; set; } = new();", output);
+            Assert.Contains("public System.Numerics.Matrix4x4 MatrixField { get; set; }", output);
         }
 
         private void AssertCode(string gameName, string typeName, string expected)
