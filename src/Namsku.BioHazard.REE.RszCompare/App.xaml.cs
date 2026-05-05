@@ -16,19 +16,19 @@ namespace ReeCompare
             TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
         }
 
-        private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+        private void App_DispatcherUnhandledException(object? sender, DispatcherUnhandledExceptionEventArgs e)
         {
             LogException("DispatcherUnhandledException", e.Exception);
             e.Handled = true; // Prevent default crash dialog if possible, though we might still want to shut down
             Shutdown();
         }
 
-        private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
+        private void CurrentDomain_UnhandledException(object? sender, UnhandledExceptionEventArgs e)
         {
             LogException("CurrentDomain_UnhandledException", e.ExceptionObject as Exception);
         }
 
-        private void TaskScheduler_UnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
+        private void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
         {
             LogException("TaskScheduler_UnobservedTaskException", e.Exception);
             e.SetObserved();

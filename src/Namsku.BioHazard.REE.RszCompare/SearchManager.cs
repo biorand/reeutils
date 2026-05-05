@@ -17,7 +17,7 @@ namespace ReeCompare
 
         public class SearchResult
         {
-            public RszNodeViewModel Node { get; set; }
+            public required RszNodeViewModel Node { get; set; }
             public string ComponentName { get; set; } = "";
             public string PropertyName { get; set; } = "";
             public string Value { get; set; } = "";

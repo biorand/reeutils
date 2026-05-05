@@ -289,7 +289,6 @@ public class ReTextureFile
         };
 
         int mipCount = mipsData.Count(); // Compiler says method group, so invocation needed
-        int numImages = 1;
         int currentWidth = image.Width;
         int currentHeight = image.Height;
         
