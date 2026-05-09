@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
@@ -11,17 +12,25 @@ namespace IntelOrca.Biohazard.REE.Rsz
     {
         public bool GenerateEnums { get; set; }
 
-        public string Generate(RszType rszType)
+        public string Generate(RszType rszType) => Generate([rszType]);
+
+        public string Generate(RszType[] rszTypes)
         {
+            if (rszTypes.Length == 0)
+                return "";
+            if (rszTypes.Select(x => x.Repository).Distinct().Count() != 1)
+                throw new ArgumentException("All types must be from the same repository.");
+
             var writer = new CsharpWriter();
 
             // Collate types
             var impl = new HashSet<RszType>();
-            var allTypes = FindTypes([], impl, rszType);
+            var allTypes = rszTypes.SelectMany(x => FindTypes([], impl, x)).Distinct().ToArray();
 
+            var repo = allTypes.First().Repository;
             foreach (var g in allTypes.GroupBy(x => x.Namespace))
             {
-                if (rszType.Repository.FromName(g.Key) != null)
+                if (repo.FromName(g.Key) != null)
                     continue;
 
                 writer.BeginNamespaceBlock(g.Key);
