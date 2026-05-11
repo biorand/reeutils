@@ -382,7 +382,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public static RszScene Add(
             this RszScene scene,
             RszTypeRepository repo,
-            SceneHierachyPath hier,
+            SceneHierarchyPath hier,
             RszGameObject gameObject)
         {
             var folders = hier.Folders;
