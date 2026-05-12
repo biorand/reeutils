@@ -23,6 +23,28 @@ jobs:
       run: |
         dotnet publish src/reeutils -c Release -o out/reeutils --os linux
         dotnet publish src/reeutils -c Release -o out/reeutils --os win
+    - name: Run tests
+      id: run_tests
+      continue-on-error: true
+      run: |
+        dotnet test --no-build -c Release --logger "trx;LogFileName=test-results.trx" --logger "console;verbosity=detailed" --collect:"XPlat Code Coverage"
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: |
+          **/TestResults/
+    - name: Publish test results
+      if: always()
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      with:
+        trx_files: '**/test-results.trx'
+        check_run_annotations: 'all'
+        compare_to_earlier_commit: false
+    - name: Fail if tests failed
+      if: steps.run_tests.outcome == 'failure'
+      run: exit 1
     - name: Pack reeutils
       run: |
         cd out/reeutils
