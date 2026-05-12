@@ -3,6 +3,8 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using IntelOrca.Biohazard.REE.Package;
+using IntelOrca.Biohazard.REE.Rsz;
+using IntelOrca.Biohazard.REEUtils;
 using IntelOrca.Biohazard.REEUtils.Commands;
 using Xunit;
 
@@ -47,6 +49,49 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             var output = sw.ToString();
             Assert.Contains("LevelFlow", output);
             Assert.Contains("natives/stm/leveldesign/chapter/chap3_01/test.txt", output);
+        }
+
+        [Fact]
+        public async Task Grep_Finds_Structured_Rsz_Entry()
+        {
+            using var temp = new TempFolder();
+            var pakPath = temp.GetSubPath("test.pak");
+            var pakListPath = temp.GetSubPath("paklist.txt");
+            var repo = McpEmbeddedData.GetRszTypeRepository("re9");
+
+            var userBuilder = new UserFile(EmbeddedData.GetFile("empty.user.2")!).ToBuilder(repo);
+            userBuilder.Objects = [repo.Create("via.GameObject").Set("Name", "UserRoot")];
+
+            var builder = new PakFileBuilder();
+            builder.AddEntry("natives/stm/test/user/test.user.2", userBuilder.Build().Data.ToArray());
+            builder.Save(pakPath);
+
+            File.WriteAllText(pakListPath, "natives/stm/test/user/test.user.2");
+
+            var settings = new GrepCommand.Settings
+            {
+                Pak = pakPath,
+                PakListPath = pakListPath,
+                Game = "re9",
+                Pattern = "UserRoot",
+                Paths = new string[] { "natives/stm/test/user" }
+            };
+
+            var sw = new StringWriter();
+            var oldOut = Console.Out;
+            try
+            {
+                Console.SetOut(sw);
+                var cmd = new GrepCommand();
+                await cmd.ExecuteAsync(null!, settings);
+            }
+            finally
+            {
+                Console.SetOut(oldOut);
+            }
+
+            var output = sw.ToString();
+            Assert.Contains("natives/stm/test/user/test.user.2: via.GameObject.Name = UserRoot", output);
         }
     }
 }

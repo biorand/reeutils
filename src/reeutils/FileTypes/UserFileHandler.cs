@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Immutable;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using IntelOrca.Biohazard.REE.Rsz;
 
 namespace IntelOrca.Biohazard.REEUtils.FileTypes
@@ -15,6 +17,17 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
             var objects = new UserFile(Data).GetObjects(Repository);
             using var raw = CreateDocument(objects);
             return JsonSupport.ApplyTreeOptions(raw, options);
+        }
+
+        public override IEnumerable<string> Search(Regex pattern)
+        {
+            var objects = new UserFile(Data).GetObjects(Repository);
+            var results = new List<string>();
+            foreach (var obj in objects)
+            {
+                SearchNode(obj, obj.Type.Name, pattern, results.Add);
+            }
+            return results;
         }
 
         public override byte[] Import(JsonDocument json)

@@ -162,8 +162,6 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             }
 
             var patternRegex = new Regex(settings.Pattern, RegexOptions.IgnoreCase);
-            var sync = new object();
-
             foreach (var entry in matched)
             {
                 try
@@ -172,27 +170,35 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                     if (data == null)
                         continue;
 
-                    var searchable = GetSearchableContent(entry, data, repo);
-                    foreach (Match match in patternRegex.Matches(searchable))
+                    IEnumerable<string> results;
+                    try
                     {
-                        lock (sync) Console.WriteLine($"{entry}: {match.Value}");
+                        var handler = FileHandlerFactory.Default.Create(entry, data, repo);
+                        results = handler.RequiresTypeRepository && repo == null
+                            ? SearchRawText(data, patternRegex)
+                            : handler.Search(patternRegex);
+                    }
+                    catch (NotSupportedException)
+                    {
+                        results = SearchRawText(data, patternRegex);
+                    }
+
+                    foreach (var result in results)
+                    {
+                        Console.WriteLine($"{entry}: {result}");
                     }
                 }
                 catch (Exception e)
                 {
-                    lock (sync)
-                    {
-                        var backup = Console.ForegroundColor;
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.Error.WriteLine(entry + " : " + e.Message);
-                        Console.ForegroundColor = backup;
-                    }
+                    var backup = Console.ForegroundColor;
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.Error.WriteLine(entry + " : " + e.Message);
+                    Console.ForegroundColor = backup;
                 }
             }
 
             return 0;
 
-            // Local helpers
             static string GetReferencePath(string path)
             {
                 return FileHandlerFactory.Default.GetReferencePath(path);
@@ -216,20 +222,12 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 return null;
             }
 
-            static string GetSearchableContent(string entry, byte[] data, RszTypeRepository? repo)
+            static IEnumerable<string> SearchRawText(byte[] data, Regex patternRegex)
             {
-                try
+                var text = System.Text.Encoding.UTF8.GetString(data);
+                foreach (Match match in patternRegex.Matches(text))
                 {
-                    var handler = FileHandlerFactory.Default.Create(entry, data, repo);
-                    if (handler.RequiresTypeRepository && repo == null)
-                        return System.Text.Encoding.UTF8.GetString(data);
-
-                    using var json = handler.GetJson(TreeOptions.Root);
-                    return JsonSupport.ToJsonString(json);
-                }
-                catch (NotSupportedException)
-                {
-                    return System.Text.Encoding.UTF8.GetString(data);
+                    yield return match.Value;
                 }
             }
         }

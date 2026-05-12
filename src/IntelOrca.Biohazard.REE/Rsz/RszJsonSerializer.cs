@@ -86,13 +86,16 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     writer.WriteStringValue(gameObject.Prefab);
                 }
                 WriteObjectNode(writer, gameObject.Settings, options);
-                writer.WritePropertyName("@components");
-                writer.WriteStartArray();
-                foreach (var child in gameObject.Components)
+                if (!gameObject.Components.IsDefaultOrEmpty)
                 {
-                    WriteNode(writer, child, options);
+                    writer.WritePropertyName("@components");
+                    writer.WriteStartArray();
+                    foreach (var child in gameObject.Components)
+                    {
+                        WriteNode(writer, child, options);
+                    }
+                    writer.WriteEndArray();
                 }
-                writer.WriteEndArray();
             }
             else if (value is RszObjectNode objectNode)
             {

@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using IntelOrca.Biohazard.REE.Package;
 using Spectre.Console;
@@ -12,10 +13,6 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
     {
         public sealed class Settings : CommandSettings
         {
-            [Description("File path (on disk or in pak)")]
-            [CommandOption("--path")]
-            public string? PathOption { get; init; }
-
             [Description("Pak file path")]
             [CommandOption("--pak")]
             public string? PakPath { get; init; }
@@ -27,19 +24,13 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             [CommandOption("--json")]
             public bool Json { get; init; }
 
-            [Description("Optional node path within the JSON/tree")]
-            [CommandOption("-x|--xpath")]
-            public string? XpathOption { get; init; }
-
-            [Description("Maximum depth. 0 means unlimited.")]
-            [CommandOption("-d|--depth")]
-            public int Depth { get; init; }
-
-            [CommandArgument(0, "[path]")]
+            [Description("File path (on disk or in pak)")]
+            [CommandArgument(0, "<path>")]
             public string? PathArgument { get; init; }
 
-            [CommandArgument(1, "[xpath]")]
-            public string? XpathArgument { get; init; }
+            [Description("Node paths to fully expand")]
+            [CommandArgument(1, "[xpaths...]")]
+            public string[] Xpaths { get; init; } = [];
         }
 
         public override ValidationResult Validate(CommandContext context, Settings settings)
@@ -47,15 +38,11 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             var path = GetFilePath(settings);
             if (string.IsNullOrEmpty(path))
             {
-                return ValidationResult.Error("File path not specified. Use --path <path> or provide it as the first argument.");
+                return ValidationResult.Error("File path not specified. Provide it as the first argument.");
             }
             if (!string.IsNullOrEmpty(settings.PakPath) && !File.Exists(settings.PakPath))
             {
                 return ValidationResult.Error($"{settings.PakPath} not found");
-            }
-            if (settings.Depth < 0)
-            {
-                return ValidationResult.Error("Depth must be zero or greater.");
             }
             return base.Validate(context, settings);
         }
@@ -100,8 +87,10 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
             var treeOptions = new TreeOptions
             {
-                Xpath = GetXpath(settings),
-                Depth = settings.Depth
+                Xpath = "",
+                Xpaths = settings.Xpaths,
+                Depth = settings.Json ? 0 : 1,
+                CompactComponents = settings.Json
             };
             if (settings.Json)
             {
@@ -118,20 +107,9 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
         private static string? GetFilePath(Settings settings)
         {
-            if (!string.IsNullOrEmpty(settings.PathOption))
-                return settings.PathOption;
             if (!string.IsNullOrEmpty(settings.PathArgument))
                 return settings.PathArgument;
             return null;
-        }
-
-        private static string GetXpath(Settings settings)
-        {
-            if (!string.IsNullOrEmpty(settings.XpathOption))
-                return settings.XpathOption;
-            if (!string.IsNullOrEmpty(settings.PathOption))
-                return settings.PathArgument ?? "";
-            return settings.XpathArgument ?? "";
         }
 
         private static IntelOrca.Biohazard.REE.Rsz.RszTypeRepository? GetRszTypeRepository(string game)

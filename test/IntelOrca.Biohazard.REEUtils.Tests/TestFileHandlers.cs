@@ -1,8 +1,12 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Text.Json;
 using IntelOrca.Biohazard.REE.Package;
 using IntelOrca.Biohazard.REE.Rsz;
 using IntelOrca.Biohazard.REEUtils.Tools;
+using IntelOrca.Biohazard.REEUtils.FileTypes;
+using Spectre.Console;
 
 namespace IntelOrca.Biohazard.REEUtils.Tests
 {
@@ -90,6 +94,92 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             Assert.Contains("\"Name\": \"SceneMcp\"", sceneJson);
         }
 
+        [Fact]
+        public void SceneTree_Expands_Selected_Xpath()
+        {
+            var repo = GetRepository();
+            var child = new RszGameObject(
+                Guid.Parse("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
+                null,
+                CreateGameObjectSettings(repo, "Child"),
+                [repo.Create("via.Transform")],
+                []);
+            var scene = new RszScene().Add(new RszGameObject(
+                Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                null,
+                CreateGameObjectSettings(repo, "Root"),
+                [repo.Create("via.Transform")],
+                [child]));
+
+            var handler = new SceneFileHandler("test.scn.20", BuildSceneFile(repo, scene), 20, repo);
+            var collapsed = RenderTree(handler.GetTree(new TreeOptions { Depth = 1 }));
+            var expanded = RenderTree(handler.GetTree(new TreeOptions { Depth = 1, Xpaths = ["Root"] }));
+
+            Assert.DoesNotContain("{via.Transform}", collapsed);
+            Assert.Contains("{via.Transform}", expanded);
+            Assert.Contains("Child", expanded);
+            Assert.DoesNotContain("Child\n", collapsed);
+            Assert.Equal(1, CountOccurrences(expanded, "{via.Transform}"));
+        }
+
+        [Fact]
+        public void SceneFileHandler_GetJson_Selects_Scene_Xpath()
+        {
+            var repo = GetRepository();
+            var scene = new RszScene().Add(new RszGameObject(
+                Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                null,
+                CreateGameObjectSettings(repo, "Root"),
+                [repo.Create("via.Transform")],
+                [new RszGameObject(
+                    Guid.Parse("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
+                    null,
+                    CreateGameObjectSettings(repo, "Child"),
+                    [repo.Create("via.Transform")],
+                    [])]));
+
+            var handler = new SceneFileHandler("test.scn.20", BuildSceneFile(repo, scene), 20, repo);
+            using var json = handler.GetJson(new TreeOptions { Depth = 0, CompactComponents = true });
+
+            var rootObject = Assert.Single(json.RootElement.GetProperty("@children").EnumerateArray());
+            var childObject = Assert.Single(rootObject.GetProperty("@children").EnumerateArray());
+            var rootComponent = Assert.Single(rootObject.GetProperty("@components").EnumerateArray());
+            var childComponent = Assert.Single(childObject.GetProperty("@components").EnumerateArray());
+
+            Assert.Single(rootComponent.EnumerateObject());
+            Assert.Single(childComponent.EnumerateObject());
+            Assert.Equal("Child", childObject.GetProperty("Name").GetString());
+        }
+
+        [Fact]
+        public void SceneFileHandler_GetJson_Only_Expands_Matched_GameObject_Components()
+        {
+            var repo = GetRepository();
+            var scene = new RszScene().Add(new RszGameObject(
+                Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                null,
+                CreateGameObjectSettings(repo, "Root"),
+                [repo.Create("via.Transform")],
+                [new RszGameObject(
+                    Guid.Parse("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
+                    null,
+                    CreateGameObjectSettings(repo, "Child"),
+                    [repo.Create("via.Transform")],
+                    [])]));
+
+            var handler = new SceneFileHandler("test.scn.20", BuildSceneFile(repo, scene), 20, repo);
+            using var json = handler.GetJson(new TreeOptions { Xpaths = ["Root"], Depth = 0, CompactComponents = true });
+
+            var rootObject = Assert.Single(json.RootElement.GetProperty("@children").EnumerateArray());
+            var childObject = Assert.Single(rootObject.GetProperty("@children").EnumerateArray());
+            var rootComponent = Assert.Single(rootObject.GetProperty("@components").EnumerateArray());
+            var childComponent = Assert.Single(childObject.GetProperty("@components").EnumerateArray());
+
+            Assert.True(rootComponent.EnumerateObject().Count() > 1);
+            Assert.Single(childComponent.EnumerateObject());
+            Assert.Equal("Child", childObject.GetProperty("Name").GetString());
+        }
+
         private static RszTypeRepository GetRepository() => McpEmbeddedData.GetRszTypeRepository("re9");
 
         private static RszObjectNode CreateGameObjectSettings(RszTypeRepository repo, string name)
@@ -110,5 +200,36 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             builder.Scene = new RszScene().Add(new RszGameObject(guid, null, CreateGameObjectSettings(repo, name), [], []));
             return builder.Build().Data.ToArray();
         }
+
+        private static byte[] BuildSceneFile(RszTypeRepository repo, RszScene scene)
+        {
+            var builder = new ScnFile(20, EmbeddedData.GetFile("empty.scn.20")!).ToBuilder(repo);
+            builder.Scene = scene;
+            return builder.Build().Data.ToArray();
+        }
+
+        private static string RenderTree(Tree tree)
+        {
+            using var writer = new StringWriter();
+            var console = AnsiConsole.Create(new AnsiConsoleSettings
+            {
+                Out = new AnsiConsoleOutput(writer)
+            });
+            console.Write(tree);
+            return writer.ToString();
+        }
+
+        private static int CountOccurrences(string text, string value)
+        {
+            var count = 0;
+            var index = 0;
+            while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) != -1)
+            {
+                count++;
+                index += value.Length;
+            }
+            return count;
+        }
+
     }
 }
