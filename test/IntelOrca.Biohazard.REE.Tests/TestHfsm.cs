@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using IntelOrca.Biohazard.REE.Fsm;
+using Xunit.Sdk;
 
 namespace IntelOrca.Biohazard.REE.Tests
 {
@@ -75,6 +76,10 @@ namespace IntelOrca.Biohazard.REE.Tests
                 _ = hfsm.ExpressionData.InstanceCount;
                 _ = hfsm.UserVariables.VariableCount;
             }
+            catch (SkipException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 throw new InvalidDataException($"Failed to parse HFSM file '{path}'.", ex);
@@ -91,6 +96,10 @@ namespace IntelOrca.Biohazard.REE.Tests
                 var rebuilt = graph.Build();
 
                 AssertSameBytes(path, data, rebuilt.Data.Span);
+            }
+            catch (SkipException)
+            {
+                throw;
             }
             catch (Exception ex)
             {

@@ -91,9 +91,16 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
                 @"D:\SteamLibrary\steamapps\common\RESIDENT EVIL 4  BIOHAZARD RE4"
             };
             var basePath = availablePaths.FirstOrDefault(Directory.Exists);
-            Assert.NotNull(basePath);
+            if (basePath == null)
+            {
+                Assert.Skip("Skipping because a vanilla RE4 install was not found.");
+            }
 
             var patch3 = Path.Combine(basePath, "re_chunk_000.pak.patch_003.pak");
+            if (!File.Exists(patch3))
+            {
+                Assert.Skip($"Skipping because required game pak '{patch3}' was not found.");
+            }
             return new PatchedPakFile(patch3);
         }
     }

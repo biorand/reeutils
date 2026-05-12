@@ -45,7 +45,7 @@ namespace IntelOrca.Biohazard.REE.Tests
                 "natives/stm/streaming/_chainsaw/environment/texture/sm79_600_a_albd.tex.143221013"
             ]);
 
-            var dlcPath = Path.Combine(_pakHelper.GetInstallPath(GameNames.RE4), "dlc", "re_dlc_stm_2109314.pak");
+            var dlcPath = _pakHelper.GetPakFilePath(GameNames.RE4, "dlc", "re_dlc_stm_2109314.pak");
             using var pakFile = new PakFile(dlcPath);
             using var tempFolder = new TempFolder();
             await pakFile.ExtractAllAsync(pakList, tempFolder.Path, TestContext.Current.CancellationToken);
