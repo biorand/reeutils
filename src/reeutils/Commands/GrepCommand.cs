@@ -121,7 +121,7 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                         continue;
                     }
 
-                    // Try full path conversion (e.g. 'spawn/enemy' -> 'natives/stm/spawn/enemy.user.2')
+                    // Try full path conversion
                     var full = GetFullPathFromArg(p);
                     exact = pakList.Entries.FirstOrDefault(x => string.Equals(x, full, StringComparison.OrdinalIgnoreCase));
                     if (exact != null)
@@ -161,8 +161,6 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 }
             }
 
-            var omitPakPath = settings.Paths.Length == 1 && matched.Count == 1;
-
             var patternRegex = new Regex(settings.Pattern, RegexOptions.IgnoreCase);
             var sync = new object();
 
@@ -174,70 +172,10 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                     if (data == null)
                         continue;
 
-                    // Handle .user.<version>
-                    var userMatch = System.Text.RegularExpressions.Regex.IsMatch(entry, @"\.user\.\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    var scnMatch = System.Text.RegularExpressions.Regex.Match(entry, @"\.scn\.(\d+)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                    var pfbMatch = System.Text.RegularExpressions.Regex.Match(entry, @"\.pfb\.(\d+)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-                    if (userMatch && repo != null)
+                    var searchable = GetSearchableContent(entry, data, repo);
+                    foreach (Match match in patternRegex.Matches(searchable))
                     {
-                        var userFile = new UserFile(data);
-                        var objects = userFile.GetObjects(repo);
-                        for (var oi = 0; oi < objects.Length; oi++)
-                        {
-                            var obj = objects[oi];
-                            var basePath = obj.Type.Name; // starting path for this root object
-                            VisitRszNode(obj, basePath, (propPath, value) =>
-                            {
-                                if (patternRegex.IsMatch(propPath) || patternRegex.IsMatch(value))
-                                {
-                                    var outLine = omitPakPath ? $"{propPath} = {value}" : $"{entry}: {propPath} = {value}";
-                                    lock (sync) Console.WriteLine(outLine);
-                                }
-                            });
-                        }
-                    }
-                    else if (scnMatch.Success && repo != null)
-                    {
-                        var version = int.Parse(scnMatch.Groups[1].Value);
-                        var scn = new ScnFile(version, data).ReadScene(repo);
-                        scn.VisitGameObjects(go =>
-                        {
-                            var goPath = go.Name;
-                            VisitRszNode(go, goPath, (propPath, value) =>
-                            {
-                                if (patternRegex.IsMatch(propPath) || patternRegex.IsMatch(value))
-                                {
-                                    lock (sync) Console.WriteLine($"{entry}: {propPath} = {value}");
-                                }
-                            });
-                        });
-                    }
-                    else if (pfbMatch.Success && repo != null)
-                    {
-                        var version = int.Parse(pfbMatch.Groups[1].Value);
-                        var pfb = new PfbFile(version, data);
-                        var scene = pfb.ReadScene(repo);
-                        scene.VisitGameObjects(go =>
-                        {
-                            var goPath = go.Name;
-                            VisitRszNode(go, goPath, (propPath, value) =>
-                            {
-                                if (patternRegex.IsMatch(propPath) || patternRegex.IsMatch(value))
-                                {
-                                    lock (sync) Console.WriteLine($"{entry}: {propPath} = {value}");
-                                }
-                            });
-                        });
-                    }
-                    else
-                    {
-                        // Fallback: raw text search
-                        var text = System.Text.Encoding.UTF8.GetString(data);
-                        foreach (Match m in patternRegex.Matches(text))
-                        {
-                            lock (sync) Console.WriteLine($"{entry}: {m.Value}");
-                        }
+                        lock (sync) Console.WriteLine($"{entry}: {match.Value}");
                     }
                 }
                 catch (Exception e)
@@ -257,29 +195,12 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             // Local helpers
             static string GetReferencePath(string path)
             {
-                if (path.StartsWith("natives/stm", StringComparison.OrdinalIgnoreCase))
-                {
-                    path = path.Substring(12);
-                }
-                var extensionIndex = path.LastIndexOf('.');
-                if (extensionIndex != -1)
-                    path = path.Substring(0, extensionIndex);
-                return path;
+                return FileHandlerFactory.Default.GetReferencePath(path);
             }
 
             static string GetFullPathFromArg(string path)
             {
-                if (path.StartsWith("natives/stm", StringComparison.OrdinalIgnoreCase))
-                    return path;
-
-                var ender = "";
-                if (path.EndsWith(".user", StringComparison.OrdinalIgnoreCase))
-                    ender = ".2";
-                else if (path.EndsWith(".scn", StringComparison.OrdinalIgnoreCase))
-                    ender = ".20";
-                else if (path.EndsWith(".pfb", StringComparison.OrdinalIgnoreCase))
-                    ender = ".17";
-                return "natives/stm/" + path + ender;
+                return FileHandlerFactory.Default.GetFullPathFromArg(path);
             }
 
             static RszTypeRepository? GetRszTypeRepository(string game)
@@ -295,67 +216,20 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 return null;
             }
 
-            static void VisitRszNode(IRszNode node, string currentPath, Action<string, string> onMatch)
+            static string GetSearchableContent(string entry, byte[] data, RszTypeRepository? repo)
             {
-                if (node is RszStringNode s)
+                try
                 {
-                    onMatch(currentPath, s.Value ?? "");
+                    var handler = FileHandlerFactory.Default.Create(entry, data, repo);
+                    if (handler.RequiresTypeRepository && repo == null)
+                        return System.Text.Encoding.UTF8.GetString(data);
+
+                    using var json = handler.GetJson(TreeOptions.Root);
+                    return JsonSupport.ToJsonString(json);
                 }
-                else if (node is RszValueNode v)
+                catch (NotSupportedException)
                 {
-                    onMatch(currentPath, v.ToString() ?? "");
-                }
-                else if (node is RszResourceNode r)
-                {
-                    onMatch(currentPath, r.Value ?? "");
-                }
-                else if (node is RszUserDataNode u)
-                {
-                    onMatch(currentPath, u.Path ?? "");
-                }
-                else if (node is RszArrayNode a)
-                {
-                    for (var i = 0; i < a.Children.Length; i++)
-                    {
-                        var np = $"{currentPath}[{i}]";
-                        VisitRszNode(a.Children[i], np, onMatch);
-                    }
-                }
-                else if (node is RszObjectNode o)
-                {
-                    for (var i = 0; i < o.Children.Length; i++)
-                    {
-                        var fieldName = o.Type.Fields[i].Name;
-                        var np = string.IsNullOrEmpty(currentPath) ? fieldName : $"{currentPath}.{fieldName}";
-                        VisitRszNode(o.Children[i], np, onMatch);
-                    }
-                }
-                else if (node is RszGameObject go)
-                {
-                    var gp = string.IsNullOrEmpty(currentPath) ? go.Name : $"{currentPath}/{go.Name}";
-                    // Make GUID searchable
-                    onMatch($"{gp}.guid", go.Guid.ToString());
-                    // Visit settings
-                    VisitRszNode(go.Settings, gp, onMatch);
-                    // Visit components, include type in braces for clarity (e.g., GameObject{via.Transform}.Position)
-                    for (var i = 0; i < go.Components.Length; i++)
-                    {
-                        var compType = go.Components[i]?.Type?.Name ?? "Unknown";
-                        var cp = $"{gp}{{{compType}}}";
-                        VisitRszNode(go.Components[i], cp, onMatch);
-                    }
-                    // Visit children
-                    foreach (var child in go.Children)
-                    {
-                        VisitRszNode(child, gp + "/" + child.Name, onMatch);
-                    }
-                }
-                else if (node is IRszNodeContainer container)
-                {
-                    foreach (var child in container.Children)
-                    {
-                        VisitRszNode(child, currentPath, onMatch);
-                    }
+                    return System.Text.Encoding.UTF8.GetString(data);
                 }
             }
         }

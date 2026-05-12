@@ -229,14 +229,7 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             /// <returns></returns>
             public static string GetReferencePath(string path)
             {
-                if (path.StartsWith("natives/stm"))
-                {
-                    path = path.Substring(12);
-                }
-                var extensionIndex = path.LastIndexOf('.');
-                if (extensionIndex != -1)
-                    path = path.Substring(0, extensionIndex);
-                return path;
+                return FileHandlerFactory.Default.GetReferencePath(path);
             }
 
             /// <summary>
@@ -247,17 +240,7 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             /// <returns></returns>
             public static string GetFullPath(string path)
             {
-                if (path.StartsWith(NativesPrefix, StringComparison.OrdinalIgnoreCase))
-                    return path;
-
-                var ender = "";
-                if (path.EndsWith(".user", StringComparison.OrdinalIgnoreCase))
-                    ender = ".2";
-                else if (path.EndsWith(".scn", StringComparison.OrdinalIgnoreCase))
-                    ender = ".20";
-                else if (path.EndsWith(".pfb", StringComparison.OrdinalIgnoreCase))
-                    ender = ".17";
-                return NativesPrefix + path + ender;
+                return FileHandlerFactory.Default.GetFullPathFromArg(path);
             }
         }
 

@@ -1,14 +1,8 @@
 ﻿using System;
 using System.ComponentModel;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using IntelOrca.Biohazard.REE.Cryptography;
-using IntelOrca.Biohazard.REE.Fsm;
-using IntelOrca.Biohazard.REE.Messages;
-using IntelOrca.Biohazard.REE.Rsz;
-using Spectre.Console;
 using Spectre.Console.Cli;
 
 namespace IntelOrca.Biohazard.REEUtils.Commands
@@ -29,109 +23,49 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             public string? Game { get; init; }
         }
 
-        public override ValidationResult Validate(CommandContext context, Settings settings)
+        public override Spectre.Console.ValidationResult Validate(CommandContext context, Settings settings)
         {
             if (!File.Exists(settings.InputPath))
             {
-                return ValidationResult.Error($"{settings.InputPath} not found");
+                return Spectre.Console.ValidationResult.Error($"{settings.InputPath} not found");
             }
             if (settings.OutputPath == null)
             {
-                return ValidationResult.Error($"{settings.OutputPath} not specified");
+                return Spectre.Console.ValidationResult.Error($"{settings.OutputPath} not specified");
             }
             return base.Validate(context, settings);
         }
 
         public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
         {
-            if (settings.OutputPath!.EndsWith(".msg.22"))
+            JsonDocument document;
+            using (var stream = new FileStream(settings.InputPath, FileMode.Open, FileAccess.Read))
             {
-                var data = File.ReadAllText(settings.InputPath).DeserializeJson<SerializableMsg>();
-                var msgBuilder = new MsgFile.Builder
-                {
-                    Version = data.Version,
-                    Languages = data.Languages.Cast<LanguageId>().ToList(),
-                    Messages = data.Entries.Select(x => new Msg
-                    {
-                        Guid = x.Guid,
-                        Crc = MurMur3.HashData(x.Name),
-                        Name = x.Name,
-                        Values = x.Values.Select((x, i) => new MsgValue((LanguageId)data.Languages[i], x)).ToList()
-                    }).ToList()
-                }
-                ;
-                var output = msgBuilder.Build();
-                await File.WriteAllBytesAsync(settings.OutputPath!, output.Data.ToArray());
+                document = JsonDocument.Parse(stream);
             }
-            else if (settings.OutputPath!.EndsWith(".user.2"))
+
+            var repository = settings.Game == null ? null : GetRszTypeRepository(settings.Game);
+            var handler = FileHandlerFactory.Default.Create(settings.OutputPath!, Array.Empty<byte>(), repository);
+            if (handler.RequiresTypeRepository && repository == null)
             {
-                if (settings.Game == null)
-                    throw new Exception("Game not specified");
-
-                var repo = GetRszTypeRepository(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
-
-                JsonDocument data;
-                using (var fs = new FileStream(settings.InputPath!, FileMode.Open, FileAccess.Read))
-                {
-                    data = JsonDocument.Parse(fs);
-                }
-                var userFile = new UserFile(EmbeddedData.GetFile("empty.user.2")!).ToBuilder(repo);
-                userFile.Objects = [(RszObjectNode)RszJsonSerializer.Deserialize(data)];
-                await File.WriteAllBytesAsync(settings.OutputPath!, userFile.Build().Data);
+                throw new InvalidOperationException("Game not specified. Use -g <game>.");
             }
-            else if (settings.OutputPath!.EndsWith(".scn.20"))
-            {
-                if (settings.Game == null)
-                    throw new Exception("Game not specified");
 
-                var repo = GetRszTypeRepository(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
-
-                JsonDocument data;
-                using (var fs = new FileStream(settings.InputPath!, FileMode.Open, FileAccess.Read))
-                {
-                    data = JsonDocument.Parse(fs);
-                }
-                var scnFile = new ScnFile(20, EmbeddedData.GetFile("empty.scn.20")!).ToBuilder(repo);
-                scnFile.Scene = (RszScene)RszJsonSerializer.Deserialize(data);
-                await File.WriteAllBytesAsync(settings.OutputPath!, scnFile.Build().Data);
-            }
-            else if (settings.OutputPath!.EndsWith(".pfb.17"))
-            {
-                if (settings.Game == null)
-                    throw new Exception("Game not specified");
-
-                var repo = GetRszTypeRepository(settings.Game) ?? throw new Exception($"{settings.Game} not recognized.");
-
-                JsonDocument data;
-                using (var fs = new FileStream(settings.InputPath!, FileMode.Open, FileAccess.Read))
-                {
-                    data = JsonDocument.Parse(fs);
-                }
-                var pfbFile = new PfbFile(17, EmbeddedData.GetFile("empty.pfb.17")!).ToBuilder(repo);
-                pfbFile.Scene = (RszScene)RszJsonSerializer.Deserialize(data);
-                await File.WriteAllBytesAsync(settings.OutputPath!, pfbFile.Build().Data);
-            }
-            else if (settings.OutputPath!.EndsWith(".fsm.16"))
-            {
-                var json = await File.ReadAllTextAsync(settings.InputPath);
-                var graph = JsonSerializer.Deserialize<HfsmGraphDocument>(json)
-                    ?? throw new InvalidDataException("Failed to deserialize HFSM graph.");
-                await File.WriteAllBytesAsync(settings.OutputPath!, graph.Build().Data);
-            }
-            else
-            {
-                throw new NotSupportedException("File format not supported.");
-            }
+            var bytes = handler.Import(document);
+            await File.WriteAllBytesAsync(settings.OutputPath!, bytes);
             return 0;
         }
 
-        private static RszTypeRepository? GetRszTypeRepository(string game)
+        private static IntelOrca.Biohazard.REE.Rsz.RszTypeRepository? GetRszTypeRepository(string game)
         {
-            var rszJsonGz = EmbeddedData.GetCompressedFile($"rsz{game}.json");
-            if (rszJsonGz == null)
+            try
+            {
+                return McpEmbeddedData.GetRszTypeRepository(game);
+            }
+            catch
+            {
                 return null;
-
-            return RszRepositorySerializer.Default.FromJsonGz(rszJsonGz);
+            }
         }
     }
 }

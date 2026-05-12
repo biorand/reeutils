@@ -100,7 +100,7 @@ namespace IntelOrca.Biohazard.REEUtils
                 foreach (var entry in PakList.Entries)
                 {
                     if (candidates.Contains(entry) ||
-                        string.Equals(McpServerSupport.GetReferencePath(entry), normalized, StringComparison.OrdinalIgnoreCase))
+                        string.Equals(FileHandlerFactory.Default.GetReferencePath(entry), normalized, StringComparison.OrdinalIgnoreCase))
                     {
                         return entry;
                     }
@@ -148,7 +148,7 @@ namespace IntelOrca.Biohazard.REEUtils
         {
             yield return path;
 
-            var fullPath = McpServerSupport.GetFullPathFromArg(path);
+            var fullPath = FileHandlerFactory.Default.GetFullPathFromArg(path);
             if (!string.Equals(fullPath, path, StringComparison.OrdinalIgnoreCase))
                 yield return fullPath;
         }
