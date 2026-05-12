@@ -8,7 +8,7 @@ namespace IntelOrca.Biohazard.REE.Tests
 {
     public sealed class TestRszSerialization : IDisposable
     {
-        private OriginalPakHelper _pakHelper = new();
+        private readonly OriginalPakHelper _pakHelper = OriginalPakHelper.Default;
 
         public void Dispose()
         {

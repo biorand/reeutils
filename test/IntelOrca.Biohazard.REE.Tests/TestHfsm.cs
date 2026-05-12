@@ -7,7 +7,7 @@ namespace IntelOrca.Biohazard.REE.Tests
 {
     public sealed class TestHfsm : IDisposable
     {
-        private readonly OriginalPakHelper _pakHelper = new();
+        private readonly OriginalPakHelper _pakHelper = OriginalPakHelper.Default;
         private readonly ImmutableArray<string> _fsmPaths;
 
         public TestHfsm()

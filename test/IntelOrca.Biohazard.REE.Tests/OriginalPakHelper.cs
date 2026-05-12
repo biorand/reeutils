@@ -9,11 +9,40 @@ namespace IntelOrca.Biohazard.REE.Tests
     /// </summary>
     internal sealed class OriginalPakHelper : IDisposable
     {
+        public static OriginalPakHelper Default { get; } = new(isSharedInstance: true);
+
         private readonly Dictionary<string, IPakFile> _pakFiles = [];
+        private readonly Dictionary<string, PakList> _pakLists = [];
         private readonly Dictionary<string, RszTypeRepository> _typeRepositories = [];
         private readonly object _sync = new object();
+        private readonly bool _isSharedInstance;
+
+        public OriginalPakHelper()
+        {
+        }
+
+        private OriginalPakHelper(bool isSharedInstance)
+        {
+            _isSharedInstance = isSharedInstance;
+        }
+
+        ~OriginalPakHelper()
+        {
+            DisposePakFiles();
+        }
 
         public void Dispose()
+        {
+            if (_isSharedInstance)
+            {
+                return;
+            }
+
+            DisposePakFiles();
+            GC.SuppressFinalize(this);
+        }
+
+        private void DisposePakFiles()
         {
             foreach (var p in _pakFiles)
             {
@@ -123,15 +152,26 @@ namespace IntelOrca.Biohazard.REE.Tests
 
         public PakList GetPakList(string gameName)
         {
-            var paklistFileName = $"paklist.{gameName.ToLowerInvariant()}.txt.gz";
-            var dataPath = GetEnvironmentVariable("REEUTILS_PAKLIST_DIR",
-                 GetRepoDataPath());
-            var pakListPath = Path.Combine(dataPath, paklistFileName);
-            if (!File.Exists(pakListPath))
+            lock (_sync)
             {
-                Assert.Skip($"Skipping because required pak list '{pakListPath}' was not found.");
+                if (_pakLists.TryGetValue(gameName, out var pakList))
+                {
+                    return pakList;
+                }
+
+                var paklistFileName = $"paklist.{gameName.ToLowerInvariant()}.txt.gz";
+                var dataPath = GetEnvironmentVariable("REEUTILS_PAKLIST_DIR",
+                     GetRepoDataPath());
+                var pakListPath = Path.Combine(dataPath, paklistFileName);
+                if (!File.Exists(pakListPath))
+                {
+                    Assert.Skip($"Skipping because required pak list '{pakListPath}' was not found.");
+                }
+
+                pakList = PakList.FromFile(pakListPath);
+                _pakLists[gameName] = pakList;
+                return pakList;
             }
-            return PakList.FromFile(pakListPath);
         }
 
         private static string GetEnvironmentVariable(string name, string defaultValue)

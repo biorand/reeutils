@@ -4,7 +4,7 @@ namespace IntelOrca.Biohazard.REE.Tests
 {
     public sealed class TestRcol : IDisposable
     {
-        private readonly OriginalPakHelper _pakHelper = new();
+        private readonly OriginalPakHelper _pakHelper = OriginalPakHelper.Default;
 
         public void Dispose()
         {
