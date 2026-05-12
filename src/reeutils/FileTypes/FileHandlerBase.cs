@@ -28,8 +28,7 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
         public virtual Tree GetTree(TreeOptions options)
         {
             using var json = GetJson(options);
-            var title = string.IsNullOrWhiteSpace(options.Xpath) ? System.IO.Path.GetFileName(Path) : options.Xpath;
-            return JsonSupport.CreateTree(json, title);
+            return JsonSupport.CreateTree(json, System.IO.Path.GetFileName(Path));
         }
     }
 }

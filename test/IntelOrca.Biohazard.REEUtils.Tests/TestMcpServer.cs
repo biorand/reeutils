@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Threading;
 using IntelOrca.Biohazard.REE.Cryptography;
 using IntelOrca.Biohazard.REE.Messages;
 using IntelOrca.Biohazard.REE.Package;
+using IntelOrca.Biohazard.REE.Rsz;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 
@@ -49,13 +51,16 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
 
             const string textPath = "natives/stm/leveldesign/chapter/test/test.txt";
             const string msgPath = "natives/stm/message/test.msg.22";
+            const string scenePath = "natives/stm/test/scene/test.scn.20";
+            var repo = McpEmbeddedData.GetRszTypeRepository("re9");
 
             var pakBuilder = new PakFileBuilder();
             pakBuilder.AddEntry(textPath, Encoding.UTF8.GetBytes("This contains LevelFlow text."));
             pakBuilder.AddEntry(msgPath, BuildMsg("Greeting", "Hello MCP"));
+            pakBuilder.AddEntry(scenePath, BuildSceneFile(repo));
             pakBuilder.Save(pakPath);
 
-            File.WriteAllText(pakListPath, string.Join('\n', new[] { textPath, msgPath }) + "\n");
+            File.WriteAllText(pakListPath, string.Join('\n', new[] { textPath, msgPath, scenePath }) + "\n");
 
             await using var client = await CreateClientAsync(cancellationToken);
 
@@ -110,6 +115,42 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             {
                 ["game"] = "re9"
             }, cancellationToken);
+
+            var collapsedSceneText = await CallToolTextAsync(client, "read", new Dictionary<string, object?>
+            {
+                ["path"] = scenePath
+            }, cancellationToken);
+            Assert.Contains("\"@type\": \"via.Transform\"", collapsedSceneText);
+
+            var expandedSceneText = await CallToolTextAsync(client, "read", new Dictionary<string, object?>
+            {
+                ["path"] = scenePath,
+                ["xpaths"] = new[] { "Root" }
+            }, cancellationToken);
+
+            var fullSceneText = await CallToolTextAsync(client, "read", new Dictionary<string, object?>
+            {
+                ["path"] = scenePath,
+                ["full"] = true
+            }, cancellationToken);
+
+            using var collapsedSceneJson = JsonDocument.Parse(collapsedSceneText);
+            using var expandedSceneJson = JsonDocument.Parse(expandedSceneText);
+            using var fullSceneJson = JsonDocument.Parse(fullSceneText);
+
+            var collapsedRootComponent = GetFirstComponent(collapsedSceneJson.RootElement);
+            var collapsedChildComponent = GetFirstChildComponent(collapsedSceneJson.RootElement);
+            var expandedRootComponent = GetFirstComponent(expandedSceneJson.RootElement);
+            var expandedChildComponent = GetFirstChildComponent(expandedSceneJson.RootElement);
+            var fullRootComponent = GetFirstComponent(fullSceneJson.RootElement);
+            var fullChildComponent = GetFirstChildComponent(fullSceneJson.RootElement);
+
+            Assert.Single(collapsedRootComponent.EnumerateObject());
+            Assert.Single(collapsedChildComponent.EnumerateObject());
+            Assert.True(expandedRootComponent.EnumerateObject().Count() > 1);
+            Assert.Single(expandedChildComponent.EnumerateObject());
+            Assert.True(fullRootComponent.EnumerateObject().Count() > 1);
+            Assert.True(fullChildComponent.EnumerateObject().Count() > 1);
 
             var getTypeText = await CallToolTextAsync(client, "get_type", new Dictionary<string, object?>
             {
@@ -177,6 +218,38 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
                 ]
             };
             return builder.Build().Data.ToArray();
+        }
+
+        private static byte[] BuildSceneFile(IntelOrca.Biohazard.REE.Rsz.RszTypeRepository repo)
+        {
+            var scene = new IntelOrca.Biohazard.REE.Rsz.RszScene().Add(new IntelOrca.Biohazard.REE.Rsz.RszGameObject(
+                Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                null,
+                repo.Create("via.GameObject").Set("Name", "Root"),
+                [repo.Create("via.Transform")],
+                [new IntelOrca.Biohazard.REE.Rsz.RszGameObject(
+                    Guid.Parse("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
+                    null,
+                    repo.Create("via.GameObject").Set("Name", "Child"),
+                    [repo.Create("via.Transform")],
+                    [])]));
+
+            var builder = new IntelOrca.Biohazard.REE.Rsz.ScnFile(20, EmbeddedData.GetFile("empty.scn.20")!).ToBuilder(repo);
+            builder.Scene = scene;
+            return builder.Build().Data.ToArray();
+        }
+
+        private static JsonElement GetFirstComponent(JsonElement root)
+        {
+            var gameObject = Assert.Single(root.GetProperty("@children").EnumerateArray());
+            return Assert.Single(gameObject.GetProperty("@components").EnumerateArray());
+        }
+
+        private static JsonElement GetFirstChildComponent(JsonElement root)
+        {
+            var gameObject = Assert.Single(root.GetProperty("@children").EnumerateArray());
+            var childObject = Assert.Single(gameObject.GetProperty("@children").EnumerateArray());
+            return Assert.Single(childObject.GetProperty("@components").EnumerateArray());
         }
     }
 }

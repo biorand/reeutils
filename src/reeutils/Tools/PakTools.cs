@@ -195,7 +195,9 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
         [McpServerTool(Name = "read", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Reads a supported REE file and returns JSON.")]
         public static string Read(
             [Description("A disk path or pak-internal path to read.")] string path,
-            McpSession session)
+            McpSession session,
+            [Description("Scene node paths whose components should be expanded.")] string[]? xpaths = null,
+            [Description("When true, expands all scene components.")] bool full = false)
         {
             var data = session.ReadFileData(path, out var resolvedPath);
             try
@@ -204,7 +206,11 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
                 if (handler.RequiresTypeRepository && session.RszTypeRepository == null)
                     throw new McpException("No RSZ repository is loaded. Call open_rsz or set_game first.");
 
-                using var json = handler.GetJson(TreeOptions.Root);
+                using var json = handler.GetJson(new TreeOptions
+                {
+                    Xpaths = xpaths ?? [],
+                    Full = full
+                });
                 return JsonSupport.ToJsonString(json);
             }
             catch (NotSupportedException ex)

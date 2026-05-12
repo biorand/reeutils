@@ -13,14 +13,8 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
         public override JsonDocument GetJson(TreeOptions options)
         {
             var scene = new ScnFile(Version, Data).ReadScene(Repository);
-            using var raw = SerializeNode(scene, new TreeOptions
-            {
-                Depth = options.Depth
-            });
-
-            return options.CompactComponents
-                ? SceneTreeRenderer.ProjectJson(raw, options)
-                : JsonSupport.ApplyTreeOptions(raw, options);
+            using var raw = SerializeNode(scene, TreeOptions.Root);
+            return SceneTreeRenderer.ProjectJson(raw, options);
         }
 
         public override IEnumerable<string> Search(Regex pattern)

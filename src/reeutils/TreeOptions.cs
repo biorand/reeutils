@@ -4,12 +4,10 @@ namespace IntelOrca.Biohazard.REEUtils
     {
         public static TreeOptions Root { get; } = new TreeOptions
         {
-            Depth = 0
+            Full = true
         };
 
-        public string Xpath { get; init; } = "";
         public string[] Xpaths { get; init; } = [];
-        public int Depth { get; init; } = 1;
-        public bool CompactComponents { get; init; }
+        public bool Full { get; init; }
     }
 }

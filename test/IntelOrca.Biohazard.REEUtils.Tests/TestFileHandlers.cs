@@ -112,18 +112,18 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
                 [child]));
 
             var handler = new SceneFileHandler("test.scn.20", BuildSceneFile(repo, scene), 20, repo);
-            var collapsed = RenderTree(handler.GetTree(new TreeOptions { Depth = 1 }));
-            var expanded = RenderTree(handler.GetTree(new TreeOptions { Depth = 1, Xpaths = ["Root"] }));
+            var collapsed = RenderTree(handler.GetTree(new TreeOptions()));
+            var expanded = RenderTree(handler.GetTree(new TreeOptions { Xpaths = ["Root"] }));
 
             Assert.DoesNotContain("{via.Transform}", collapsed);
             Assert.Contains("{via.Transform}", expanded);
+            Assert.Contains("Child", collapsed);
             Assert.Contains("Child", expanded);
-            Assert.DoesNotContain("Child\n", collapsed);
             Assert.Equal(1, CountOccurrences(expanded, "{via.Transform}"));
         }
 
         [Fact]
-        public void SceneFileHandler_GetJson_Selects_Scene_Xpath()
+        public void SceneFileHandler_GetJson_Does_Not_Expand_Components_By_Default()
         {
             var repo = GetRepository();
             var scene = new RszScene().Add(new RszGameObject(
@@ -139,7 +139,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
                     [])]));
 
             var handler = new SceneFileHandler("test.scn.20", BuildSceneFile(repo, scene), 20, repo);
-            using var json = handler.GetJson(new TreeOptions { Depth = 0, CompactComponents = true });
+            using var json = handler.GetJson(new TreeOptions());
 
             var rootObject = Assert.Single(json.RootElement.GetProperty("@children").EnumerateArray());
             var childObject = Assert.Single(rootObject.GetProperty("@children").EnumerateArray());
@@ -168,7 +168,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
                     [])]));
 
             var handler = new SceneFileHandler("test.scn.20", BuildSceneFile(repo, scene), 20, repo);
-            using var json = handler.GetJson(new TreeOptions { Xpaths = ["Root"], Depth = 0, CompactComponents = true });
+            using var json = handler.GetJson(new TreeOptions { Xpaths = ["Root"] });
 
             var rootObject = Assert.Single(json.RootElement.GetProperty("@children").EnumerateArray());
             var childObject = Assert.Single(rootObject.GetProperty("@children").EnumerateArray());
@@ -178,6 +178,34 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             Assert.True(rootComponent.EnumerateObject().Count() > 1);
             Assert.Single(childComponent.EnumerateObject());
             Assert.Equal("Child", childObject.GetProperty("Name").GetString());
+        }
+
+        [Fact]
+        public void SceneFileHandler_GetJson_Full_Expands_All_GameObject_Components()
+        {
+            var repo = GetRepository();
+            var scene = new RszScene().Add(new RszGameObject(
+                Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                null,
+                CreateGameObjectSettings(repo, "Root"),
+                [repo.Create("via.Transform")],
+                [new RszGameObject(
+                    Guid.Parse("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
+                    null,
+                    CreateGameObjectSettings(repo, "Child"),
+                    [repo.Create("via.Transform")],
+                    [])]));
+
+            var handler = new SceneFileHandler("test.scn.20", BuildSceneFile(repo, scene), 20, repo);
+            using var json = handler.GetJson(new TreeOptions { Full = true });
+
+            var rootObject = Assert.Single(json.RootElement.GetProperty("@children").EnumerateArray());
+            var childObject = Assert.Single(rootObject.GetProperty("@children").EnumerateArray());
+            var rootComponent = Assert.Single(rootObject.GetProperty("@components").EnumerateArray());
+            var childComponent = Assert.Single(childObject.GetProperty("@components").EnumerateArray());
+
+            Assert.True(rootComponent.EnumerateObject().Count() > 1);
+            Assert.True(childComponent.EnumerateObject().Count() > 1);
         }
 
         private static RszTypeRepository GetRepository() => McpEmbeddedData.GetRszTypeRepository("re9");

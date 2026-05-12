@@ -16,7 +16,7 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
             var xpaths = GetXpaths(options);
             foreach (var child in scene.Children)
             {
-                PrintSceneNode(root, child, "", xpaths, options.Depth, false);
+                PrintSceneNode(root, child, "", xpaths, options.Full);
             }
             return root;
         }
@@ -47,7 +47,7 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
             using var stream = new MemoryStream();
             using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
             {
-                WriteProjectedNode(writer, document.RootElement, "", xpaths);
+                WriteProjectedNode(writer, document.RootElement, "", xpaths, options.Full);
             }
             return JsonDocument.Parse(stream.ToArray());
         }
@@ -60,14 +60,12 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
 
-        private static void PrintSceneNode(IHasTreeNodes parent, IRszSceneNode node, string currentPath, HashSet<string> xpaths, int remainingDepth, bool forceShow)
+        private static void PrintSceneNode(IHasTreeNodes parent, IRszSceneNode node, string currentPath, HashSet<string> xpaths, bool full)
         {
             if (node is RszFolder folder)
             {
                 var folderName = folder.Name;
                 var newPath = string.IsNullOrEmpty(currentPath) ? folderName : $"{currentPath}/{folderName}";
-                var match = MatchesFilter(newPath, xpaths) || MatchesFilter(folderName, xpaths);
-                var descendantMatch = AnyChildMatches(folder, newPath, xpaths);
 
                 var externalPath = GetFolderExternalPath(folder);
                 var label = string.IsNullOrEmpty(externalPath)
@@ -75,13 +73,9 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
                     : $"[lightskyblue1]{Escape(folderName)}/[/] [dim](external: {Escape(externalPath)})[/]";
                 var treeNode = parent.AddNode(label);
 
-                if (forceShow || match || descendantMatch || remainingDepth > 0)
+                foreach (var child in folder.Children)
                 {
-                    var nextDepth = NextDepth(remainingDepth, match || forceShow, descendantMatch);
-                    foreach (var child in folder.Children)
-                    {
-                        PrintSceneNode(treeNode, child, newPath, xpaths, nextDepth, forceShow || match);
-                    }
+                    PrintSceneNode(treeNode, child, newPath, xpaths, full);
                 }
             }
             else if (node is RszGameObject gameObject)
@@ -89,8 +83,6 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
                 var goName = gameObject.Name;
                 var goGuid = gameObject.Guid.ToString();
                 var newPath = string.IsNullOrEmpty(currentPath) ? goName : $"{currentPath}/{goName}";
-                var match = MatchesFilter(newPath, xpaths) || MatchesFilter(goName, xpaths) || MatchesFilter(goGuid, xpaths);
-                var descendantMatch = AnyChildMatches(gameObject, newPath, xpaths);
 
                 var componentList = gameObject.Components
                     .Where(c => c.Type.Name != "via.Transform")
@@ -103,7 +95,7 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
                     : $"[white]{Escape(goName)}[/] [green]{goGuid}[/] {componentSummary}";
                 var treeNode = parent.AddNode(label);
 
-                if (match)
+                if (ShouldExpandComponents(xpaths, full, newPath, goName, goGuid))
                 {
                     foreach (var component in gameObject.Components)
                     {
@@ -111,13 +103,9 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
                     }
                 }
 
-                if (forceShow || match || descendantMatch || remainingDepth > 0)
+                foreach (var child in gameObject.Children)
                 {
-                    var nextDepth = NextDepth(remainingDepth, match || forceShow, descendantMatch);
-                    foreach (var child in gameObject.Children)
-                    {
-                        PrintSceneNode(treeNode, child, newPath, xpaths, nextDepth, forceShow || match);
-                    }
+                    PrintSceneNode(treeNode, child, newPath, xpaths, full);
                 }
             }
         }
@@ -164,50 +152,6 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
             }
         }
 
-        private static bool AnyChildMatches(RszFolder folder, string currentPath, HashSet<string> xpaths)
-        {
-            foreach (var child in folder.Children)
-            {
-                if (ContainsMatch(child, currentPath, xpaths))
-                    return true;
-            }
-            return false;
-        }
-
-        private static bool AnyChildMatches(RszGameObject gameObject, string currentPath, HashSet<string> xpaths)
-        {
-            foreach (var child in gameObject.Children)
-            {
-                if (ContainsMatch(child, currentPath, xpaths))
-                    return true;
-            }
-            return false;
-        }
-
-        private static bool ContainsMatch(IRszSceneNode node, string currentPath, HashSet<string> xpaths)
-        {
-            if (node is RszFolder folder)
-            {
-                var folderName = folder.Name;
-                var newPath = string.IsNullOrEmpty(currentPath) ? folderName : $"{currentPath}/{folderName}";
-                if (MatchesFilter(newPath, xpaths) || MatchesFilter(folderName, xpaths))
-                    return true;
-                return AnyChildMatches(folder, newPath, xpaths);
-            }
-
-            if (node is RszGameObject gameObject)
-            {
-                var goName = gameObject.Name;
-                var goGuid = gameObject.Guid.ToString();
-                var newPath = string.IsNullOrEmpty(currentPath) ? goName : $"{currentPath}/{goName}";
-                if (MatchesFilter(newPath, xpaths) || MatchesFilter(goName, xpaths) || MatchesFilter(goGuid, xpaths))
-                    return true;
-                return AnyChildMatches(gameObject, newPath, xpaths);
-            }
-
-            return false;
-        }
-
         private static bool MatchesFilter(string value, HashSet<string> xpaths)
         {
             if (xpaths.Count == 0)
@@ -222,15 +166,9 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
             return false;
         }
 
-        private static int NextDepth(int remainingDepth, bool matched, bool descendantMatch)
+        private static bool ShouldExpandComponents(HashSet<string> xpaths, bool full, string path, string name, string guid)
         {
-            if (matched)
-                return -1;
-            if (descendantMatch)
-                return remainingDepth;
-            if (remainingDepth <= 0)
-                return 0;
-            return remainingDepth - 1;
+            return full || MatchesFilter(path, xpaths) || MatchesFilter(name, xpaths) || MatchesFilter(guid, xpaths);
         }
 
         private static string GetComponentSummary(List<string> componentList)
@@ -313,7 +251,7 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
             return path.TrimEnd('/');
         }
 
-        private static void WriteProjectedNode(Utf8JsonWriter writer, JsonElement element, string currentPath, HashSet<string> xpaths)
+        private static void WriteProjectedNode(Utf8JsonWriter writer, JsonElement element, string currentPath, HashSet<string> xpaths, bool full)
         {
             if (element.ValueKind != JsonValueKind.Object)
             {
@@ -327,26 +265,26 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
 
             if (type == "via.GameObject")
             {
-                WriteGameObject(writer, element, currentPath, xpaths);
+                WriteGameObject(writer, element, currentPath, xpaths, full);
                 return;
             }
 
             if (type == "via.Folder")
             {
-                WriteFolder(writer, element, currentPath, xpaths);
+                WriteFolder(writer, element, currentPath, xpaths, full);
                 return;
             }
 
             if (element.TryGetProperty("@children", out _))
             {
-                WriteSceneRoot(writer, element, currentPath, xpaths);
+                WriteSceneRoot(writer, element, currentPath, xpaths, full);
                 return;
             }
 
             WriteGenericObject(writer, element);
         }
 
-        private static void WriteSceneRoot(Utf8JsonWriter writer, JsonElement element, string currentPath, HashSet<string> xpaths)
+        private static void WriteSceneRoot(Utf8JsonWriter writer, JsonElement element, string currentPath, HashSet<string> xpaths, bool full)
         {
             writer.WriteStartObject();
             foreach (var property in element.EnumerateObject())
@@ -354,7 +292,7 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
                 writer.WritePropertyName(property.Name);
                 if (property.NameEquals("@children"))
                 {
-                    WriteChildren(writer, property.Value, currentPath, xpaths);
+                    WriteChildren(writer, property.Value, currentPath, xpaths, full);
                 }
                 else
                 {
@@ -364,7 +302,7 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
             writer.WriteEndObject();
         }
 
-        private static void WriteFolder(Utf8JsonWriter writer, JsonElement element, string currentPath, HashSet<string> xpaths)
+        private static void WriteFolder(Utf8JsonWriter writer, JsonElement element, string currentPath, HashSet<string> xpaths, bool full)
         {
             var name = element.TryGetProperty("Name", out var nameElement) ? nameElement.GetString() ?? "" : "";
             var nextPath = string.IsNullOrEmpty(currentPath) ? name : $"{currentPath}/{name}";
@@ -375,7 +313,7 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
                 writer.WritePropertyName(property.Name);
                 if (property.NameEquals("@children"))
                 {
-                    WriteChildren(writer, property.Value, nextPath, xpaths);
+                    WriteChildren(writer, property.Value, nextPath, xpaths, full);
                 }
                 else
                 {
@@ -385,12 +323,12 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
             writer.WriteEndObject();
         }
 
-        private static void WriteGameObject(Utf8JsonWriter writer, JsonElement element, string currentPath, HashSet<string> xpaths)
+        private static void WriteGameObject(Utf8JsonWriter writer, JsonElement element, string currentPath, HashSet<string> xpaths, bool full)
         {
             var name = element.TryGetProperty("Name", out var nameElement) ? nameElement.GetString() ?? "" : "";
             var guid = element.TryGetProperty("@guid", out var guidElement) ? guidElement.GetString() ?? "" : "";
             var nextPath = string.IsNullOrEmpty(currentPath) ? name : $"{currentPath}/{name}";
-            var expandComponents = MatchesFilter(nextPath, xpaths) || MatchesFilter(name, xpaths) || MatchesFilter(guid, xpaths);
+            var expandComponents = ShouldExpandComponents(xpaths, full, nextPath, name, guid);
 
             writer.WriteStartObject();
             foreach (var property in element.EnumerateObject())
@@ -402,7 +340,7 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
                 }
                 else if (property.NameEquals("@children"))
                 {
-                    WriteChildren(writer, property.Value, nextPath, xpaths);
+                    WriteChildren(writer, property.Value, nextPath, xpaths, full);
                 }
                 else
                 {
@@ -412,12 +350,12 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
             writer.WriteEndObject();
         }
 
-        private static void WriteChildren(Utf8JsonWriter writer, JsonElement children, string currentPath, HashSet<string> xpaths)
+        private static void WriteChildren(Utf8JsonWriter writer, JsonElement children, string currentPath, HashSet<string> xpaths, bool full)
         {
             writer.WriteStartArray();
             foreach (var child in children.EnumerateArray())
             {
-                WriteProjectedNode(writer, child, currentPath, xpaths);
+                WriteProjectedNode(writer, child, currentPath, xpaths, full);
             }
             writer.WriteEndArray();
         }

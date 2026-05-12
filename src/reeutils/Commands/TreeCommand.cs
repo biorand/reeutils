@@ -1,7 +1,6 @@
 using System;
 using System.ComponentModel;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using IntelOrca.Biohazard.REE.Package;
 using Spectre.Console;
@@ -31,6 +30,10 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             [Description("Node paths to fully expand")]
             [CommandArgument(1, "[xpaths...]")]
             public string[] Xpaths { get; init; } = [];
+
+            [Description("Always expand all components")]
+            [CommandOption("--full")]
+            public bool Full { get; init; }
         }
 
         public override ValidationResult Validate(CommandContext context, Settings settings)
@@ -87,10 +90,8 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
             var treeOptions = new TreeOptions
             {
-                Xpath = "",
                 Xpaths = settings.Xpaths,
-                Depth = settings.Json ? 0 : 1,
-                CompactComponents = settings.Json
+                Full = settings.Full
             };
             if (settings.Json)
             {
