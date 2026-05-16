@@ -2,10 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using IntelOrca.Biohazard.REE.Cryptography;
 using IntelOrca.Biohazard.REE.Package;
+using IntelOrca.Biohazard.REEUtils;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -96,36 +95,14 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
             if (pakList != null)
             {
-                foreach (var entry in pakList.Entries)
-                {
-                    if (string.IsNullOrEmpty(entry))
-                        continue;
-
-                    ulong hash;
-                    try
-                    {
-                        hash = ComputeNormalizedPathHash(entry);
-                    }
-                    catch
-                    {
-                        continue;
-                    }
-
-                    if (!existingHashes.Contains(hash))
-                        continue;
-
-                    if (MatchesPatterns(entry, settings.Patterns))
-                    {
-                        results.Add(entry);
-                    }
-                }
+                results.AddRange(PakPathMatcher.FindMatchingEntries(pak, pakList, settings.Patterns));
             }
             else
             {
                 foreach (var hash in existingHashes)
                 {
                     var name = hash.ToString("X16");
-                    if (MatchesPatterns(name, settings.Patterns))
+                    if (PakPathMatcher.MatchesPatterns(name, settings.Patterns))
                     {
                         results.Add(name);
                     }
@@ -138,40 +115,6 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             }
 
             return Task.FromResult(0);
-        }
-
-        private static bool MatchesPatterns(string entry, string[] patterns)
-        {
-            foreach (var p in patterns)
-            {
-                if (p.Contains('*') || p.Contains('?'))
-                {
-                    var rx = new Regex("^" + Regex.Escape(p).Replace("\\*", ".*").Replace("\\?", ".") + "$", RegexOptions.IgnoreCase);
-                    if (rx.IsMatch(entry))
-                        return true;
-                }
-                else if (entry.IndexOf(p, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private static ulong ComputeNormalizedPathHash(string path)
-        {
-            path = path.Replace("\\", "/");
-            if (path.Contains("__Unknown"))
-            {
-                var pathWithoutExtension = Path.GetFileNameWithoutExtension(path);
-                return Convert.ToUInt64(pathWithoutExtension, 16);
-            }
-            else
-            {
-                var lower = (uint)MurMur3.HashData(path.ToLowerInvariant());
-                var upper = (uint)MurMur3.HashData(path.ToUpperInvariant());
-                return ((ulong)upper << 32) | lower;
-            }
         }
     }
 }

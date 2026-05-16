@@ -69,6 +69,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             Assert.Contains("open_pak_list", toolNames);
             Assert.Contains("list_games", toolNames);
             Assert.Contains("search", toolNames);
+            Assert.Contains("find", toolNames);
             Assert.Contains("read", toolNames);
             Assert.Contains("set_game", toolNames);
             Assert.Contains("get_type", toolNames);
@@ -82,6 +83,13 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
                 ["path"] = pakPath
             }, cancellationToken);
             Assert.Contains(pakPath.Replace("\\", "\\\\"), openPakText);
+
+            var findError = await client.CallToolAsync("find", new Dictionary<string, object?>
+            {
+                ["patterns"] = new[] { "*.txt" }
+            }, cancellationToken: cancellationToken);
+            Assert.True(findError.IsError is true);
+            Assert.Contains("No pak list is loaded", GetText(findError));
 
             await CallToolTextAsync(client, "open_pak_list", new Dictionary<string, object?>
             {
@@ -165,6 +173,54 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
                 ["includeEnums"] = false
             }, cancellationToken);
             Assert.Contains("InventorySlotCapacitySetting", generateClassText);
+        }
+
+        [Fact]
+        public async Task Mcp_Find_Returns_Matching_Paths()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            using var temp = new TempFolder();
+            var pakPath = temp.GetSubPath("test.pak");
+            var pakListPath = temp.GetSubPath("paklist.txt");
+
+            const string textPath = "natives/stm/leveldesign/chapter/test/test.txt";
+            const string msgPath = "natives/stm/message/test.msg.22";
+            const string scenePath = "natives/stm/test/scene/test.scn.20";
+
+            var pakBuilder = new PakFileBuilder();
+            pakBuilder.AddEntry(textPath, Encoding.UTF8.GetBytes("hello"));
+            pakBuilder.AddEntry(msgPath, Encoding.UTF8.GetBytes("hello"));
+            pakBuilder.AddEntry(scenePath, Encoding.UTF8.GetBytes("hello"));
+            pakBuilder.Save(pakPath);
+
+            File.WriteAllText(pakListPath, string.Join('\n', new[] { textPath, msgPath, scenePath }) + "\n");
+
+            await using var client = await CreateClientAsync(cancellationToken);
+            await CallToolTextAsync(client, "open_pak", new Dictionary<string, object?>
+            {
+                ["path"] = pakPath
+            }, cancellationToken);
+            await CallToolTextAsync(client, "open_pak_list", new Dictionary<string, object?>
+            {
+                ["path"] = pakListPath
+            }, cancellationToken);
+
+            var findText = await CallToolTextAsync(client, "find", new Dictionary<string, object?>
+            {
+                ["patterns"] = new[] { "test.scn", "*.txt" }
+            }, cancellationToken);
+
+            using var findJson = JsonDocument.Parse(findText);
+            var paths = findJson.RootElement.GetProperty("paths").EnumerateArray().Select(x => x.GetString()).ToArray();
+            Assert.Equal(new[] { textPath, scenePath }, paths);
+
+            var noMatchText = await CallToolTextAsync(client, "find", new Dictionary<string, object?>
+            {
+                ["patterns"] = new[] { "does-not-exist" }
+            }, cancellationToken);
+
+            using var noMatchJson = JsonDocument.Parse(noMatchText);
+            Assert.Empty(noMatchJson.RootElement.GetProperty("paths").EnumerateArray());
         }
 
         private static async Task<McpClient> CreateClientAsync(CancellationToken cancellationToken)

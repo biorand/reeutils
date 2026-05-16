@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using IntelOrca.Biohazard.REE.Cryptography;
 using IntelOrca.Biohazard.REE.Package;
+using IntelOrca.Biohazard.REEUtils;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
@@ -76,6 +77,25 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
             });
         }
 
+        [McpServerTool(Name = "find", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Finds files in the current pak matching the given path patterns. Requires a loaded pak list.")]
+        public static string Find(
+            [Description("One or more path patterns.")] string[] patterns,
+            McpSession session)
+        {
+            if (patterns == null || patterns.Length == 0)
+                throw new McpException("At least one pattern must be specified.");
+
+            var pak = session.Pak ?? throw new McpException("No pak is open. Call open_pak first.");
+            var pakList = session.PakList ?? throw new McpException("No pak list is loaded. Call open_pak_list or set_game first.");
+            var paths = PakPathMatcher.FindMatchingEntries(pak, pakList, patterns);
+
+            return ToJson(new
+            {
+                patterns,
+                paths
+            });
+        }
+
         [McpServerTool(Name = "list_files", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Lists files or directories in the current pak similarly to the ls command.")]
         public static string ListFiles(
             [Description("Optional pak directory or file path. Leave empty to list the pak root.")] string? path,
@@ -136,7 +156,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
                 ulong hash;
                 try
                 {
-                    hash = ComputeNormalizedPathHash(name);
+                    hash = PakPathMatcher.ComputeNormalizedPathHash(name);
                 }
                 catch
                 {
@@ -310,20 +330,6 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
                 resolvedPath = "";
                 return false;
             }
-        }
-
-        private static ulong ComputeNormalizedPathHash(string path)
-        {
-            path = path.Replace("\\", "/");
-            if (path.Contains("__Unknown"))
-            {
-                var pathWithoutExtension = Path.GetFileNameWithoutExtension(path);
-                return Convert.ToUInt64(pathWithoutExtension, 16);
-            }
-
-            var lower = (uint)MurMur3.HashData(path.ToLowerInvariant());
-            var upper = (uint)MurMur3.HashData(path.ToUpperInvariant());
-            return ((ulong)upper << 32) | lower;
         }
 
         private sealed class ChildEntry
