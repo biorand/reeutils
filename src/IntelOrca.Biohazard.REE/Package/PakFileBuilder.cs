@@ -139,6 +139,7 @@ namespace IntelOrca.Biohazard.REE.Package
                     {
                         var buffer = CompressionKind switch
                         {
+                            CompressionKind.None => entryData,
                             CompressionKind.Deflate => Deflate.CompressData(entryData),
                             CompressionKind.Zstd => Zstd.CompressData(entryData),
                             _ => throw new ArgumentException("CompressionKind not supported")
