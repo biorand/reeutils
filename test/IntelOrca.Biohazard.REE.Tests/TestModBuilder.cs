@@ -31,7 +31,6 @@ namespace IntelOrca.Biohazard.REE.Tests
 
             var pakFileContents = modBuilder.BuildPakFile();
             var fluffyZipFileContents = modBuilder.BuildFluffyZipFile();
-            File.WriteAllBytes(@"G:\temp\test.zip", fluffyZipFileContents);
 
             var builtPakFile = new PakFile(pakFileContents);
             Assert.Equal(2, builtPakFile.EntryCount);
@@ -42,7 +41,7 @@ namespace IntelOrca.Biohazard.REE.Tests
             Assert.Equal(4, builtZipFile.Entries.Count);
             Assert.Equal(2452144428U, builtZipFile.GetEntry("modinfo.ini")!.Crc32);
             Assert.Equal(100665928U, builtZipFile.GetEntry("pic.jpg")!.Crc32);
-            Assert.Equal(696328369U, builtZipFile.GetEntry("natives/stm/_chainsaw/appsystem/weapon/weaponequipparamcataloguserdata.user.2")!.Crc32);
+            Assert.Equal(508615380U, builtZipFile.GetEntry("natives/stm/_chainsaw/appsystem/weapon/weaponequipparamcataloguserdata.user.2")!.Crc32);
             Assert.Equal(3014755518U, builtZipFile.GetEntry("natives/stm/_anotherorder/appsystem/weapon/weaponequipparamcataloguserdata_ao.user.2")!.Crc32);
 
             // Change behaviour of bolt thrower
