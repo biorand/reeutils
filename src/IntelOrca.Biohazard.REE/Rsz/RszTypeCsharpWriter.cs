@@ -202,8 +202,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
             if (type.Name.StartsWith("System."))
                 return decl;
 
-            if (type.Name.StartsWith("via."))
-                return decl;
+            // if (type.Name.StartsWith("via."))
+            //     return decl;
 
             if (type.IsEnum && !GenerateEnums)
                 return decl;
