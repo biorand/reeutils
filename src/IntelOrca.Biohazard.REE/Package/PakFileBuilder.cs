@@ -69,13 +69,18 @@ namespace IntelOrca.Biohazard.REE.Package
             }
         }
 
-        public void Save(string path, CompressionKind CompressionKind = CompressionKind.Zstd)
+        public void Save(string path, CompressionKind compressionKind = CompressionKind.Zstd)
         {
             using var stream = File.OpenWrite(path);
-            Save(stream, CompressionKind);
+            Save(stream, compressionKind);
         }
 
-        public void Save(Stream stream, CompressionKind CompressionKind = CompressionKind.Zstd)
+        public void Save(Stream stream, CompressionKind compressionKind = CompressionKind.Zstd)
+        {
+            Save(stream, _ => compressionKind);
+        }
+
+        public void Save(Stream stream, Func<string, CompressionKind> getCompressionKind)
         {
             var header = new PakFile.Header
             {
@@ -137,7 +142,8 @@ namespace IntelOrca.Biohazard.REE.Package
                     }
                     else
                     {
-                        var buffer = CompressionKind switch
+                        var compressionKind = getCompressionKind(pakEntryPath);
+                        var buffer = getCompressionKind(pakEntryPath) switch
                         {
                             CompressionKind.None => entryData,
                             CompressionKind.Deflate => Deflate.CompressData(entryData),
@@ -148,7 +154,7 @@ namespace IntelOrca.Biohazard.REE.Package
 
                         pakEntry.CompressedSize = buffer.Length;
                         pakEntry.DecompressedSize = entryData.Length;
-                        pakEntry.CompressionType = (byte)CompressionKind;
+                        pakEntry.CompressionType = (byte)compressionKind;
                     }
                 }
                 else
