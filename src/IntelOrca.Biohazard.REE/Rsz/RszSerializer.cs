@@ -348,7 +348,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             if (rszType.Name != targetClrType.FullName!.Replace('+', '.'))
             {
                 // Look for inheritance
-                var foundClrType = targetClrType.Assembly.DefinedTypes.FirstOrDefault(x => x.FullName == rszType.Name);
+                var foundClrType = targetClrType.Assembly.DefinedTypes.FirstOrDefault(x => x.FullName?.Replace('+', '.') == rszType.Name);
                 if (foundClrType == null)
                     throw new Exception($"Expected to deserialize {targetClrType.FullName} but got {rszType.Name}.");
 

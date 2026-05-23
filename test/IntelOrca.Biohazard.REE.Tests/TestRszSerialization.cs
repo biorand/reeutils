@@ -181,8 +181,8 @@ namespace IntelOrca.Biohazard.REE.Tests
                 var data = new List<byte>();
                 foreach (var value in values)
                 {
-                        switch (value)
-                        {
+                    switch (value)
+                    {
                         case float f:
                             data.AddRange(BitConverter.GetBytes(f));
                             break;
@@ -282,6 +282,26 @@ namespace IntelOrca.Biohazard.REE.Tests
             var output = inputBuilder.Build();
             Assert.True(input.Data.Span.SequenceEqual(output.Data.Span));
         }
+
+        [Fact]
+        public void RE9_CRAFTRECIPECATALOGUSERDATA()
+        {
+            var path = "natives/stm/leveldesign/item/userdata/craftrecipecataloguserdata.user.3";
+
+            var repo = _pakHelper.GetTypeRepository(GameNames.RE9);
+            var input = new UserFile(_pakHelper.GetFileData(GameNames.RE9, path));
+            var inputBuilder = input.ToBuilder(repo);
+            var root = inputBuilder.Objects[0];
+            var rootRszType = root.Type;
+            var userData = RszSerializer.Deserialize<app.CraftRecipeCatalogUserData>(root)!;
+
+            var m = Assert.IsType<app.CraftRecipe.MaterialItemData_Basic>(userData._Recipes[22]._MaterialItems[0]);
+            Assert.Equal(1, m._Stock);
+
+            inputBuilder.Objects = [(RszObjectNode)RszSerializer.Serialize(rootRszType, userData)];
+            var output = inputBuilder.Build();
+            Assert.True(input.Data.Span.SequenceEqual(output.Data.Span));
+        }
     }
 }
 
@@ -322,5 +342,60 @@ namespace chainsaw
     {
         public int _Difficulty { get; set; }
         public RszObjectNode? _Result { get; set; }
+    }
+}
+
+namespace app
+{
+    internal class CraftRecipeCatalogUserData
+    {
+        public RszUserDataNode _SoundCatalogUserData { get; set; } = new();
+        public System.Collections.Generic.List<app.CraftRecipe> _Recipes { get; set; } = [];
+    }
+    internal class CraftRecipe
+    {
+        public string _RecipeIDStr { get; set; } = "";
+        public string _RecipeSectionID { get; set; } = "";
+        public bool _IsStartupRecipe { get; set; }
+        public int _UnlockCondition { get; set; }
+        public string _UnlockDifficulty { get; set; } = "";
+        public System.Collections.Generic.List<MaterialItemDataBase> _MaterialItems { get; set; } = [];
+        public System.Collections.Generic.List<ProductItemDataBase> _ProductItems { get; set; } = [];
+        public System.Collections.Generic.List<IgnoreCraftingCharacterSetting> _IgnoreCraftingCharacterSettings { get; set; } = [];
+        internal class IgnoreCraftingCharacterSetting
+        {
+            public string _IgnorePlayerID { get; set; } = "";
+        }
+        internal class MaterialItemData_Basic : MaterialItemDataBase
+        {
+            public int _Stock { get; set; }
+        }
+        internal class MaterialItemData_Contained : MaterialItemDataBase
+        {
+            public int _Stock { get; set; }
+            public System.Collections.Generic.List<OptionalData> _DiscountData { get; set; } = [];
+        }
+        internal class MaterialItemDataBase
+        {
+            public string _ItemID { get; set; } = "";
+        }
+        internal class ProductItemData_Basic : ProductItemDataBase
+        {
+            public int _Stock { get; set; }
+        }
+        internal class ProductItemData_Loadable : ProductItemDataBase
+        {
+            public int _LoadingCount { get; set; }
+            public int _LoadingType { get; set; }
+        }
+        internal class ProductItemDataBase
+        {
+            public string _ItemID { get; set; } = "";
+        }
+        internal class OptionalData
+        {
+            public string _EffectiveItemID { get; set; } = "";
+            public int _Value { get; set; }
+        }
     }
 }
