@@ -21,13 +21,15 @@ namespace IntelOrca.Biohazard.REEUtils
                     .WithExample("unpack", "-g", "re4r", "-o", "output", "input.pak")
                     .WithExample("unpack", "-l", "mylist.txt", "-o", "output", "input.pak");
                 config.AddCommand<ExportCommand>("export")
-                    .WithDescription("Export an REE file to JSON, or an HFSM file to DOT.")
+                    .WithDescription("Exports a file using its handler-specific format.")
                     .WithExample("export", "-o", "ch_mes_main_item_caption.msg.22.json", "ch_mes_main_item_caption.msg.22")
-                    .WithExample("export", "-o", "fsm.dot", "input.fsm.16");
+                    .WithExample("export", "-o", "fsm.dot", "input.fsm.16")
+                    .WithExample("export", "-o", "output.dds", "input.tex.143221013");
                 config.AddCommand<ImportCommand>("import")
-                    .WithDescription("Import a JSON file and convert to an REE file.")
+                    .WithDescription("Imports a file using the destination handler.")
                     .WithExample("import", "-o", "ch_mes_main_item_caption.msg.22", "ch_mes_main_item_caption.msg.22.json")
-                    .WithExample("import", "-o", "input.fsm.16", "input.fsm.16.json");
+                    .WithExample("import", "-o", "input.fsm.16", "input.fsm.16.json")
+                    .WithExample("import", "-o", "input.tex.143221013", "input.dds");
                 config.AddCommand<MsgCommand>("msg")
                     .WithDescription("Lists strings in an MSG file")
                     .WithExample("msg", "input.msg.22");
@@ -38,8 +40,9 @@ namespace IntelOrca.Biohazard.REEUtils
                     .WithDescription("Generates a C# class for an RSZ type.")
                     .WithExample("class", "-g", "re9", "app.InventorySlotCapacitySetting");
                 config.AddCommand<InspectCommand>("inspect")
-                    .WithDescription("Looks through every file in a pak to find paths for a pak list.")
-                    .WithExample("inspect", "-g", "re4", "input.pak");
+                    .WithDescription("Displays metadata for supported REE file types.")
+                    .WithExample("inspect", "input.tex.143221013")
+                    .WithExample("inspect", "--pak", "input.pak", "natives/stm/leveldesign/chapter/chap3_01/chap3_01_level.scn.21");
                 config.AddCommand<GrepCommand>("grep")
                     .WithDescription("Search files in a pak for properties/values matching a regex.")
                     .WithExample("grep", "--pak", "input.pak", "--regex", "pattern", "natives/stm/**/enemy.user.2");

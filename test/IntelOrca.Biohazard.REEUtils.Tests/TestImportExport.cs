@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using IntelOrca.Biohazard.REE.Graphics;
 using IntelOrca.Biohazard.REE.Package;
 using IntelOrca.Biohazard.REEUtils.Commands;
 
@@ -46,6 +47,35 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             await CheckFileAsync(path, ".pfb.17");
         }
 
+        [Fact]
+        public async Task TextureFile_RoundTrips_Dds()
+        {
+            using var tempFolder = new TempFolder();
+            var texPath = tempFolder.GetSubPath("test.tex.36");
+            var ddsPath = tempFolder.GetSubPath("test.dds");
+            var roundTrippedTexPath = tempFolder.GetSubPath("roundtrip.tex.36");
+
+            await File.WriteAllBytesAsync(texPath, BuildTextureFile(), TestContext.Current.CancellationToken);
+
+            var exportCommand = new ExportCommand();
+            await exportCommand.ExecuteAsync(null!, new ExportCommand.Settings()
+            {
+                InputPath = texPath,
+                OutputPath = ddsPath
+            });
+
+            var importCommand = new ImportCommand();
+            await importCommand.ExecuteAsync(null!, new ImportCommand.Settings()
+            {
+                InputPath = ddsPath,
+                OutputPath = roundTrippedTexPath
+            });
+
+            Assert.Equal(
+                await File.ReadAllBytesAsync(texPath, TestContext.Current.CancellationToken),
+                await File.ReadAllBytesAsync(roundTrippedTexPath, TestContext.Current.CancellationToken));
+        }
+
         private async Task CheckFileAsync(string path, string extension)
         {
             using var tempFolder = new TempFolder();
@@ -81,6 +111,31 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             var jsonB = File.ReadAllText(jsonPath);
 
             Assert.Equal(jsonA, jsonB);
+        }
+
+        private static byte[] BuildTextureFile()
+        {
+            using var ms = new MemoryStream();
+            using var bw = new BinaryWriter(ms);
+
+            bw.Write(0x00584554u);
+            bw.Write(143221013u);
+            bw.Write((ushort)64);
+            bw.Write((ushort)32);
+            bw.Write((ushort)0);
+            bw.Write((byte)1);
+            bw.Write((byte)16);
+            bw.Write(98u);
+            bw.Write(0u);
+            bw.Write(0u);
+            bw.Write(0u);
+            bw.Write(new byte[8]);
+            bw.Write(56UL);
+            bw.Write(256u);
+            bw.Write(4u);
+            bw.Write(new byte[] { 1, 2, 3, 4 });
+
+            return ms.ToArray();
         }
 
         private PatchedPakFile GetVanillaPak()

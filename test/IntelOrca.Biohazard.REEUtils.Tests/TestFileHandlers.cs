@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using IntelOrca.Biohazard.REE.Package;
+using IntelOrca.Biohazard.REE.Graphics;
 using IntelOrca.Biohazard.REE.Rsz;
 using IntelOrca.Biohazard.REEUtils.Tools;
 using IntelOrca.Biohazard.REEUtils.FileTypes;
@@ -24,6 +25,17 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             Assert.Equal(
                 "natives/stm/leveldesign/test.pfb.17",
                 FileHandlerFactory.Default.GetFullPathFromArg("leveldesign/test.pfb"));
+        }
+
+        [Fact]
+        public void TextureFileHandler_Summary_Includes_Texture_Metadata()
+        {
+            var handler = FileHandlerFactory.Default.Create("leveldesign/test.tex.143221013", BuildTextureFile());
+            var summary = handler.GetSummary();
+
+            Assert.Equal("TEX", summary["File type"]);
+            Assert.Equal(TextureCompression.Bc7Unorm, summary["Compression"]);
+            Assert.Equal("64x32", summary["Dimensions"]);
         }
 
         [Fact]
@@ -209,6 +221,31 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
         }
 
         private static RszTypeRepository GetRepository() => McpEmbeddedData.GetRszTypeRepository("re9");
+
+        private static byte[] BuildTextureFile()
+        {
+            using var ms = new MemoryStream();
+            using var bw = new BinaryWriter(ms);
+
+            bw.Write(0x00584554u);
+            bw.Write(143221013u);
+            bw.Write((ushort)64);
+            bw.Write((ushort)32);
+            bw.Write((ushort)0);
+            bw.Write((byte)1);
+            bw.Write((byte)16);
+            bw.Write(98u);
+            bw.Write(0u);
+            bw.Write(0u);
+            bw.Write(0u);
+            bw.Write(new byte[8]);
+            bw.Write(56UL);
+            bw.Write(256u);
+            bw.Write(4u);
+            bw.Write(new byte[] { 1, 2, 3, 4 });
+
+            return ms.ToArray();
+        }
 
         private static RszObjectNode CreateGameObjectSettings(RszTypeRepository repo, string name)
         {

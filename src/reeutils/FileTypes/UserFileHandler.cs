@@ -12,6 +12,15 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
     internal sealed class UserFileHandler(string path, byte[] data, int version, RszTypeRepository? repository)
         : RszFileHandlerBase(path, data, version, repository)
     {
+        public override Dictionary<string, object?> GetSummary()
+        {
+            var file = new UserFile(Data);
+            var summary = CreateSummary("USER");
+            summary["RSZ version"] = file.RszVersion;
+            summary["Instance count"] = file.InstanceCount;
+            return summary;
+        }
+
         public override JsonDocument GetJson(TreeOptions options)
         {
             var objects = new UserFile(Data).GetObjects(Repository);

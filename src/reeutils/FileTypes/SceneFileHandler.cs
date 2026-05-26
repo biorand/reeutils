@@ -10,6 +10,18 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
     internal sealed class SceneFileHandler(string path, byte[] data, int version, RszTypeRepository? repository)
         : RszFileHandlerBase(path, data, version, repository)
     {
+        public override Dictionary<string, object?> GetSummary()
+        {
+            var file = new ScnFile(Version, Data);
+            var summary = CreateSummary("SCN");
+            summary["Version"] = file.Version;
+            summary["RSZ version"] = file.RszVersion;
+            summary["Instances"] = file.InstanceCount;
+            summary["Prefabs"] = file.Prefabs.Length;
+            summary["Resources"] = file.Resources.Length;
+            return summary;
+        }
+
         public override JsonDocument GetJson(TreeOptions options)
         {
             var scene = new ScnFile(Version, Data).ReadScene(Repository);

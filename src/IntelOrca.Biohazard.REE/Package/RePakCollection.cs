@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace IntelOrca.Biohazard.REE.Package
 {
@@ -18,6 +19,19 @@ namespace IntelOrca.Biohazard.REE.Package
                 throw new Exception($"Failed to find {BasePakFileName}.");
 
             var patchedMainPak = new PatchedPakFile(basePakPath);
+            var subPaks = new List<IPakFile>();
+
+            foreach (var f in Directory.GetFiles(gamePath))
+            {
+                var fileName = Path.GetFileName(f);
+                if (fileName.StartsWith("re_chunk_000.pak.sub_", StringComparison.OrdinalIgnoreCase) &&
+                    fileName.EndsWith(".pak", StringComparison.OrdinalIgnoreCase) &&
+                    !Regex.IsMatch(fileName, @"\.patch_[0-9]{3}\.pak$", RegexOptions.IgnoreCase))
+                {
+                    subPaks.Add(new PatchedPakFile(f));
+                }
+            }
+
             var dlcPaks = new List<IPakFile>();
 
             foreach (var directory in Directory.GetDirectories(gamePath))
@@ -31,7 +45,7 @@ namespace IntelOrca.Biohazard.REE.Package
                     }
                 }
             }
-            _collection = new PakFileCollection([patchedMainPak, .. dlcPaks]);
+            _collection = new PakFileCollection([patchedMainPak, .. subPaks, .. dlcPaks]);
         }
 
         public void Dispose() => _collection.Dispose();
