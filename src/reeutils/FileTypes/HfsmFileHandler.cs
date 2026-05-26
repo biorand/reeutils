@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using IntelOrca.Biohazard.REE.Fsm;
@@ -6,6 +7,23 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
 {
     internal sealed class HfsmFileHandler(string path, byte[] data) : FileHandlerBase(path, data)
     {
+        public override Dictionary<string, object?> GetSummary()
+        {
+            var file = new HfsmFile(Data);
+            var summary = CreateSummary("HFSM");
+            summary["Version"] = file.Version;
+            summary["Header size"] = file.HeaderSize;
+            summary["Flags"] = $"0x{file.Flags:X2}";
+            summary["State data entries"] = file.StateDataEntryCount;
+            summary["States"] = file.States.Length;
+            summary["Transition groups"] = file.TransitionGroups.Length;
+            summary["Transition infos"] = file.TransitionInfos.Length;
+            summary["Action references"] = file.ActionReferences.Length;
+            summary["Strings"] = file.Strings.Length;
+            summary["Extra strings"] = file.ExtraStrings.Length;
+            return summary;
+        }
+
         public override JsonDocument GetJson(TreeOptions options)
         {
             var graph = HfsmGraphDocument.FromFile(new HfsmFile(Data));

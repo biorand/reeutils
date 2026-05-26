@@ -19,6 +19,7 @@
   - `.user` serialized object data
   - `.scn` scene graphs
   - `.pfb` prefab scene graphs
+  - `.tex` texture headers and mip tables
 
 ## Typical MCP workflow
 
@@ -30,5 +31,6 @@
 
 - `set_game` only loads embedded RSZ and pak-list data. It does not infer or open a pak automatically.
 - `read` returns JSON for `.msg`, `.user`, `.scn`, and `.pfb`.
+- `inspect` prints handler-provided summaries without building: file type, version, size, and type-specific attributes such as texture format and image dimensions.
 - `generate_class` emits C# code from RSZ type metadata.
 - `get_type` returns structured field and inheritance information for an RSZ type.

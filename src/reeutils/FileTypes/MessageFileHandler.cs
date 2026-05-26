@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -8,6 +9,17 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
 {
     internal sealed class MessageFileHandler(string path, byte[] data) : FileHandlerBase(path, data)
     {
+        public override Dictionary<string, object?> GetSummary()
+        {
+            var file = new MsgFile(Data);
+            var summary = CreateSummary("MSG");
+            summary["Version"] = file.Version;
+            summary["Entries"] = file.Count;
+            summary["Languages"] = file.LanguageCount;
+            summary["Attributes"] = file.AttributeCount;
+            return summary;
+        }
+
         public override JsonDocument GetJson(TreeOptions options)
         {
             var msg = new MsgFile(Data).ToBuilder();

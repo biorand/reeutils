@@ -24,6 +24,7 @@ namespace IntelOrca.Biohazard.REEUtils
                 ".user" => new UserFileHandler(path, data, GetVersionOrDefault(info, 2), repository),
                 ".scn" => new SceneFileHandler(path, data, GetVersionOrDefault(info, 20), repository),
                 ".pfb" => new PrefabFileHandler(path, data, GetVersionOrDefault(info, 17), repository),
+                ".tex" => new TextureFileHandler(path, data),
                 _ => throw new NotSupportedException($"Unsupported file format '{info.Extension}'.")
             };
         }

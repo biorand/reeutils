@@ -17,6 +17,10 @@ namespace IntelOrca.Biohazard.REE.Messages
 
         public ReadOnlyMemory<byte> Data => data;
 
+        public int Version => (int)HeaderA.Version;
+
+        public int LanguageCount => Languages.Length;
+
         private ReadOnlySpan<T> GetSpan<T>(ulong offset, int count) where T : unmanaged
         {
             return MemoryMarshal.Cast<byte, T>(data.Slice((int)offset, count * sizeof(T)).Span);

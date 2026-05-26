@@ -2,7 +2,6 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using IntelOrca.Biohazard.REE.Package;
 using Spectre.Console.Cli;
@@ -56,8 +55,7 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 throw new InvalidOperationException("Game not specified. Use -g <game>.");
             }
 
-            using var json = handler.GetJson(TreeOptions.Root);
-            await File.WriteAllTextAsync(settings.OutputPath!, JsonSupport.ToJsonString(json));
+            await File.WriteAllBytesAsync(settings.OutputPath!, handler.Export());
             return 0;
         }
 

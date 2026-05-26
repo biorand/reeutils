@@ -25,6 +25,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public int InstanceCount => Rsz.InstanceCount;
 
+        public int RszVersion => Rsz.Version;
+
         public ImmutableArray<string> Prefabs
         {
             get

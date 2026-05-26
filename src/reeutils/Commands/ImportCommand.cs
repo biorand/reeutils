@@ -1,7 +1,6 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.IO;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Spectre.Console.Cli;
 
@@ -38,12 +37,6 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
         public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
         {
-            JsonDocument document;
-            using (var stream = new FileStream(settings.InputPath, FileMode.Open, FileAccess.Read))
-            {
-                document = JsonDocument.Parse(stream);
-            }
-
             var repository = settings.Game == null ? null : GetRszTypeRepository(settings.Game);
             var handler = FileHandlerFactory.Default.Create(settings.OutputPath!, Array.Empty<byte>(), repository);
             if (handler.RequiresTypeRepository && repository == null)
@@ -51,7 +44,7 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 throw new InvalidOperationException("Game not specified. Use -g <game>.");
             }
 
-            var bytes = handler.Import(document);
+            var bytes = handler.Import(settings.InputPath);
             await File.WriteAllBytesAsync(settings.OutputPath!, bytes);
             return 0;
         }
