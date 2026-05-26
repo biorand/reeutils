@@ -148,6 +148,38 @@ namespace IntelOrca.Biohazard.REE.Tests
                 .ToArray();
         }
 
+        [Theory]
+        [InlineData("natives/x64/objectroot/setmodel/textures/sm70_201_inkribbon01a_a_albm.tex.10", 1024, 1024, -981482334)]
+        [InlineData("natives/x64/objectroot/setmodel/textures/sm70_201_inkribbon01a_a_nrmr.tex.10", 512, 512, 849078052)]
+        [InlineData("natives/x64/streaming/objectroot/setmodel/textures/sm70_201_inkribbon01a_a_albm.tex.10", 2048, 2048, 1348337597)]
+        [InlineData("natives/x64/streaming/objectroot/setmodel/textures/sm70_201_inkribbon01a_a_nrmr.tex.10", 2048, 2048, 1191428912)]
+        public void Reads_RE2R_InkRibbon_Textures(string path, int expectedWidth, int expectedHeight, int expectedDdsHash)
+        {
+            var data = OriginalPakHelper.Default.GetFileData(GameNames.RE2, path);
+            var file = new TextureFile(data);
+
+            Assert.Equal(10u, file.RawVersion);
+            Assert.Equal(10, file.EffectiveVersion);
+            Assert.Equal(expectedWidth, file.Width);
+            Assert.Equal(expectedHeight, file.Height);
+
+            // Export to DDS
+            var ddsBytes = file.ToDdsBytes();
+            var ddsHash = IntelOrca.Biohazard.REE.Cryptography.MurMur3.HashData(ddsBytes);
+            Assert.Equal(expectedDdsHash, ddsHash);
+
+            // Roundtrip check
+            var dds = DdsFile.Read(ddsBytes);
+            var roundtripTexBytes = dds.ToTextureBytes((int)file.RawVersion);
+            var roundtripTex = new TextureFile(roundtripTexBytes);
+
+            Assert.Equal(file.Width, roundtripTex.Width);
+            Assert.Equal(file.Height, roundtripTex.Height);
+            Assert.Equal(file.RawVersion, roundtripTex.RawVersion);
+            Assert.Equal(file.Compression, roundtripTex.Compression);
+            Assert.Equal(file.MipCount, roundtripTex.MipCount);
+        }
+
         private sealed class FakeGDeflateCodec : IGDeflateCodec
         {
             private readonly Dictionary<string, byte[]> _payloads = new();
