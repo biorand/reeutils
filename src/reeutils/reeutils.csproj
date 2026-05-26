@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <RootNamespace>IntelOrca.Biohazard.REEUtils</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.7" />
@@ -15,5 +16,8 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="data/**/*" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="GDeflate/runtimes/**/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

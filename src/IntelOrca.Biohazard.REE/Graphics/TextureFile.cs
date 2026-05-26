@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Immutable;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -8,11 +9,14 @@ namespace IntelOrca.Biohazard.REE.Graphics
     public sealed class TextureFile
     {
         private const uint MAGIC = 0x00584554; // "TEX\0"
+        private const ushort GDeflateMagic = 0xFB04;
 
         private readonly TextureHeaderCommon _header;
         private readonly TextureHeaderV1? _headerV1;
         private readonly TextureHeaderV2? _headerV2;
         private readonly ImmutableArray<TextureMip> _mips;
+        private readonly ImmutableArray<TexturePackedMip> _packedMips;
+        private readonly int _packedPayloadOffset;
 
         public TextureFile(ReadOnlyMemory<byte> data)
         {
@@ -40,6 +44,11 @@ namespace IntelOrca.Biohazard.REE.Graphics
                 _headerV1 = ReadStruct<TextureHeaderV1>(HeaderV1Offset);
                 _mips = ReadMips(HeaderV1MipOffset, _headerV1.Value.NumImages, _headerV1.Value.MipCount);
             }
+
+            _packedMips = TryReadPackedMips();
+            _packedPayloadOffset = _packedMips.IsDefaultOrEmpty || _mips.IsDefaultOrEmpty
+                ? 0
+                : checked((int)_mips[0].Offset + (_packedMips.Length * Marshal.SizeOf<TexturePackedMip>()));
         }
 
         public ReadOnlyMemory<byte> Data { get; }
@@ -72,21 +81,36 @@ namespace IntelOrca.Biohazard.REE.Graphics
 
         public ImmutableArray<TextureMip> Mips => _mips;
 
+        public bool UsesPackedMips => !_packedMips.IsDefaultOrEmpty && _packedMips.Length != 0;
+
         public TextureMip GetMip(int imageIndex = 0, int mipIndex = 0)
         {
             var index = GetMipIndex(imageIndex, mipIndex);
             return _mips[index];
         }
 
-        public ReadOnlyMemory<byte> GetMipData(int imageIndex = 0, int mipIndex = 0)
+        public ReadOnlyMemory<byte> GetMipData(int imageIndex = 0, int mipIndex = 0, IGDeflateCodec? gdeflate = null)
         {
-            var mip = GetMip(imageIndex, mipIndex);
-            return Data.Slice((int)mip.Offset, (int)mip.Size);
+            var index = GetMipIndex(imageIndex, mipIndex);
+            var mip = _mips[index];
+            var mipData = ReadMipBytes(index, mip, gdeflate);
+            if (!DdsFile.TryGetFormatInfo(FormatId, out var formatInfo))
+                return mipData;
+
+            var mipWidth = Math.Max(1, Width >> mipIndex);
+            var mipHeight = Math.Max(1, Height >> mipIndex);
+            var expectedPitch = DdsFile.GetMipPitch(mipWidth, mipHeight, formatInfo);
+            var expectedSize = DdsFile.GetMipSize(mipWidth, mipHeight, formatInfo);
+
+            if (mip.Pitch > expectedPitch)
+                return StripPitch(mipData.Span, mipHeight, (int)mip.Pitch, expectedPitch, formatInfo.IsBlockCompressed);
+
+            return mipData.Slice(0, Math.Min(mipData.Length, Math.Min((int)mip.Size, expectedSize)));
         }
 
-        public byte[] ToDdsBytes()
+        public byte[] ToDdsBytes(IGDeflateCodec? gdeflate = null)
         {
-            return DdsFile.FromTexture(this).ToBytes();
+            return DdsFile.FromTexture(this, gdeflate).ToBytes();
         }
 
         public TextureHeaderCommon Header => _header;
@@ -102,6 +126,43 @@ namespace IntelOrca.Biohazard.REE.Graphics
             if (version == 143221013)
                 return 36;
             return version;
+        }
+
+        private ReadOnlyMemory<byte> ReadMipBytes(int index, TextureMip mip, IGDeflateCodec? gdeflate)
+        {
+            if (!UsesPackedMips)
+            {
+                if (mip.Offset > (ulong)Data.Length || mip.Size > int.MaxValue)
+                    throw new InvalidDataException("TEX mip data exceeds the file size.");
+
+                var mipStart = (int)mip.Offset;
+                var mipSize = (int)mip.Size;
+                if (mipSize > Data.Length - mipStart)
+                    throw new InvalidDataException("TEX mip data exceeds the file size.");
+
+                return Data.Slice(mipStart, mipSize);
+            }
+
+            var packedMip = _packedMips[index];
+            var start = checked(_packedPayloadOffset + (int)packedMip.Offset);
+            var size = checked((int)packedMip.Size);
+            if (start < 0 || size < 0 || start > Data.Length || size > Data.Length - start)
+                throw new InvalidDataException("TEX packed mip data exceeds the file size.");
+
+            var result = Data.Slice(start, size);
+            if (result.Length >= 2 && BinaryPrimitives.ReadUInt16LittleEndian(result.Span) == GDeflateMagic)
+            {
+                if (gdeflate is null)
+                    throw new NotSupportedException("TEX packed mip data is gdeflate-compressed. Provide an IGDeflateCodec.");
+
+                var decoded = gdeflate.Decompress(result, checked((int)mip.Size));
+                if (decoded.Length < mip.Size)
+                    throw new InvalidDataException("GDeflate codec returned less data than the mip requires.");
+
+                return decoded.AsMemory(0, checked((int)mip.Size));
+            }
+
+            return result;
         }
 
         private int GetMipIndex(int imageIndex, int mipIndex)
@@ -138,6 +199,82 @@ namespace IntelOrca.Biohazard.REE.Graphics
             }
 
             return result.ToImmutable();
+        }
+
+        private ImmutableArray<TexturePackedMip> TryReadPackedMips()
+        {
+            if (!UsesPackedMipHeaders() || _mips.IsDefaultOrEmpty || _mips.Length == 0)
+                return [];
+
+            var headerOffset = checked((int)_mips[0].Offset);
+            var headerSize = checked(_mips.Length * Marshal.SizeOf<TexturePackedMip>());
+            if (headerOffset < 0 || headerOffset > Data.Length || headerSize > Data.Length - headerOffset)
+                return [];
+
+            var result = ImmutableArray.CreateBuilder<TexturePackedMip>(_mips.Length);
+            var offset = headerOffset;
+            for (var i = 0; i < _mips.Length; i++)
+            {
+                result.Add(ReadStruct<TexturePackedMip>(offset));
+                offset += Marshal.SizeOf<TexturePackedMip>();
+            }
+
+            var packedPayloadOffset = headerOffset + headerSize;
+            var maxPayloadLength = Data.Length - packedPayloadOffset;
+            var previousOffset = -1;
+            for (var i = 0; i < result.Count; i++)
+            {
+                var packedMip = result[i];
+                if (packedMip.Size > int.MaxValue || packedMip.Offset > int.MaxValue)
+                    return [];
+
+                var packedSize = (int)packedMip.Size;
+                var packedOffset = (int)packedMip.Offset;
+                if (packedSize < 0 || packedOffset < 0)
+                    return [];
+                if (i == 0 && packedOffset != 0)
+                    return [];
+                if (packedOffset < previousOffset)
+                    return [];
+                if (packedOffset + packedSize > maxPayloadLength)
+                    return [];
+
+                previousOffset = packedOffset;
+            }
+
+            return result.ToImmutable();
+        }
+
+        private bool UsesPackedMipHeaders()
+        {
+            return RawVersion switch
+            {
+                241106027u => true,
+                250813143u => true,
+                251111100u => true,
+                _ => false,
+            };
+        }
+
+        private static ReadOnlyMemory<byte> StripPitch(ReadOnlySpan<byte> source, int height, int sourcePitch, int expectedPitch, bool blockCompressed)
+        {
+            var rowCount = blockCompressed
+                ? Math.Max(1, (height + 3) / 4)
+                : height;
+            var result = new byte[checked(rowCount * expectedPitch)];
+            var sourceOffset = 0;
+            var destinationOffset = 0;
+            for (var i = 0; i < rowCount; i++)
+            {
+                if (sourceOffset + expectedPitch > source.Length)
+                    throw new InvalidDataException("TEX mip pitch exceeds the mip data size.");
+
+                source.Slice(sourceOffset, expectedPitch).CopyTo(result.AsSpan(destinationOffset, expectedPitch));
+                sourceOffset += sourcePitch;
+                destinationOffset += expectedPitch;
+            }
+
+            return result;
         }
 
         private T ReadStruct<T>(int offset) where T : unmanaged
@@ -208,5 +345,12 @@ namespace IntelOrca.Biohazard.REE.Graphics
         public ulong Offset;
         public uint Pitch;
         public uint Size;
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public struct TexturePackedMip
+    {
+        public uint Size;
+        public uint Offset;
     }
 }

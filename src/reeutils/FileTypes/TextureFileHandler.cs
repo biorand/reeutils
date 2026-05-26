@@ -3,20 +3,23 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using IntelOrca.Biohazard.REE.Graphics;
+using IntelOrca.Biohazard.REEUtils.GDeflate;
 
 namespace IntelOrca.Biohazard.REEUtils.FileTypes
 {
     internal sealed class TextureFileHandler(string path, byte[] data) : FileHandlerBase(path, data)
     {
+        private static readonly IGDeflateCodec GDeflateCodec = ReeUtilsGDeflateCodec.Instance;
+
         public override byte[] Export()
         {
-            return DdsFile.FromTexture(new TextureFile(Data)).ToBytes();
+            return DdsFile.FromTexture(new TextureFile(Data), GDeflateCodec).ToBytes();
         }
 
         public override byte[] Import(string inputPath)
         {
             var dds = DdsFile.Read(File.ReadAllBytes(inputPath));
-            return dds.ToTextureBytes(GetVersionOrDefault(GetFileInfo(Path), 36));
+            return dds.ToTextureBytes(GetVersionOrDefault(GetFileInfo(Path), 36), GDeflateCodec);
         }
 
         public override Dictionary<string, object?> GetSummary()

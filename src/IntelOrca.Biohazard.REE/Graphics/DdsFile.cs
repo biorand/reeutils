@@ -35,7 +35,7 @@ public sealed class DdsFile
     public byte[][] MipData { get; private set; } = [];
     public byte[]? OriginalTexBytes { get; private set; }
 
-    public static DdsFile FromTexture(TextureFile texture)
+    public static DdsFile FromTexture(TextureFile texture, IGDeflateCodec? gdeflate = null)
     {
         var mipData = new byte[texture.TotalMipCount][];
         var index = 0;
@@ -43,7 +43,7 @@ public sealed class DdsFile
         {
             for (var mipIndex = 0; mipIndex < texture.MipCount; mipIndex++)
             {
-                mipData[index++] = texture.GetMipData(imageIndex, mipIndex).ToArray();
+                mipData[index++] = texture.GetMipData(imageIndex, mipIndex, gdeflate).ToArray();
             }
         }
 
@@ -276,7 +276,7 @@ public sealed class DdsFile
         return data;
     }
 
-    public byte[] ToTextureBytes(int version)
+    public byte[] ToTextureBytes(int version, IGDeflateCodec? gdeflate = null)
     {
         if (OriginalTexBytes is not null)
             return OriginalTexBytes;
@@ -289,6 +289,9 @@ public sealed class DdsFile
 
         var effectiveVersion = NormalizeVersion(version);
         var rawVersion = EncodeVersion(version);
+        if (UsesPackedMipHeaders(rawVersion))
+            return ToPackedTextureBytes(rawVersion, formatInfo, gdeflate);
+
         var fixedHeaderLength = effectiveVersion > 27 ? 40 : 32;
         var dataOffset = fixedHeaderLength + (MipData.Length * 16);
         var totalLength = checked(dataOffset + MipData.Sum(x => x.Length));
@@ -306,9 +309,9 @@ public sealed class DdsFile
             writer.WriteByte((byte)ImageCount);
             writer.WriteByte((byte)(MipCount * 16));
             writer.WriteUInt32(FormatId);
+            writer.WriteUInt32(0xFFFFFFFF);
             writer.WriteUInt32(0);
-            writer.WriteUInt32(0);
-            writer.WriteUInt32(0);
+            writer.WriteUInt32((uint)GetTextureFlags(effectiveVersion, formatInfo));
             writer.WriteZeros(8);
         }
         else
@@ -362,6 +365,95 @@ public sealed class DdsFile
         };
     }
 
+    private byte[] ToPackedTextureBytes(uint rawVersion, TextureFormatInfo formatInfo, IGDeflateCodec? gdeflate)
+    {
+        if (gdeflate is null)
+            throw new NotSupportedException($"Building TEX version {rawVersion} requires an IGDeflateCodec.");
+
+        var fixedHeaderLength = 40;
+        var mipTableLength = MipData.Length * 16;
+        var packedHeaderOffset = fixedHeaderLength + mipTableLength;
+        var packedHeaderLength = MipData.Length * 8;
+        var packedPayloads = new byte[MipData.Length][];
+
+        for (var i = 0; i < MipData.Length; i++)
+        {
+            var mipBytes = MipData[i];
+            var compressed = gdeflate.Compress(mipBytes);
+            packedPayloads[i] = compressed.Length > 0 && compressed.Length < mipBytes.Length && IsGDeflatePayload(compressed)
+                ? compressed
+                : mipBytes;
+        }
+
+        var totalLength = checked(packedHeaderOffset + packedHeaderLength + packedPayloads.Sum(x => x.Length));
+        var data = new byte[totalLength];
+        var writer = new SpanWriter(data);
+
+        writer.WriteUInt32(0x00584554);
+        writer.WriteUInt32(rawVersion);
+        writer.WriteUInt16((ushort)Width);
+        writer.WriteUInt16((ushort)Height);
+        writer.WriteUInt16(0);
+        writer.WriteByte((byte)ImageCount);
+        writer.WriteByte((byte)(MipCount * 16));
+        writer.WriteUInt32(FormatId);
+        writer.WriteUInt32(0xFFFFFFFF);
+        writer.WriteUInt32(0);
+        writer.WriteUInt32((uint)GetTextureFlags(NormalizeVersion((int)rawVersion), formatInfo));
+        writer.WriteZeros(8);
+
+        var currentMipOffset = packedHeaderOffset;
+        var mipIndex = 0;
+        for (var imageIndex = 0; imageIndex < ImageCount; imageIndex++)
+        {
+            var mipWidth = Width;
+            var mipHeight = Height;
+            for (var level = 0; level < MipCount; level++)
+            {
+                var mipBytes = MipData[mipIndex++];
+                writer.WriteUInt64((ulong)currentMipOffset);
+                writer.WriteUInt32((uint)GetMipPitch(mipWidth, mipHeight, formatInfo));
+                writer.WriteUInt32((uint)mipBytes.Length);
+                currentMipOffset += mipBytes.Length;
+                mipWidth = Math.Max(1, mipWidth / 2);
+                mipHeight = Math.Max(1, mipHeight / 2);
+            }
+        }
+
+        var currentPayloadOffset = 0;
+        foreach (var payload in packedPayloads)
+        {
+            writer.WriteUInt32((uint)payload.Length);
+            writer.WriteUInt32((uint)currentPayloadOffset);
+            currentPayloadOffset += payload.Length;
+        }
+
+        foreach (var payload in packedPayloads)
+            writer.WriteBytes(payload);
+
+        return data;
+    }
+
+    private static bool UsesPackedMipHeaders(uint rawVersion)
+    {
+        return rawVersion is 241106027u or 250813143u or 251111100u;
+    }
+
+    private static int GetTextureFlags(int effectiveVersion, TextureFormatInfo formatInfo)
+    {
+        if (effectiveVersion <= 20)
+            return 0x0001;
+
+        return formatInfo.IsBlockCompressed ? 0x0580 : 0x0080;
+    }
+
+    private static bool IsGDeflatePayload(ReadOnlySpan<byte> payload)
+    {
+        return payload.Length >= 2
+            && payload[0] == 0x04
+            && payload[1] == 0xFB;
+    }
+
     private static uint MapLegacyFourCcToDxgi(uint fourCc)
     {
         return fourCc switch
@@ -375,7 +467,7 @@ public sealed class DdsFile
         };
     }
 
-    private static int GetMipPitch(int width, int height, TextureFormatInfo formatInfo)
+    internal static int GetMipPitch(int width, int height, TextureFormatInfo formatInfo)
     {
         if (formatInfo.IsBlockCompressed)
         {
@@ -386,7 +478,7 @@ public sealed class DdsFile
         return width * formatInfo.UnitSize;
     }
 
-    private static int GetMipSize(int width, int height, TextureFormatInfo formatInfo)
+    internal static int GetMipSize(int width, int height, TextureFormatInfo formatInfo)
     {
         if (formatInfo.IsBlockCompressed)
         {
@@ -398,7 +490,7 @@ public sealed class DdsFile
         return width * height * formatInfo.UnitSize;
     }
 
-    private static bool TryGetFormatInfo(uint formatId, out TextureFormatInfo formatInfo)
+    internal static bool TryGetFormatInfo(uint formatId, out TextureFormatInfo formatInfo)
     {
         formatInfo = formatId switch
         {
@@ -415,7 +507,7 @@ public sealed class DdsFile
         return formatInfo.UnitSize != 0;
     }
 
-    private readonly record struct TextureFormatInfo(bool IsBlockCompressed, int UnitSize, uint LegacyFourCc);
+    internal readonly record struct TextureFormatInfo(bool IsBlockCompressed, int UnitSize, uint LegacyFourCc);
 
     private sealed class SpanReader(byte[] data)
     {
