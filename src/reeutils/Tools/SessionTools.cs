@@ -50,7 +50,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
 
         [McpServerTool(Name = "set_game", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false), Description("Sets the active game using embedded RSZ and pak-list data.")]
         public static string SetGame(
-            [Description("Game identifier, such as re4, re7, re8, or re9.")] string game,
+            [Description("Game identifier, such as re2, re4, re7, re8, or re9.")] string game,
             McpSession session)
         {
             session.SetGame(game);

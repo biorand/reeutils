@@ -4,6 +4,7 @@
 
 ## Supported embedded games
 
+- `re2`
 - `re4`
 - `re7`
 - `re8`
