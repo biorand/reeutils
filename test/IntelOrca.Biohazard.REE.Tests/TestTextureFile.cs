@@ -180,6 +180,84 @@ namespace IntelOrca.Biohazard.REE.Tests
             Assert.Equal(file.MipCount, roundtripTex.MipCount);
         }
 
+        [Fact]
+        public void Reads_RE9_Title_Texture()
+        {
+            var data = OriginalPakHelper.Default.GetFileData(GameNames.RE9, "natives/stm/gui/ui1000/tex/ui1000_iam.tex.250813143");
+            var file = new TextureFile(data);
+
+            Assert.Equal(250813143u, file.RawVersion);
+            Assert.Equal(250813143, file.EffectiveVersion);
+            Assert.Equal((ushort)2048, file.Width);
+            Assert.Equal((ushort)1024, file.Height);
+            Assert.Equal(99u, file.FormatId);
+            Assert.Equal(TextureCompression.Bc7UnormSrgb, file.Compression);
+            Assert.Equal(1, file.ImageCount);
+            Assert.Equal(1, file.MipCount);
+            Assert.Equal(1, file.TotalMipCount);
+            Assert.True(file.UsesPackedMips);
+
+            var codec = new MockGDeflateCodec(data);
+            var ddsBytes = file.ToDdsBytes(codec);
+            var dds = DdsFile.Read(ddsBytes);
+
+            Assert.Single(dds.MipData);
+
+            var decompHash = IntelOrca.Biohazard.REE.Cryptography.MurMur3.HashData(dds.MipData[0]);
+            Assert.Equal(1662662843, decompHash);
+
+            // Roundtrip check using mock codec
+            var roundtripTexBytes = dds.ToTextureBytes((int)file.RawVersion, codec);
+            var roundtripTex = new TextureFile(roundtripTexBytes);
+
+            Assert.Equal(file.Width, roundtripTex.Width);
+            Assert.Equal(file.Height, roundtripTex.Height);
+            Assert.Equal(file.RawVersion, roundtripTex.RawVersion);
+            Assert.Equal(file.Compression, roundtripTex.Compression);
+            Assert.Equal(file.MipCount, roundtripTex.MipCount);
+        }
+
+        private sealed class MockGDeflateCodec : IGDeflateCodec
+        {
+            private static readonly byte[] DecompressedData;
+            private readonly byte[] _compressedMip;
+
+            static MockGDeflateCodec()
+            {
+                using var ms = new MemoryStream(Resources.ui1000_iam_decompressed);
+                using var gzip = new System.IO.Compression.GZipStream(ms, System.IO.Compression.CompressionMode.Decompress);
+                using var outMs = new MemoryStream();
+                gzip.CopyTo(outMs);
+                DecompressedData = outMs.ToArray();
+            }
+
+            public MockGDeflateCodec(byte[] originalTextureBytes)
+            {
+                _compressedMip = new byte[originalTextureBytes.Length - 64];
+                Array.Copy(originalTextureBytes, 64, _compressedMip, 0, _compressedMip.Length);
+            }
+
+            public byte[] Compress(ReadOnlyMemory<byte> uncompressed)
+            {
+                var hash = IntelOrca.Biohazard.REE.Cryptography.MurMur3.HashData(uncompressed.ToArray());
+                if (hash == 1662662843)
+                {
+                    return _compressedMip;
+                }
+                throw new NotSupportedException($"MockGDeflateCodec: Unexpected uncompressed payload to compress. MurMur3: {hash}");
+            }
+
+            public byte[] Decompress(ReadOnlyMemory<byte> compressed, int uncompressedSize)
+            {
+                var hash = IntelOrca.Biohazard.REE.Cryptography.MurMur3.HashData(compressed.ToArray());
+                if (hash == 342356049)
+                {
+                    return DecompressedData;
+                }
+                throw new NotSupportedException($"MockGDeflateCodec: Unexpected compressed payload to decompress. MurMur3: {hash}");
+            }
+        }
+
         private sealed class FakeGDeflateCodec : IGDeflateCodec
         {
             private readonly Dictionary<string, byte[]> _payloads = new();
