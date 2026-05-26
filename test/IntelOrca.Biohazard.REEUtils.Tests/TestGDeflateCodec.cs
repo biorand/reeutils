@@ -12,14 +12,30 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
         {
             var expectedMipData = Enumerable.Repeat((byte)0x5A, 64 * 64 * 4).ToArray();
             var texBytes = BuildRgbaTextureFile(expectedMipData);
-            var ddsBytes = new TextureFile(texBytes).ToDdsBytes();
-            var dds = DdsFile.Read(ddsBytes[..^(8 + texBytes.Length)]);
+            var file = new TextureFile(texBytes);
+            var dds = file.ToDds();
 
-            var packedTexBytes = dds.ToTextureBytes(250813143, ReeUtilsGDeflateCodec.Instance);
-            var packedTexture = new TextureFile(packedTexBytes);
+            // Clear original texture bytes so we force rebuilding and compressing the DDS as a packed texture
+            var builder = new DdsFile.Builder
+            {
+                Width = dds.Width,
+                Height = dds.Height,
+                FormatId = dds.FormatId,
+                ImageCount = dds.ImageCount,
+                MipCount = dds.MipCount,
+                MipData = dds.MipData.Select(x => x.ToArray()).ToList(),
+                OriginalTexBytes = null
+            };
+            var rebuiltDds = builder.Build();
+
+            var options = new TextureConvertOptions
+            {
+                Encoder = ReeUtilsGDeflateEncoder.Instance
+            };
+            var packedTexture = rebuiltDds.ToTextureFile(250813143, options);
 
             Assert.True(packedTexture.UsesPackedMips);
-            Assert.True(packedTexture.GetMipData(gdeflate: ReeUtilsGDeflateCodec.Instance).ToArray().SequenceEqual(expectedMipData));
+            Assert.True(packedTexture.GetMipData(options: options).ToArray().SequenceEqual(expectedMipData));
         }
 
         private static byte[] BuildRgbaTextureFile(byte[] mipData)

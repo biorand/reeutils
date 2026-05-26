@@ -9,17 +9,20 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
 {
     internal sealed class TextureFileHandler(string path, byte[] data) : FileHandlerBase(path, data)
     {
-        private static readonly IGDeflateCodec GDeflateCodec = ReeUtilsGDeflateCodec.Instance;
+        private static readonly TextureConvertOptions TextureConvertOptions = new TextureConvertOptions
+        {
+            Encoder = ReeUtilsGDeflateEncoder.Instance
+        };
 
         public override byte[] Export()
         {
-            return DdsFile.FromTexture(new TextureFile(Data), GDeflateCodec).ToBytes();
+            return new TextureFile(Data).ToDds(TextureConvertOptions).ToBytes();
         }
 
         public override byte[] Import(string inputPath)
         {
             var dds = DdsFile.Read(File.ReadAllBytes(inputPath));
-            return dds.ToTextureBytes(GetVersionOrDefault(GetFileInfo(Path), 36), GDeflateCodec);
+            return dds.ToTextureFile(GetVersionOrDefault(GetFileInfo(Path), 36), TextureConvertOptions).Data.ToArray();
         }
 
         public override Dictionary<string, object?> GetSummary()

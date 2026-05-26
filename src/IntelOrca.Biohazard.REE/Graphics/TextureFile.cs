@@ -1,7 +1,9 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace IntelOrca.Biohazard.REE.Graphics
@@ -89,11 +91,11 @@ namespace IntelOrca.Biohazard.REE.Graphics
             return _mips[index];
         }
 
-        public ReadOnlyMemory<byte> GetMipData(int imageIndex = 0, int mipIndex = 0, IGDeflateCodec? gdeflate = null)
+        public ReadOnlyMemory<byte> GetMipData(int imageIndex = 0, int mipIndex = 0, TextureConvertOptions? options = null)
         {
             var index = GetMipIndex(imageIndex, mipIndex);
             var mip = _mips[index];
-            var mipData = ReadMipBytes(index, mip, gdeflate);
+            var mipData = ReadMipBytes(index, mip, options);
             if (!DdsFile.TryGetFormatInfo(FormatId, out var formatInfo))
                 return mipData;
 
@@ -108,9 +110,9 @@ namespace IntelOrca.Biohazard.REE.Graphics
             return mipData.Slice(0, Math.Min(mipData.Length, Math.Min((int)mip.Size, expectedSize)));
         }
 
-        public byte[] ToDdsBytes(IGDeflateCodec? gdeflate = null)
+        public DdsFile ToDds(TextureConvertOptions? options = null)
         {
-            return DdsFile.FromTexture(this, gdeflate).ToBytes();
+            return DdsFile.FromTexture(this, options);
         }
 
         public TextureHeaderCommon Header => _header;
@@ -119,7 +121,7 @@ namespace IntelOrca.Biohazard.REE.Graphics
 
         public TextureHeaderV2? HeaderV2 => _headerV2;
 
-        private static int NormalizeVersion(int version)
+        internal static int NormalizeVersion(int version)
         {
             if (version == 190820018)
                 return 10;
@@ -128,7 +130,36 @@ namespace IntelOrca.Biohazard.REE.Graphics
             return version;
         }
 
-        private ReadOnlyMemory<byte> ReadMipBytes(int index, TextureMip mip, IGDeflateCodec? gdeflate)
+        internal static uint EncodeVersion(int version)
+        {
+            return version switch
+            {
+                36 => 143221013u,
+                _ => (uint)version,
+            };
+        }
+
+        internal static int GetTextureFlags(int effectiveVersion, DdsFile.TextureFormatInfo formatInfo)
+        {
+            if (effectiveVersion <= 20)
+                return 0x0001;
+
+            return formatInfo.IsBlockCompressed ? 0x0580 : 0x0080;
+        }
+
+        internal static bool IsGDeflatePayload(ReadOnlySpan<byte> payload)
+        {
+            return payload.Length >= 2
+                && payload[0] == 0x04
+                && payload[1] == 0xFB;
+        }
+
+        internal static bool UsesPackedMipHeaders(uint rawVersion)
+        {
+            return rawVersion is 241106027u or 250813143u or 251111100u;
+        }
+
+        private ReadOnlyMemory<byte> ReadMipBytes(int index, TextureMip mip, TextureConvertOptions? options)
         {
             if (!UsesPackedMips)
             {
@@ -152,12 +183,13 @@ namespace IntelOrca.Biohazard.REE.Graphics
             var result = Data.Slice(start, size);
             if (result.Length >= 2 && BinaryPrimitives.ReadUInt16LittleEndian(result.Span) == GDeflateMagic)
             {
-                if (gdeflate is null)
-                    throw new NotSupportedException("TEX packed mip data is gdeflate-compressed. Provide an IGDeflateCodec.");
+                var encoder = options?.Encoder;
+                if (encoder is null)
+                    throw new NotSupportedException("TEX packed mip data is gdeflate-compressed. Provide an IGDeflateEncoder inside TextureConvertOptions.");
 
-                var decoded = gdeflate.Decompress(result, checked((int)mip.Size));
+                var decoded = encoder.Decompress(result, checked((int)mip.Size));
                 if (decoded.Length < mip.Size)
-                    throw new InvalidDataException("GDeflate codec returned less data than the mip requires.");
+                    throw new InvalidDataException("GDeflate encoder returned less data than the mip requires.");
 
                 return decoded.AsMemory(0, checked((int)mip.Size));
             }
@@ -203,7 +235,7 @@ namespace IntelOrca.Biohazard.REE.Graphics
 
         private ImmutableArray<TexturePackedMip> TryReadPackedMips()
         {
-            if (!UsesPackedMipHeaders() || _mips.IsDefaultOrEmpty || _mips.Length == 0)
+            if (!UsesPackedMipHeaders(RawVersion) || _mips.IsDefaultOrEmpty || _mips.Length == 0)
                 return [];
 
             var headerOffset = checked((int)_mips[0].Offset);
@@ -245,17 +277,6 @@ namespace IntelOrca.Biohazard.REE.Graphics
             return result.ToImmutable();
         }
 
-        private bool UsesPackedMipHeaders()
-        {
-            return RawVersion switch
-            {
-                241106027u => true,
-                250813143u => true,
-                251111100u => true,
-                _ => false,
-            };
-        }
-
         private static ReadOnlyMemory<byte> StripPitch(ReadOnlySpan<byte> source, int height, int sourcePitch, int expectedPitch, bool blockCompressed)
         {
             var rowCount = blockCompressed
@@ -286,6 +307,151 @@ namespace IntelOrca.Biohazard.REE.Graphics
         private static int HeaderV2Offset => Marshal.SizeOf<TextureHeaderCommon>();
         private static int HeaderV1MipOffset => HeaderV1Offset + Marshal.SizeOf<TextureHeaderV1>();
         private static int HeaderV2MipOffset => HeaderV2Offset + Marshal.SizeOf<TextureHeaderV2>() + 8;
+
+        public class Builder
+        {
+            public int Version { get; set; }
+            public ushort Width { get; set; }
+            public ushort Height { get; set; }
+            public int ImageCount { get; set; }
+            public int MipCount { get; set; }
+            public uint FormatId { get; set; }
+            public List<byte[]> MipData { get; set; } = new();
+
+            public TextureFile Build(TextureConvertOptions? options = null)
+            {
+                if (!DdsFile.TryGetFormatInfo(FormatId, out var formatInfo))
+                    throw new InvalidDataException($"Unsupported TEX format: {FormatId}.");
+
+                if (MipData.Count != checked(ImageCount * MipCount))
+                    throw new InvalidDataException("Mip data does not match the image/mip counts.");
+
+                var effectiveVersion = NormalizeVersion(Version);
+                var rawVersion = EncodeVersion(Version);
+
+                var ms = new MemoryStream();
+                using (var writer = new BinaryWriter(ms))
+                {
+                    if (UsesPackedMipHeaders(rawVersion))
+                    {
+                        var encoder = options?.Encoder;
+                        if (encoder is null)
+                            throw new NotSupportedException($"Building TEX version {rawVersion} requires an IGDeflateEncoder inside TextureConvertOptions.");
+
+                        var fixedHeaderLength = 40;
+                        var mipTableLength = MipData.Count * 16;
+                        var packedHeaderOffset = fixedHeaderLength + mipTableLength;
+                        var packedHeaderLength = MipData.Count * 8;
+                        var packedPayloads = new byte[MipData.Count][];
+
+                        for (var i = 0; i < MipData.Count; i++)
+                        {
+                            var mipBytes = MipData[i];
+                            var compressed = encoder.Compress(mipBytes);
+                            packedPayloads[i] = compressed.Length > 0 && compressed.Length < mipBytes.Length && IsGDeflatePayload(compressed)
+                                ? compressed
+                                : mipBytes;
+                        }
+
+                        writer.Write(MAGIC);
+                        writer.Write(rawVersion);
+                        writer.Write(Width);
+                        writer.Write(Height);
+                        writer.Write((ushort)0);
+                        writer.Write((byte)ImageCount);
+                        writer.Write((byte)(MipCount * 16));
+                        writer.Write(FormatId);
+                        writer.Write(0xFFFFFFFFu);
+                        writer.Write(0u);
+                        writer.Write((uint)GetTextureFlags(effectiveVersion, formatInfo));
+                        writer.Write(new byte[8]);
+
+                        var currentMipOffset = packedHeaderOffset;
+                        var mipIndex = 0;
+                        for (var imageIndex = 0; imageIndex < ImageCount; imageIndex++)
+                        {
+                            var mipWidth = (int)Width;
+                            var mipHeight = (int)Height;
+                            for (var level = 0; level < MipCount; level++)
+                            {
+                                var mipBytes = MipData[mipIndex++];
+                                writer.Write((ulong)currentMipOffset);
+                                writer.Write((uint)DdsFile.GetMipPitch(mipWidth, mipHeight, formatInfo));
+                                writer.Write((uint)mipBytes.Length);
+                                currentMipOffset += mipBytes.Length;
+                                mipWidth = Math.Max(1, mipWidth / 2);
+                                mipHeight = Math.Max(1, mipHeight / 2);
+                            }
+                        }
+
+                        var currentPayloadOffset = 0;
+                        foreach (var payload in packedPayloads)
+                        {
+                            writer.Write((uint)payload.Length);
+                            writer.Write((uint)currentPayloadOffset);
+                            currentPayloadOffset += payload.Length;
+                        }
+
+                        foreach (var payload in packedPayloads)
+                            writer.Write(payload);
+                    }
+                    else
+                    {
+                        var fixedHeaderLength = effectiveVersion > 27 ? 40 : 32;
+                        var dataOffset = fixedHeaderLength + (MipData.Count * 16);
+
+                        writer.Write(MAGIC);
+                        writer.Write(rawVersion);
+                        writer.Write(Width);
+                        writer.Write(Height);
+                        writer.Write((ushort)0);
+
+                        if (effectiveVersion > 27)
+                        {
+                            writer.Write((byte)ImageCount);
+                            writer.Write((byte)(MipCount * 16));
+                            writer.Write(FormatId);
+                            writer.Write(0xFFFFFFFFu);
+                            writer.Write(0u);
+                            writer.Write((uint)GetTextureFlags(effectiveVersion, formatInfo));
+                            writer.Write(new byte[8]);
+                        }
+                        else
+                        {
+                            writer.Write((byte)MipCount);
+                            writer.Write((byte)ImageCount);
+                            writer.Write(FormatId);
+                            writer.Write(0xFFFFFFFFu);
+                            writer.Write(0u);
+                            writer.Write(0u);
+                        }
+
+                        var currentOffset = dataOffset;
+                        var mipIndex = 0;
+                        for (var imageIndex = 0; imageIndex < ImageCount; imageIndex++)
+                        {
+                            var mipWidth = (int)Width;
+                            var mipHeight = (int)Height;
+                            for (var level = 0; level < MipCount; level++)
+                            {
+                                var mipBytes = MipData[mipIndex++];
+                                writer.Write((ulong)currentOffset);
+                                writer.Write((uint)DdsFile.GetMipPitch(mipWidth, mipHeight, formatInfo));
+                                writer.Write((uint)mipBytes.Length);
+                                currentOffset += mipBytes.Length;
+                                mipWidth = Math.Max(1, mipWidth / 2);
+                                mipHeight = Math.Max(1, mipHeight / 2);
+                            }
+                        }
+
+                        foreach (var mip in MipData)
+                            writer.Write(mip);
+                    }
+                }
+
+                return new TextureFile(ms.ToArray());
+            }
+        }
     }
 
     public enum TextureCompression : uint

@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -27,431 +28,205 @@ public sealed class DdsFile
     private const uint DdsCapsMipmap = 0x00400000;
     private const int D3d10ResourceDimensionTexture2D = 3;
 
-    public int Width { get; private set; }
-    public int Height { get; private set; }
-    public uint FormatId { get; private set; }
-    public int ImageCount { get; private set; } = 1;
-    public int MipCount { get; private set; } = 1;
-    public byte[][] MipData { get; private set; } = [];
-    public byte[]? OriginalTexBytes { get; private set; }
+    public ReadOnlyMemory<byte> Data { get; }
 
-    public static DdsFile FromTexture(TextureFile texture, IGDeflateCodec? gdeflate = null)
+    public int Width => BinaryPrimitives.ReadInt32LittleEndian(Data.Span.Slice(16, 4));
+    public int Height => BinaryPrimitives.ReadInt32LittleEndian(Data.Span.Slice(12, 4));
+
+    public uint FormatId
     {
-        var mipData = new byte[texture.TotalMipCount][];
-        var index = 0;
-        for (var imageIndex = 0; imageIndex < texture.ImageCount; imageIndex++)
+        get
         {
-            for (var mipIndex = 0; mipIndex < texture.MipCount; mipIndex++)
+            var pixelFormatFlags = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(80, 4));
+            if ((pixelFormatFlags & DdpfFourCc) != 0)
             {
-                mipData[index++] = texture.GetMipData(imageIndex, mipIndex, gdeflate).ToArray();
+                var fourCc = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(84, 4));
+                if (fourCc == FourCcDx10)
+                {
+                    return BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(128, 4));
+                }
+                else
+                {
+                    return MapLegacyFourCcToDxgi(fourCc);
+                }
             }
+            else if ((pixelFormatFlags & DdpfRgb) != 0 && BinaryPrimitives.ReadInt32LittleEndian(Data.Span.Slice(88, 4)) == 32)
+            {
+                var rMask = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(92, 4));
+                var gMask = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(96, 4));
+                var bMask = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(100, 4));
+                var aMask = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(104, 4));
+                if (rMask == 0x00FF0000 && gMask == 0x0000FF00 && bMask == 0x000000FF && aMask == 0xFF000000)
+                {
+                    return 28;
+                }
+            }
+            throw new InvalidDataException("Unsupported DDS pixel format.");
         }
+    }
 
-        return new DdsFile
+    public int ImageCount
+    {
+        get
+        {
+            var pixelFormatFlags = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(80, 4));
+            if ((pixelFormatFlags & DdpfFourCc) != 0)
+            {
+                var fourCc = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(84, 4));
+                if (fourCc == FourCcDx10)
+                {
+                    return BinaryPrimitives.ReadInt32LittleEndian(Data.Span.Slice(140, 4));
+                }
+            }
+            return 1;
+        }
+    }
+
+    public int MipCount
+    {
+        get
+        {
+            var flags = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(8, 4));
+            var mipCount = BinaryPrimitives.ReadInt32LittleEndian(Data.Span.Slice(28, 4));
+            var hasMipMaps = (flags & DdsdMipmapCount) != 0 && mipCount > 0;
+            return hasMipMaps ? mipCount : 1;
+        }
+    }
+
+    public byte[][] MipData
+    {
+        get
+        {
+            if (!TryGetFormatInfo(FormatId, out var formatInfo))
+                throw new InvalidDataException($"Unsupported DDS format: {FormatId}.");
+
+            var pixelFormatFlags = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(80, 4));
+            var usesDx10 = (pixelFormatFlags & DdpfFourCc) != 0 && BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(84, 4)) == FourCcDx10;
+            var headerLength = 128 + (usesDx10 ? 20 : 0);
+
+            var mipData = new byte[checked(ImageCount * MipCount)][];
+            var index = 0;
+            var offset = headerLength;
+            for (var imageIndex = 0; imageIndex < ImageCount; imageIndex++)
+            {
+                var mipWidth = Width;
+                var mipHeight = Height;
+                for (var mipIndex = 0; mipIndex < MipCount; mipIndex++)
+                {
+                    var size = GetMipSize(mipWidth, mipHeight, formatInfo);
+                    if (offset + size > Data.Length)
+                        throw new InvalidDataException("DDS pixel data is truncated.");
+
+                    mipData[index++] = Data.Slice(offset, size).ToArray();
+                    offset += size;
+                    mipWidth = Math.Max(1, mipWidth / 2);
+                    mipHeight = Math.Max(1, mipHeight / 2);
+                }
+            }
+            return mipData;
+        }
+    }
+
+    public byte[]? OriginalTexBytes
+    {
+        get
+        {
+            if (!TryGetFormatInfo(FormatId, out var formatInfo))
+                throw new InvalidDataException($"Unsupported DDS format: {FormatId}.");
+
+            var pixelFormatFlags = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(80, 4));
+            var usesDx10 = (pixelFormatFlags & DdpfFourCc) != 0 && BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(84, 4)) == FourCcDx10;
+            var headerLength = 128 + (usesDx10 ? 20 : 0);
+
+            var offset = headerLength;
+            for (var imageIndex = 0; imageIndex < ImageCount; imageIndex++)
+            {
+                var mipWidth = Width;
+                var mipHeight = Height;
+                for (var mipIndex = 0; mipIndex < MipCount; mipIndex++)
+                {
+                    var size = GetMipSize(mipWidth, mipHeight, formatInfo);
+                    offset += size;
+                    mipWidth = Math.Max(1, mipWidth / 2);
+                    mipHeight = Math.Max(1, mipHeight / 2);
+                }
+            }
+
+            if (offset + 8 <= Data.Length)
+            {
+                var trailerMagic = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(offset, 4));
+                if (trailerMagic == TrailerMagic)
+                {
+                    var texLength = BinaryPrimitives.ReadInt32LittleEndian(Data.Span.Slice(offset + 4, 4));
+                    if (texLength >= 0 && offset + 8 + texLength <= Data.Length)
+                    {
+                        return Data.Slice(offset + 8, texLength).ToArray();
+                    }
+                }
+            }
+
+            return null;
+        }
+    }
+
+    public DdsFile(ReadOnlyMemory<byte> data)
+    {
+        if (data.Length < 128)
+            throw new InvalidDataException("DDS data is too small.");
+
+        if (BinaryPrimitives.ReadUInt32LittleEndian(data.Span) != Magic)
+            throw new InvalidDataException("Not a DDS file.");
+
+        if (BinaryPrimitives.ReadInt32LittleEndian(data.Span.Slice(4, 4)) != HeaderSize)
+            throw new InvalidDataException("Unsupported DDS header size.");
+
+        Data = data;
+    }
+
+    public static DdsFile Read(byte[] data) => new(data);
+
+    public byte[] ToBytes() => Data.ToArray();
+
+    public static DdsFile FromTexture(TextureFile texture, TextureConvertOptions? options = null)
+    {
+        var builder = new Builder
         {
             Width = texture.Width,
             Height = texture.Height,
             FormatId = texture.FormatId,
             ImageCount = texture.ImageCount,
             MipCount = texture.MipCount,
-            MipData = mipData,
-            OriginalTexBytes = texture.Data.ToArray(),
+            OriginalTexBytes = texture.Data.ToArray()
         };
+
+        for (var imageIndex = 0; imageIndex < texture.ImageCount; imageIndex++)
+        {
+            for (var mipIndex = 0; mipIndex < texture.MipCount; mipIndex++)
+            {
+                builder.MipData.Add(texture.GetMipData(imageIndex, mipIndex, options).ToArray());
+            }
+        }
+
+        return builder.Build();
     }
 
-    public static DdsFile Read(byte[] data)
-    {
-        var reader = new SpanReader(data);
-        if (reader.ReadUInt32() != Magic)
-            throw new InvalidDataException("Not a DDS file.");
-
-        if (reader.ReadInt32() != HeaderSize)
-            throw new InvalidDataException("Unsupported DDS header size.");
-
-        var flags = reader.ReadUInt32();
-        var height = reader.ReadInt32();
-        var width = reader.ReadInt32();
-        _ = reader.ReadInt32(); // pitchOrLinearSize
-        _ = reader.ReadInt32(); // depth
-        var mipCount = reader.ReadInt32();
-        reader.Advance(44);
-
-        if (reader.ReadInt32() != PixelFormatSize)
-            throw new InvalidDataException("Unsupported DDS pixel format.");
-
-        var pixelFormatFlags = reader.ReadUInt32();
-        var fourCc = reader.ReadUInt32();
-        var rgbBitCount = reader.ReadInt32();
-        var rMask = reader.ReadUInt32();
-        var gMask = reader.ReadUInt32();
-        var bMask = reader.ReadUInt32();
-        var aMask = reader.ReadUInt32();
-        var caps = reader.ReadUInt32();
-        _ = reader.ReadUInt32(); // caps2
-        _ = reader.ReadUInt32(); // caps3
-        _ = reader.ReadUInt32(); // caps4
-        _ = reader.ReadUInt32(); // reserved2
-
-        var hasMipMaps = (flags & DdsdMipmapCount) != 0 && mipCount > 0;
-        mipCount = hasMipMaps ? mipCount : 1;
-
-        uint formatId;
-        var imageCount = 1;
-
-        if ((pixelFormatFlags & DdpfFourCc) != 0)
-        {
-            if (fourCc == FourCcDx10)
-            {
-                formatId = reader.ReadUInt32();
-                var resourceDimension = reader.ReadUInt32();
-                _ = reader.ReadUInt32(); // miscFlag
-                imageCount = reader.ReadInt32();
-                _ = reader.ReadUInt32(); // miscFlags2
-
-                if (resourceDimension != D3d10ResourceDimensionTexture2D)
-                    throw new InvalidDataException("Only DDS texture2D resources are supported.");
-            }
-            else
-            {
-                formatId = MapLegacyFourCcToDxgi(fourCc);
-            }
-        }
-        else if ((pixelFormatFlags & DdpfRgb) != 0 && rgbBitCount == 32)
-        {
-            if (rMask == 0x00FF0000 && gMask == 0x0000FF00 && bMask == 0x000000FF && aMask == 0xFF000000)
-            {
-                formatId = 28;
-            }
-            else
-            {
-                throw new InvalidDataException("Unsupported DDS RGB mask layout.");
-            }
-        }
-        else
-        {
-            throw new InvalidDataException("Unsupported DDS pixel format.");
-        }
-
-        if (!TryGetFormatInfo(formatId, out var formatInfo))
-            throw new InvalidDataException($"Unsupported DDS format: {formatId}.");
-
-        if (imageCount <= 0)
-            throw new InvalidDataException("DDS array size must be positive.");
-
-        var mipData = new byte[checked(imageCount * mipCount)][];
-        var index = 0;
-        for (var imageIndex = 0; imageIndex < imageCount; imageIndex++)
-        {
-            var mipWidth = width;
-            var mipHeight = height;
-            for (var mipIndex = 0; mipIndex < mipCount; mipIndex++)
-            {
-                var size = GetMipSize(mipWidth, mipHeight, formatInfo);
-                if (reader.Remaining < size)
-                    throw new InvalidDataException("DDS pixel data is truncated.");
-
-                mipData[index++] = reader.ReadBytes(size);
-                mipWidth = Math.Max(1, mipWidth / 2);
-                mipHeight = Math.Max(1, mipHeight / 2);
-            }
-        }
-
-        byte[]? originalTexBytes = null;
-        if (reader.Remaining >= 8)
-        {
-            var trailerMagic = reader.ReadUInt32();
-            if (trailerMagic == TrailerMagic)
-            {
-                var texLength = reader.ReadInt32();
-                if (texLength < 0 || reader.Remaining < texLength)
-                    throw new InvalidDataException("DDS trailer is truncated.");
-
-                originalTexBytes = reader.ReadBytes(texLength);
-            }
-        }
-
-        return new DdsFile
-        {
-            Width = width,
-            Height = height,
-            FormatId = formatId,
-            ImageCount = imageCount,
-            MipCount = mipCount,
-            MipData = mipData,
-            OriginalTexBytes = originalTexBytes,
-        };
-    }
-
-    public byte[] ToBytes()
-    {
-        if (!TryGetFormatInfo(FormatId, out var formatInfo))
-            throw new InvalidDataException($"Unsupported DDS format: {FormatId}.");
-
-        if (MipData.Length != checked(ImageCount * MipCount))
-            throw new InvalidDataException("Mip data does not match the image/mip counts.");
-
-        var usesDx10 = formatInfo.LegacyFourCc == 0;
-        var headerLength = 128 + (usesDx10 ? 20 : 0);
-        var payloadLength = MipData.Sum(x => x.Length);
-        var trailerLength = OriginalTexBytes?.Length is int texLength ? 8 + texLength : 0;
-        var data = new byte[checked(headerLength + payloadLength + trailerLength)];
-        var writer = new SpanWriter(data);
-
-        var flags = DdsdCaps | DdsdHeight | DdsdWidth | DdsdPixelFormat;
-        flags |= formatInfo.IsBlockCompressed ? DdsdLinearSize : DdsdPitch;
-        if (MipCount > 1)
-            flags |= DdsdMipmapCount;
-
-        writer.WriteUInt32(Magic);
-        writer.WriteInt32(HeaderSize);
-        writer.WriteUInt32(flags);
-        writer.WriteInt32(Height);
-        writer.WriteInt32(Width);
-        writer.WriteInt32(GetMipSize(Width, Height, formatInfo));
-        writer.WriteInt32(0);
-        writer.WriteInt32(MipCount);
-        writer.WriteZeros(44);
-
-        writer.WriteInt32(PixelFormatSize);
-        if (usesDx10)
-        {
-            writer.WriteUInt32(DdpfFourCc);
-            writer.WriteUInt32(FourCcDx10);
-            writer.WriteInt32(0);
-            writer.WriteUInt32(0);
-            writer.WriteUInt32(0);
-            writer.WriteUInt32(0);
-            writer.WriteUInt32(0);
-        }
-        else if (formatInfo.LegacyFourCc != 0)
-        {
-            writer.WriteUInt32(DdpfFourCc);
-            writer.WriteUInt32(formatInfo.LegacyFourCc);
-            writer.WriteInt32(0);
-            writer.WriteUInt32(0);
-            writer.WriteUInt32(0);
-            writer.WriteUInt32(0);
-            writer.WriteUInt32(0);
-        }
-        else
-        {
-            writer.WriteUInt32(DdpfRgb | DdpfAlphaPixels);
-            writer.WriteUInt32(0);
-            writer.WriteInt32(32);
-            writer.WriteUInt32(0x00FF0000);
-            writer.WriteUInt32(0x0000FF00);
-            writer.WriteUInt32(0x000000FF);
-            writer.WriteUInt32(0xFF000000);
-        }
-
-        var caps = DdsCapsTexture;
-        if (MipCount > 1)
-            caps |= DdsCapsComplex | DdsCapsMipmap;
-
-        writer.WriteUInt32(caps);
-        writer.WriteUInt32(0);
-        writer.WriteUInt32(0);
-        writer.WriteUInt32(0);
-        writer.WriteUInt32(0);
-
-        if (usesDx10)
-        {
-            writer.WriteUInt32(FormatId);
-            writer.WriteUInt32(D3d10ResourceDimensionTexture2D);
-            writer.WriteUInt32(0);
-            writer.WriteInt32(ImageCount);
-            writer.WriteUInt32(0);
-        }
-
-        foreach (var mip in MipData)
-            writer.WriteBytes(mip);
-
-        if (OriginalTexBytes is { Length: > 0 } texBytes)
-        {
-            writer.WriteUInt32(TrailerMagic);
-            writer.WriteInt32(texBytes.Length);
-            writer.WriteBytes(texBytes);
-        }
-
-        return data;
-    }
-
-    public byte[] ToTextureBytes(int version, IGDeflateCodec? gdeflate = null)
+    public TextureFile ToTextureFile(int version, TextureConvertOptions? options = null)
     {
         if (OriginalTexBytes is not null)
-            return OriginalTexBytes;
+            return new TextureFile(OriginalTexBytes);
 
-        if (!TryGetFormatInfo(FormatId, out var formatInfo))
-            throw new InvalidDataException($"Unsupported TEX format: {FormatId}.");
-
-        if (MipData.Length != checked(ImageCount * MipCount))
-            throw new InvalidDataException("Mip data does not match the image/mip counts.");
-
-        var effectiveVersion = NormalizeVersion(version);
-        var rawVersion = EncodeVersion(version);
-        if (UsesPackedMipHeaders(rawVersion))
-            return ToPackedTextureBytes(rawVersion, formatInfo, gdeflate);
-
-        var fixedHeaderLength = effectiveVersion > 27 ? 40 : 32;
-        var dataOffset = fixedHeaderLength + (MipData.Length * 16);
-        var totalLength = checked(dataOffset + MipData.Sum(x => x.Length));
-        var data = new byte[totalLength];
-        var writer = new SpanWriter(data);
-
-        writer.WriteUInt32(0x00584554);
-        writer.WriteUInt32(rawVersion);
-        writer.WriteUInt16((ushort)Width);
-        writer.WriteUInt16((ushort)Height);
-        writer.WriteUInt16(0);
-
-        if (effectiveVersion > 27)
+        var builder = new TextureFile.Builder
         {
-            writer.WriteByte((byte)ImageCount);
-            writer.WriteByte((byte)(MipCount * 16));
-            writer.WriteUInt32(FormatId);
-            writer.WriteUInt32(0xFFFFFFFF);
-            writer.WriteUInt32(0);
-            writer.WriteUInt32((uint)GetTextureFlags(effectiveVersion, formatInfo));
-            writer.WriteZeros(8);
-        }
-        else
-        {
-            writer.WriteByte((byte)MipCount);
-            writer.WriteByte((byte)ImageCount);
-            writer.WriteUInt32(FormatId);
-            writer.WriteUInt32(0xFFFFFFFF);
-            writer.WriteUInt32(0);
-            writer.WriteUInt32(0);
-        }
-
-        var currentOffset = dataOffset;
-        var mipIndex = 0;
-        for (var imageIndex = 0; imageIndex < ImageCount; imageIndex++)
-        {
-            var mipWidth = Width;
-            var mipHeight = Height;
-            for (var level = 0; level < MipCount; level++)
-            {
-                var mipBytes = MipData[mipIndex++];
-                writer.WriteUInt64((ulong)currentOffset);
-                writer.WriteUInt32((uint)GetMipPitch(mipWidth, mipHeight, formatInfo));
-                writer.WriteUInt32((uint)mipBytes.Length);
-                mipBytes.CopyTo(data, currentOffset);
-                currentOffset += mipBytes.Length;
-                mipWidth = Math.Max(1, mipWidth / 2);
-                mipHeight = Math.Max(1, mipHeight / 2);
-            }
-        }
-
-        return data;
-    }
-
-    private static uint EncodeVersion(int version)
-    {
-        return version switch
-        {
-            36 => 143221013u,
-            _ => (uint)version,
+            Version = version,
+            Width = (ushort)Width,
+            Height = (ushort)Height,
+            ImageCount = ImageCount,
+            MipCount = MipCount,
+            FormatId = FormatId,
+            MipData = MipData.Select(x => x.ToArray()).ToList()
         };
-    }
 
-    private static int NormalizeVersion(int version)
-    {
-        return version switch
-        {
-            190820018 => 10,
-            143221013 => 36,
-            _ => version,
-        };
-    }
-
-    private byte[] ToPackedTextureBytes(uint rawVersion, TextureFormatInfo formatInfo, IGDeflateCodec? gdeflate)
-    {
-        if (gdeflate is null)
-            throw new NotSupportedException($"Building TEX version {rawVersion} requires an IGDeflateCodec.");
-
-        var fixedHeaderLength = 40;
-        var mipTableLength = MipData.Length * 16;
-        var packedHeaderOffset = fixedHeaderLength + mipTableLength;
-        var packedHeaderLength = MipData.Length * 8;
-        var packedPayloads = new byte[MipData.Length][];
-
-        for (var i = 0; i < MipData.Length; i++)
-        {
-            var mipBytes = MipData[i];
-            var compressed = gdeflate.Compress(mipBytes);
-            packedPayloads[i] = compressed.Length > 0 && compressed.Length < mipBytes.Length && IsGDeflatePayload(compressed)
-                ? compressed
-                : mipBytes;
-        }
-
-        var totalLength = checked(packedHeaderOffset + packedHeaderLength + packedPayloads.Sum(x => x.Length));
-        var data = new byte[totalLength];
-        var writer = new SpanWriter(data);
-
-        writer.WriteUInt32(0x00584554);
-        writer.WriteUInt32(rawVersion);
-        writer.WriteUInt16((ushort)Width);
-        writer.WriteUInt16((ushort)Height);
-        writer.WriteUInt16(0);
-        writer.WriteByte((byte)ImageCount);
-        writer.WriteByte((byte)(MipCount * 16));
-        writer.WriteUInt32(FormatId);
-        writer.WriteUInt32(0xFFFFFFFF);
-        writer.WriteUInt32(0);
-        writer.WriteUInt32((uint)GetTextureFlags(NormalizeVersion((int)rawVersion), formatInfo));
-        writer.WriteZeros(8);
-
-        var currentMipOffset = packedHeaderOffset;
-        var mipIndex = 0;
-        for (var imageIndex = 0; imageIndex < ImageCount; imageIndex++)
-        {
-            var mipWidth = Width;
-            var mipHeight = Height;
-            for (var level = 0; level < MipCount; level++)
-            {
-                var mipBytes = MipData[mipIndex++];
-                writer.WriteUInt64((ulong)currentMipOffset);
-                writer.WriteUInt32((uint)GetMipPitch(mipWidth, mipHeight, formatInfo));
-                writer.WriteUInt32((uint)mipBytes.Length);
-                currentMipOffset += mipBytes.Length;
-                mipWidth = Math.Max(1, mipWidth / 2);
-                mipHeight = Math.Max(1, mipHeight / 2);
-            }
-        }
-
-        var currentPayloadOffset = 0;
-        foreach (var payload in packedPayloads)
-        {
-            writer.WriteUInt32((uint)payload.Length);
-            writer.WriteUInt32((uint)currentPayloadOffset);
-            currentPayloadOffset += payload.Length;
-        }
-
-        foreach (var payload in packedPayloads)
-            writer.WriteBytes(payload);
-
-        return data;
-    }
-
-    private static bool UsesPackedMipHeaders(uint rawVersion)
-    {
-        return rawVersion is 241106027u or 250813143u or 251111100u;
-    }
-
-    private static int GetTextureFlags(int effectiveVersion, TextureFormatInfo formatInfo)
-    {
-        if (effectiveVersion <= 20)
-            return 0x0001;
-
-        return formatInfo.IsBlockCompressed ? 0x0580 : 0x0080;
-    }
-
-    private static bool IsGDeflatePayload(ReadOnlySpan<byte> payload)
-    {
-        return payload.Length >= 2
-            && payload[0] == 0x04
-            && payload[1] == 0xFB;
+        return builder.Build(options);
     }
 
     private static uint MapLegacyFourCcToDxgi(uint fourCc)
@@ -509,81 +284,107 @@ public sealed class DdsFile
 
     internal readonly record struct TextureFormatInfo(bool IsBlockCompressed, int UnitSize, uint LegacyFourCc);
 
-    private sealed class SpanReader(byte[] data)
+    public class Builder
     {
-        private readonly byte[] _data = data;
-        private int _offset;
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public uint FormatId { get; set; }
+        public int ImageCount { get; set; } = 1;
+        public int MipCount { get; set; } = 1;
+        public List<byte[]> MipData { get; set; } = new();
+        public byte[]? OriginalTexBytes { get; set; }
 
-        public int Remaining => _data.Length - _offset;
-
-        public uint ReadUInt32()
+        public DdsFile Build()
         {
-            var value = BinaryPrimitives.ReadUInt32LittleEndian(_data.AsSpan(_offset, 4));
-            _offset += 4;
-            return value;
-        }
+            if (!TryGetFormatInfo(FormatId, out var formatInfo))
+                throw new InvalidDataException($"Unsupported DDS format: {FormatId}.");
 
-        public int ReadInt32()
-        {
-            var value = BinaryPrimitives.ReadInt32LittleEndian(_data.AsSpan(_offset, 4));
-            _offset += 4;
-            return value;
-        }
+            if (MipData.Count != checked(ImageCount * MipCount))
+                throw new InvalidDataException("Mip data does not match the image/mip counts.");
 
-        public byte[] ReadBytes(int length)
-        {
-            var value = _data.AsSpan(_offset, length).ToArray();
-            _offset += length;
-            return value;
-        }
+            var ms = new MemoryStream();
+            using (var writer = new BinaryWriter(ms))
+            {
+                var usesDx10 = formatInfo.LegacyFourCc == 0;
 
-        public void Advance(int length) => _offset += length;
-    }
+                var flags = DdsdCaps | DdsdHeight | DdsdWidth | DdsdPixelFormat;
+                flags |= formatInfo.IsBlockCompressed ? DdsdLinearSize : DdsdPitch;
+                if (MipCount > 1)
+                    flags |= DdsdMipmapCount;
 
-    private sealed class SpanWriter(byte[] data)
-    {
-        private readonly byte[] _data = data;
-        private int _offset;
+                writer.Write(Magic);
+                writer.Write(HeaderSize);
+                writer.Write(flags);
+                writer.Write(Height);
+                writer.Write(Width);
+                writer.Write(GetMipSize(Width, Height, formatInfo));
+                writer.Write(0);
+                writer.Write(MipCount);
+                writer.Write(new byte[44]);
 
-        public void WriteUInt32(uint value)
-        {
-            BinaryPrimitives.WriteUInt32LittleEndian(_data.AsSpan(_offset, 4), value);
-            _offset += 4;
-        }
+                writer.Write(PixelFormatSize);
+                if (usesDx10)
+                {
+                    writer.Write(DdpfFourCc);
+                    writer.Write(FourCcDx10);
+                    writer.Write(0);
+                    writer.Write(0u);
+                    writer.Write(0u);
+                    writer.Write(0u);
+                    writer.Write(0u);
+                }
+                else if (formatInfo.LegacyFourCc != 0)
+                {
+                    writer.Write(DdpfFourCc);
+                    writer.Write(formatInfo.LegacyFourCc);
+                    writer.Write(0);
+                    writer.Write(0u);
+                    writer.Write(0u);
+                    writer.Write(0u);
+                    writer.Write(0u);
+                }
+                else
+                {
+                    writer.Write(DdpfRgb | DdpfAlphaPixels);
+                    writer.Write(0u);
+                    writer.Write(32);
+                    writer.Write(0x00FF0000u);
+                    writer.Write(0x0000FF00u);
+                    writer.Write(0x000000FFu);
+                    writer.Write(0xFF000000u);
+                }
 
-        public void WriteUInt64(ulong value)
-        {
-            BinaryPrimitives.WriteUInt64LittleEndian(_data.AsSpan(_offset, 8), value);
-            _offset += 8;
-        }
+                var caps = DdsCapsTexture;
+                if (MipCount > 1)
+                    caps |= DdsCapsComplex | DdsCapsMipmap;
 
-        public void WriteInt32(int value)
-        {
-            BinaryPrimitives.WriteInt32LittleEndian(_data.AsSpan(_offset, 4), value);
-            _offset += 4;
-        }
+                writer.Write(caps);
+                writer.Write(0u);
+                writer.Write(0u);
+                writer.Write(0u);
+                writer.Write(0u);
 
-        public void WriteUInt16(ushort value)
-        {
-            BinaryPrimitives.WriteUInt16LittleEndian(_data.AsSpan(_offset, 2), value);
-            _offset += 2;
-        }
+                if (usesDx10)
+                {
+                    writer.Write(FormatId);
+                    writer.Write(D3d10ResourceDimensionTexture2D);
+                    writer.Write(0u);
+                    writer.Write(ImageCount);
+                    writer.Write(0u);
+                }
 
-        public void WriteByte(byte value)
-        {
-            _data[_offset++] = value;
-        }
+                foreach (var mip in MipData)
+                    writer.Write(mip);
 
-        public void WriteBytes(ReadOnlySpan<byte> value)
-        {
-            value.CopyTo(_data.AsSpan(_offset, value.Length));
-            _offset += value.Length;
-        }
+                if (OriginalTexBytes is { Length: > 0 } texBytes)
+                {
+                    writer.Write(TrailerMagic);
+                    writer.Write(texBytes.Length);
+                    writer.Write(texBytes);
+                }
+            }
 
-        public void WriteZeros(int length)
-        {
-            _data.AsSpan(_offset, length).Clear();
-            _offset += length;
+            return new DdsFile(ms.ToArray());
         }
     }
 }

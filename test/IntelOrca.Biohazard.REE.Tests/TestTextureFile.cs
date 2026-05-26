@@ -44,7 +44,7 @@ namespace IntelOrca.Biohazard.REE.Tests
         {
             var expectedMipData = Enumerable.Range(0, 64).Select(x => (byte)x).ToArray();
             var file = new TextureFile(BuildPackedTextureFile(expectedMipData));
-            var dds = DdsFile.Read(file.ToDdsBytes());
+            var dds = file.ToDds();
 
             Assert.Single(dds.MipData);
             Assert.True(dds.MipData[0].SequenceEqual(expectedMipData));
@@ -55,9 +55,10 @@ namespace IntelOrca.Biohazard.REE.Tests
         {
             var expectedMipData = Enumerable.Range(0, 64).Select(x => (byte)x).ToArray();
             var paddedMipData = BuildPaddedMipData(expectedMipData);
-            var codec = new FakeGDeflateCodec();
-            var file = new TextureFile(BuildPackedTextureFile(codec.Compress(paddedMipData), 48, paddedMipData.Length));
-            var dds = DdsFile.Read(file.ToDdsBytes(codec));
+            var encoder = new FakeGDeflateEncoder();
+            var options = new TextureConvertOptions { Encoder = encoder };
+            var file = new TextureFile(BuildPackedTextureFile(encoder.Compress(paddedMipData), 48, paddedMipData.Length));
+            var dds = file.ToDds(options);
 
             Assert.Single(dds.MipData);
             Assert.True(dds.MipData[0].SequenceEqual(expectedMipData));
@@ -68,14 +69,14 @@ namespace IntelOrca.Biohazard.REE.Tests
         {
             var expectedMipData = Enumerable.Range(0, 64).Select(x => (byte)x).ToArray();
             var source = new TextureFile(BuildPackedTextureFile(expectedMipData));
-            var dds = DdsFile.Read(source.ToDdsBytes());
-            var codec = new FakeGDeflateCodec();
+            var dds = source.ToDds();
+            var encoder = new FakeGDeflateEncoder();
+            var options = new TextureConvertOptions { Encoder = encoder };
 
-            var packedTexBytes = dds.ToTextureBytes(250813143, codec);
-            var packedTex = new TextureFile(packedTexBytes);
+            var packedTex = dds.ToTextureFile(250813143, options);
 
             Assert.True(packedTex.UsesPackedMips);
-            Assert.True(packedTex.GetMipData(gdeflate: codec).Span.SequenceEqual(expectedMipData));
+            Assert.True(packedTex.GetMipData(options: options).Span.SequenceEqual(expectedMipData));
         }
 
         private static byte[] BuildTextureFile()
@@ -164,14 +165,13 @@ namespace IntelOrca.Biohazard.REE.Tests
             Assert.Equal(expectedHeight, file.Height);
 
             // Export to DDS
-            var ddsBytes = file.ToDdsBytes();
+            var dds = file.ToDds();
+            var ddsBytes = dds.ToBytes();
             var ddsHash = IntelOrca.Biohazard.REE.Cryptography.MurMur3.HashData(ddsBytes);
             Assert.Equal(expectedDdsHash, ddsHash);
 
             // Roundtrip check
-            var dds = DdsFile.Read(ddsBytes);
-            var roundtripTexBytes = dds.ToTextureBytes((int)file.RawVersion);
-            var roundtripTex = new TextureFile(roundtripTexBytes);
+            var roundtripTex = dds.ToTextureFile((int)file.RawVersion);
 
             Assert.Equal(file.Width, roundtripTex.Width);
             Assert.Equal(file.Height, roundtripTex.Height);
@@ -197,9 +197,9 @@ namespace IntelOrca.Biohazard.REE.Tests
             Assert.Equal(1, file.TotalMipCount);
             Assert.True(file.UsesPackedMips);
 
-            var codec = new MockGDeflateCodec(data);
-            var ddsBytes = file.ToDdsBytes(codec);
-            var dds = DdsFile.Read(ddsBytes);
+            var encoder = new MockGDeflateEncoder(data);
+            var options = new TextureConvertOptions { Encoder = encoder };
+            var dds = file.ToDds(options);
 
             Assert.Single(dds.MipData);
 
@@ -207,8 +207,7 @@ namespace IntelOrca.Biohazard.REE.Tests
             Assert.Equal(1662662843, decompHash);
 
             // Roundtrip check using mock codec
-            var roundtripTexBytes = dds.ToTextureBytes((int)file.RawVersion, codec);
-            var roundtripTex = new TextureFile(roundtripTexBytes);
+            var roundtripTex = dds.ToTextureFile((int)file.RawVersion, options);
 
             Assert.Equal(file.Width, roundtripTex.Width);
             Assert.Equal(file.Height, roundtripTex.Height);
@@ -217,12 +216,12 @@ namespace IntelOrca.Biohazard.REE.Tests
             Assert.Equal(file.MipCount, roundtripTex.MipCount);
         }
 
-        private sealed class MockGDeflateCodec : IGDeflateCodec
+        private sealed class MockGDeflateEncoder : IGDeflateEncoder
         {
             private static readonly byte[] DecompressedData;
             private readonly byte[] _compressedMip;
 
-            static MockGDeflateCodec()
+            static MockGDeflateEncoder()
             {
                 using var ms = new MemoryStream(Resources.ui1000_iam_decompressed);
                 using var gzip = new System.IO.Compression.GZipStream(ms, System.IO.Compression.CompressionMode.Decompress);
@@ -231,7 +230,7 @@ namespace IntelOrca.Biohazard.REE.Tests
                 DecompressedData = outMs.ToArray();
             }
 
-            public MockGDeflateCodec(byte[] originalTextureBytes)
+            public MockGDeflateEncoder(byte[] originalTextureBytes)
             {
                 _compressedMip = new byte[originalTextureBytes.Length - 64];
                 Array.Copy(originalTextureBytes, 64, _compressedMip, 0, _compressedMip.Length);
@@ -244,7 +243,7 @@ namespace IntelOrca.Biohazard.REE.Tests
                 {
                     return _compressedMip;
                 }
-                throw new NotSupportedException($"MockGDeflateCodec: Unexpected uncompressed payload to compress. MurMur3: {hash}");
+                throw new NotSupportedException($"MockGDeflateEncoder: Unexpected uncompressed payload to compress. MurMur3: {hash}");
             }
 
             public byte[] Decompress(ReadOnlyMemory<byte> compressed, int uncompressedSize)
@@ -254,11 +253,11 @@ namespace IntelOrca.Biohazard.REE.Tests
                 {
                     return DecompressedData;
                 }
-                throw new NotSupportedException($"MockGDeflateCodec: Unexpected compressed payload to decompress. MurMur3: {hash}");
+                throw new NotSupportedException($"MockGDeflateEncoder: Unexpected compressed payload to decompress. MurMur3: {hash}");
             }
         }
 
-        private sealed class FakeGDeflateCodec : IGDeflateCodec
+        private sealed class FakeGDeflateEncoder : IGDeflateEncoder
         {
             private readonly Dictionary<string, byte[]> _payloads = new();
             private int _nextId = 1;

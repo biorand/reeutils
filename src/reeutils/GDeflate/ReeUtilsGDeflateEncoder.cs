@@ -5,11 +5,11 @@ using IntelOrca.Biohazard.REE.Graphics;
 
 namespace IntelOrca.Biohazard.REEUtils.GDeflate;
 
-public sealed class ReeUtilsGDeflateCodec : IGDeflateCodec
+public sealed class ReeUtilsGDeflateEncoder : IGDeflateEncoder
 {
-    public static ReeUtilsGDeflateCodec Instance { get; } = new();
+    public static ReeUtilsGDeflateEncoder Instance { get; } = new();
 
-    private ReeUtilsGDeflateCodec()
+    private ReeUtilsGDeflateEncoder()
     {
     }
 
