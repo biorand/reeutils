@@ -150,10 +150,10 @@ namespace IntelOrca.Biohazard.REE.Tests
         }
 
         [Theory]
-        [InlineData("natives/x64/objectroot/setmodel/textures/sm70_201_inkribbon01a_a_albm.tex.10", 1024, 1024, -981482334)]
-        [InlineData("natives/x64/objectroot/setmodel/textures/sm70_201_inkribbon01a_a_nrmr.tex.10", 512, 512, 849078052)]
-        [InlineData("natives/x64/streaming/objectroot/setmodel/textures/sm70_201_inkribbon01a_a_albm.tex.10", 2048, 2048, 1348337597)]
-        [InlineData("natives/x64/streaming/objectroot/setmodel/textures/sm70_201_inkribbon01a_a_nrmr.tex.10", 2048, 2048, 1191428912)]
+        [InlineData("natives/x64/objectroot/setmodel/textures/sm70_201_inkribbon01a_a_albm.tex.10", 1024, 1024, 873095586)]
+        [InlineData("natives/x64/objectroot/setmodel/textures/sm70_201_inkribbon01a_a_nrmr.tex.10", 512, 512, -250761442)]
+        [InlineData("natives/x64/streaming/objectroot/setmodel/textures/sm70_201_inkribbon01a_a_albm.tex.10", 2048, 2048, -2134722669)]
+        [InlineData("natives/x64/streaming/objectroot/setmodel/textures/sm70_201_inkribbon01a_a_nrmr.tex.10", 2048, 2048, -214742397)]
         public void Reads_RE2R_InkRibbon_Textures(string path, int expectedWidth, int expectedHeight, int expectedDdsHash)
         {
             var data = OriginalPakHelper.Default.GetFileData(GameNames.RE2, path);
@@ -170,8 +170,10 @@ namespace IntelOrca.Biohazard.REE.Tests
             var ddsHash = IntelOrca.Biohazard.REE.Cryptography.MurMur3.HashData(ddsBytes);
             Assert.Equal(expectedDdsHash, ddsHash);
 
-            // Roundtrip check
+            // Triple-trip check: converting DDS -> TEX -> DDS produces an identical DDS
             var roundtripTex = dds.ToTextureFile((int)file.RawVersion);
+            var roundtripDds = roundtripTex.ToDds();
+            Assert.True(dds.ToBytes().SequenceEqual(roundtripDds.ToBytes()));
 
             Assert.Equal(file.Width, roundtripTex.Width);
             Assert.Equal(file.Height, roundtripTex.Height);
@@ -206,8 +208,10 @@ namespace IntelOrca.Biohazard.REE.Tests
             var decompHash = IntelOrca.Biohazard.REE.Cryptography.MurMur3.HashData(dds.MipData[0]);
             Assert.Equal(1662662843, decompHash);
 
-            // Roundtrip check using mock codec
+            // Triple-trip check using mock codec: DDS -> TEX -> DDS produces an identical DDS
             var roundtripTex = dds.ToTextureFile((int)file.RawVersion, options);
+            var roundtripDds = roundtripTex.ToDds(options);
+            Assert.True(dds.ToBytes().SequenceEqual(roundtripDds.ToBytes()));
 
             Assert.Equal(file.Width, roundtripTex.Width);
             Assert.Equal(file.Height, roundtripTex.Height);

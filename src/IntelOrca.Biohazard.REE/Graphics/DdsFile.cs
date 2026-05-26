@@ -9,7 +9,6 @@ namespace IntelOrca.Biohazard.REE.Graphics;
 public sealed class DdsFile
 {
     private const uint Magic = 0x20534444;
-    private const uint TrailerMagic = 0x30524545;
     private const int HeaderSize = 124;
     private const int PixelFormatSize = 32;
     private const uint FourCcDx10 = 0x30315844;
@@ -127,47 +126,6 @@ public sealed class DdsFile
         }
     }
 
-    public byte[]? OriginalTexBytes
-    {
-        get
-        {
-            if (!TryGetFormatInfo(FormatId, out var formatInfo))
-                throw new InvalidDataException($"Unsupported DDS format: {FormatId}.");
-
-            var pixelFormatFlags = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(80, 4));
-            var usesDx10 = (pixelFormatFlags & DdpfFourCc) != 0 && BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(84, 4)) == FourCcDx10;
-            var headerLength = 128 + (usesDx10 ? 20 : 0);
-
-            var offset = headerLength;
-            for (var imageIndex = 0; imageIndex < ImageCount; imageIndex++)
-            {
-                var mipWidth = Width;
-                var mipHeight = Height;
-                for (var mipIndex = 0; mipIndex < MipCount; mipIndex++)
-                {
-                    var size = GetMipSize(mipWidth, mipHeight, formatInfo);
-                    offset += size;
-                    mipWidth = Math.Max(1, mipWidth / 2);
-                    mipHeight = Math.Max(1, mipHeight / 2);
-                }
-            }
-
-            if (offset + 8 <= Data.Length)
-            {
-                var trailerMagic = BinaryPrimitives.ReadUInt32LittleEndian(Data.Span.Slice(offset, 4));
-                if (trailerMagic == TrailerMagic)
-                {
-                    var texLength = BinaryPrimitives.ReadInt32LittleEndian(Data.Span.Slice(offset + 4, 4));
-                    if (texLength >= 0 && offset + 8 + texLength <= Data.Length)
-                    {
-                        return Data.Slice(offset + 8, texLength).ToArray();
-                    }
-                }
-            }
-
-            return null;
-        }
-    }
 
     public DdsFile(ReadOnlyMemory<byte> data)
     {
@@ -195,8 +153,7 @@ public sealed class DdsFile
             Height = texture.Height,
             FormatId = texture.FormatId,
             ImageCount = texture.ImageCount,
-            MipCount = texture.MipCount,
-            OriginalTexBytes = texture.Data.ToArray()
+            MipCount = texture.MipCount
         };
 
         for (var imageIndex = 0; imageIndex < texture.ImageCount; imageIndex++)
@@ -212,9 +169,6 @@ public sealed class DdsFile
 
     public TextureFile ToTextureFile(int version, TextureConvertOptions? options = null)
     {
-        if (OriginalTexBytes is not null)
-            return new TextureFile(OriginalTexBytes);
-
         var builder = new TextureFile.Builder
         {
             Version = version,
@@ -292,7 +246,6 @@ public sealed class DdsFile
         public int ImageCount { get; set; } = 1;
         public int MipCount { get; set; } = 1;
         public List<byte[]> MipData { get; set; } = new();
-        public byte[]? OriginalTexBytes { get; set; }
 
         public DdsFile Build()
         {
@@ -375,13 +328,6 @@ public sealed class DdsFile
 
                 foreach (var mip in MipData)
                     writer.Write(mip);
-
-                if (OriginalTexBytes is { Length: > 0 } texBytes)
-                {
-                    writer.Write(TrailerMagic);
-                    writer.Write(texBytes.Length);
-                    writer.Write(texBytes);
-                }
             }
 
             return new DdsFile(ms.ToArray());

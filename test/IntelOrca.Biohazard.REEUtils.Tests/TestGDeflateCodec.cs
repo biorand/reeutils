@@ -15,27 +15,18 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             var file = new TextureFile(texBytes);
             var dds = file.ToDds();
 
-            // Clear original texture bytes so we force rebuilding and compressing the DDS as a packed texture
-            var builder = new DdsFile.Builder
-            {
-                Width = dds.Width,
-                Height = dds.Height,
-                FormatId = dds.FormatId,
-                ImageCount = dds.ImageCount,
-                MipCount = dds.MipCount,
-                MipData = dds.MipData.Select(x => x.ToArray()).ToList(),
-                OriginalTexBytes = null
-            };
-            var rebuiltDds = builder.Build();
-
             var options = new TextureConvertOptions
             {
                 Encoder = ReeUtilsGDeflateEncoder.Instance
             };
-            var packedTexture = rebuiltDds.ToTextureFile(250813143, options);
+            var packedTexture = dds.ToTextureFile(250813143, options);
 
             Assert.True(packedTexture.UsesPackedMips);
             Assert.True(packedTexture.GetMipData(options: options).ToArray().SequenceEqual(expectedMipData));
+
+            // Triple-trip check: converting DDS -> TEX -> DDS produces an identical DDS
+            var roundtripDds = packedTexture.ToDds(options);
+            Assert.True(dds.ToBytes().SequenceEqual(roundtripDds.ToBytes()));
         }
 
         private static byte[] BuildRgbaTextureFile(byte[] mipData)
