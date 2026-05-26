@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using IntelOrca.Biohazard.REE.Graphics;
-using IntelOrca.Biohazard.REEUtils.GDeflate;
 
 namespace IntelOrca.Biohazard.REEUtils.FileTypes
 {
@@ -11,7 +10,7 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
     {
         private static readonly TextureConvertOptions TextureConvertOptions = new TextureConvertOptions
         {
-            Encoder = ReeUtilsGDeflateEncoder.Instance
+            Encoder = IntelOrca.Biohazard.REEUtils.GDeflate.Instance
         };
 
         public override byte[] Export()

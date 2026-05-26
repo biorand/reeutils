@@ -1,7 +1,6 @@
 using System.IO;
 using System.Linq;
 using IntelOrca.Biohazard.REE.Graphics;
-using IntelOrca.Biohazard.REEUtils.GDeflate;
 
 namespace IntelOrca.Biohazard.REEUtils.Tests
 {
@@ -17,7 +16,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
 
             var options = new TextureConvertOptions
             {
-                Encoder = ReeUtilsGDeflateEncoder.Instance
+                Encoder = IntelOrca.Biohazard.REEUtils.GDeflate.Instance
             };
             var packedTexture = dds.ToTextureFile(250813143, options);
 

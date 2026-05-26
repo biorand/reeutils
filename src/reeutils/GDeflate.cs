@@ -1,19 +1,40 @@
 using System;
 using System.Buffers;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using IntelOrca.Biohazard.REE.Graphics;
 
-namespace IntelOrca.Biohazard.REEUtils.GDeflate;
+namespace IntelOrca.Biohazard.REEUtils;
 
-internal static class VendoredGDeflate
+public sealed class GDeflate : IGDeflateEncoder
 {
-    public const int TileSize = 0x10000;
-    public const int MaxTiles = 0xFFFF;
+    public static GDeflate Instance { get; } = new();
 
-    public static unsafe IMemoryOwner<byte> Compress(ReadOnlyMemory<byte> uncompressed, int level, out int size)
+    private GDeflate()
     {
-        NativeMethods.EnsureLoaded();
+    }
 
+    private const int TileSize = 0x10000;
+    private const int MaxTiles = 0xFFFF;
+
+    public byte[] Compress(ReadOnlyMemory<byte> uncompressed)
+    {
+        using IMemoryOwner<byte> compressed = CompressInternal(uncompressed, 12, out var size);
+        return compressed.Memory.Span[..size].ToArray();
+    }
+
+    public byte[] Decompress(ReadOnlyMemory<byte> compressed, int uncompressedSize)
+    {
+        var result = new byte[uncompressedSize];
+        if (!DecompressInternal(compressed, result))
+            throw new InvalidDataException("Failed to decompress gdeflate payload.");
+
+        return result;
+    }
+
+    private static unsafe IMemoryOwner<byte> CompressInternal(ReadOnlyMemory<byte> uncompressed, int level, out int size)
+    {
         var tileHeader = new TileStreamHeader
         {
             Id = TileStreamCompressor.GDeflate,
@@ -82,10 +103,8 @@ internal static class VendoredGDeflate
         }
     }
 
-    public static unsafe bool Decompress(ReadOnlyMemory<byte> compressed, Memory<byte> uncompressed)
+    private static unsafe bool DecompressInternal(ReadOnlyMemory<byte> compressed, Memory<byte> uncompressed)
     {
-        NativeMethods.EnsureLoaded();
-
         uncompressed.Span.Clear();
         var compressedSpan = compressed.Span;
         var tileHeader = MemoryMarshal.Read<TileStreamHeader>(compressedSpan);
@@ -118,5 +137,79 @@ internal static class VendoredGDeflate
         {
             NativeMethods.libdeflate_free_gdeflate_decompressor(decompressor);
         }
+    }
+
+    private enum TileStreamCompressor : byte
+    {
+        GDeflate = 4,
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1, Size = 8)]
+    private record struct TileStreamHeader
+    {
+        public TileStreamHeader()
+        {
+            Flags = 1;
+        }
+
+        public TileStreamCompressor Id
+        {
+            readonly get;
+            set
+            {
+                field = value;
+                Magic = (byte)(0xFF ^ (byte)value);
+            }
+        }
+
+        public byte Magic { get; private set; }
+        public ushort NumTiles { readonly get; set; }
+        public uint Flags { readonly get; set; }
+
+        public int LastTileSize
+        {
+            readonly get => (int)((Flags >> 2) & 0x3FFFFU);
+            set => Flags = (Flags & 0xFFF00003U) | (((uint)value & 0x3FFFFU) << 2);
+        }
+
+        public readonly bool Valid => (byte)Id == (0xFF ^ Magic);
+
+        public int UncompressedSize
+        {
+            readonly get => NumTiles * TileSize - (LastTileSize == 0 ? 0 : TileSize - LastTileSize);
+            set
+            {
+                NumTiles = (ushort)(value / TileSize);
+                LastTileSize = value - NumTiles * TileSize;
+                if (LastTileSize > 0)
+                    NumTiles++;
+            }
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 8)]
+    private readonly record struct GDeflatePage(nint Data, int Size);
+
+    private static class NativeMethods
+    {
+        private const string LibName = "libgdeflate";
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern nint libdeflate_alloc_gdeflate_compressor(int level);
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern unsafe nint libdeflate_gdeflate_compress(nint compressor, nint src, nint srcSize, GDeflatePage* pages, nint numPages);
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void libdeflate_free_gdeflate_compressor(nint compressor);
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern nint libdeflate_alloc_gdeflate_decompressor();
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern unsafe int libdeflate_gdeflate_decompress(nint decompressor, GDeflatePage* pages, nint numPages, nint dst, nint dstSize, out nint bytes);
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void libdeflate_free_gdeflate_decompressor(nint decompressor);
     }
 }
