@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -71,7 +71,7 @@ namespace IntelOrca.Biohazard.REE.Package
 
         public void Save(string path, CompressionKind compressionKind = CompressionKind.Zstd)
         {
-            using var stream = File.OpenWrite(path);
+            using var stream = File.Create(path);
             Save(stream, compressionKind);
         }
 
