@@ -152,7 +152,7 @@ namespace IntelOrca.Biohazard.REE.Tests
                 Repository = repo,
                 Id = 1,
                 Crc = 0,
-                Name = "app.NativeFields",
+                TypeName = new RszTypeName("app.NativeFields"),
                 Fields =
                 [
                     new() { Name = "RangeField", Type = RszFieldType.Range },
@@ -171,6 +171,28 @@ namespace IntelOrca.Biohazard.REE.Tests
             Assert.Contains("public via.Capsule CapsuleField { get; set; } = new();", output);
             Assert.Contains("public via.Position PositionField { get; set; } = new();", output);
             Assert.Contains("public System.Numerics.Matrix4x4 MatrixField { get; set; }", output);
+        }
+
+        [Fact]
+        public void Generate_GenericType()
+        {
+            AssertCode(GameNames.RE9, "app.ItemAppointSetting.AppointGimmickData",
+                """
+                namespace app
+                {
+                    internal class ItemAppointSetting
+                    {
+                        internal class AppointGimmickData
+                        {
+                            public app.ContextIDRef<app.GimmickCore> _Target { get; set; } = new();
+                        }
+                    }
+                    internal class ContextIDRef<TContextIDHolder>
+                    {
+                        public System.Guid _RawContextID { get; set; }
+                    }
+                }
+                """);
         }
 
         private void AssertCode(string gameName, string typeName, string expected)

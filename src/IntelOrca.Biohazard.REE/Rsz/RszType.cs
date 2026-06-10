@@ -12,7 +12,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public required RszTypeRepository Repository { get; init; }
         public required uint Id { get; init; }
         public required uint Crc { get; init; }
-        public required string Name { get; init; }
+        public required RszTypeName TypeName { get; init; }
         public ImmutableArray<RszTypeField> Fields { get; set; } = [];
 
         /// <summary>
@@ -30,23 +30,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
         /// </summary>
         public IEnumerable<RszType> Children => Repository.Types.Where(x => x.Parent == this);
 
-        public string Namespace
-        {
-            get
-            {
-                var lastFullStop = Name.LastIndexOf('.');
-                return lastFullStop == -1 ? "" : Name[..lastFullStop];
-            }
-        }
-
-        public string NameWithoutNamespace
-        {
-            get
-            {
-                var lastFullStop = Name.LastIndexOf('.');
-                return lastFullStop == -1 ? Name : Name[(lastFullStop + 1)..];
-            }
-        }
+        public string Name => TypeName.FullName;
+        public string Namespace => TypeName.Namespace;
+        public string NameWithoutNamespace => TypeName.NameWithoutNamespace;
 
         public bool IsEnum
         {

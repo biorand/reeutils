@@ -56,20 +56,39 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             void WriteType(RszType t)
             {
-                if (t.Name.Contains("[]") || t.Name.Contains('<'))
+                if (t.Name.Contains("[]"))
                     return;
+
+                // Skip concrete closed generic types; generate classes for open generic definitions
+                if (t.TypeName.IsGeneric)
+                    return;
+
+                string className;
+                if (t.TypeName.IsGenericDefinition)
+                {
+                    var simpleName = GetSimpleClassName(t);
+                    var paramNames = t.TypeName.GenericParameterNames;
+                    className = $"{simpleName}<{string.Join(", ", paramNames)}>";
+                }
+                else
+                {
+                    className = t.NameWithoutNamespace;
+                }
 
                 string? parentName = null;
                 RszType? parent = null;
                 if (t.Parent != null && allTypes.Contains(t.Parent))
                 {
-                    parent = t.Parent;
-                    parentName = t.Parent.Namespace == t.Namespace
-                        ? t.Parent.NameWithoutNamespace
-                        : t.Parent.Name;
+                    if (!t.TypeName.IsGenericDefinition || !TypesWouldClash(t, t.Parent))
+                    {
+                        parent = t.Parent;
+                        parentName = t.Parent.Namespace == t.Namespace
+                            ? t.Parent.NameWithoutNamespace
+                            : t.Parent.Name;
+                    }
                 }
 
-                writer.BeginClassBlock(t.NameWithoutNamespace, parentName);
+                writer.BeginClassBlock(className, parentName);
                 if (impl.Contains(t))
                 {
                     foreach (var f in t.Fields)
@@ -133,7 +152,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
             }
 
-            return field.Type switch
+            var typeName = field.Type switch
             {
                 RszFieldType.Bool => "bool",
                 RszFieldType.S8 => "sbyte",
@@ -193,8 +212,30 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.String => "string",
                 RszFieldType.UserData => "RszUserDataNode",
                 RszFieldType.Resource => "RszResourceNode",
-                _ => objectType?.Name ?? "object"
+                _ => null
             };
+            if (typeName != null)
+                return typeName;
+
+            if (objectType?.TypeName.IsGeneric == true)
+                return GetGenericFieldTypeName(objectType);
+            return objectType?.Name ?? "object";
+        }
+
+        private string GetGenericFieldTypeName(RszType type)
+        {
+            var defName = type.TypeName.GenericTypeDefinitionName;
+            var backtickIdx = defName.IndexOf('`');
+            var simpleName = backtickIdx == -1 ? defName : defName[..backtickIdx];
+
+            var typeArgs = type.TypeName.TypeArguments;
+            var argStrings = new string[typeArgs.Length];
+            for (var i = 0; i < typeArgs.Length; i++)
+            {
+                argStrings[i] = typeArgs[i].FullName;
+            }
+
+            return $"{simpleName}<{string.Join(", ", argStrings)}>";
         }
 
         private List<RszType> FindTypes(List<RszType> decl, HashSet<RszType> impl, RszType type)
@@ -235,9 +276,37 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 if (f.ObjectType != null)
                 {
                     FindTypes(decl, impl, f.ObjectType);
+
+                    if (f.ObjectType.TypeName.IsGeneric)
+                    {
+                        var defName = f.ObjectType.TypeName.GenericTypeDefinitionName;
+                        var defType = f.ObjectType.Repository.FromName(defName);
+                        if (defType == null)
+                        {
+                            defType = f.ObjectType.Repository.Types.FirstOrDefault(t =>
+                                t.TypeName.IsGenericDefinition &&
+                                t.TypeName.GenericTypeDefinitionName == defName);
+                        }
+                        if (defType != null && !decl.Contains(defType))
+                        {
+                            FindTypes(decl, impl, defType);
+                        }
+                    }
                 }
             }
             return decl;
+        }
+
+        private static string GetSimpleClassName(RszType t)
+        {
+            var name = t.NameWithoutNamespace;
+            var backtickIdx = name.IndexOf('`');
+            return backtickIdx == -1 ? name : name[..backtickIdx];
+        }
+
+        private static bool TypesWouldClash(RszType a, RszType b)
+        {
+            return GetSimpleClassName(a) == GetSimpleClassName(b);
         }
 
         private class CsharpWriter

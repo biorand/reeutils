@@ -109,7 +109,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
             var clrName = obj.GetType().FullName!.Replace('+', '.');
             if (clrName != type.Name)
             {
-                var subRszType = type.Repository.FromName(clrName);
+                var rszName = RszTypeName.FromClrType(obj.GetType()).FullName;
+                var subRszType = type.Repository.FromName(rszName);
                 if (subRszType != null)
                     type = subRszType;
             }
@@ -338,7 +339,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.UserData => (RszUserDataNode)obj,
                 RszFieldType.Object => typeRepository == null
                     ? throw new ArgumentException("Unable to serialize objects without a repository")
-                    : Serialize(typeRepository.FromName(obj.GetType().FullName ?? "") ?? throw new ArgumentException($"{obj.GetType().FullName} not found in repository."), obj),
+                    : Serialize(typeRepository.FromName(RszTypeName.FromClrType(obj.GetType()).FullName) ?? throw new ArgumentException($"{obj.GetType().FullName} not found in repository."), obj),
                 _ => throw new NotSupportedException()
             };
         }
@@ -347,7 +348,20 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             if (rszType.Name != targetClrType.FullName!.Replace('+', '.'))
             {
-                // Look for inheritance
+                // Generic type resolution
+                if (rszType.TypeName.IsGeneric)
+                {
+                    var clrType = rszType.TypeName.TryFindClrType(targetClrType.Assembly);
+                    if (clrType != null)
+                    {
+                        if (clrType != targetClrType && !clrType.IsSubclassOf(targetClrType))
+                            throw new Exception($"{clrType} is not a sub class of {targetClrType}.");
+
+                        return clrType;
+                    }
+                }
+
+                // Look for inheritance (non-generic)
                 var foundClrType = targetClrType.Assembly.DefinedTypes.FirstOrDefault(x => x.FullName?.Replace('+', '.') == rszType.Name);
                 if (foundClrType == null)
                     throw new Exception($"Expected to deserialize {targetClrType.FullName} but got {rszType.Name}.");

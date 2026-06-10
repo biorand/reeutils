@@ -283,6 +283,28 @@ namespace IntelOrca.Biohazard.REE.Tests
             Assert.True(input.Data.Span.SequenceEqual(output.Data.Span));
         }
 
+        /// <summary>
+        /// Round-trip of ItemAppointSetting with generic ContextIDRef<T>.
+        /// </summary>
+        [Fact]
+        public void RE9_ITEMAPPOINTSETTING_RoundTrip()
+        {
+            var path = "natives/stm/leveldesign/item/userdata/itemappointment/it60_00_002.user.3";
+
+            var repo = _pakHelper.GetTypeRepository(GameNames.RE9);
+            var input = new UserFile(_pakHelper.GetFileData(GameNames.RE9, path));
+            var inputBuilder = input.ToBuilder(repo);
+            var root = inputBuilder.Objects[0];
+            var rootRszType = root.Type;
+
+            var userData = RszSerializer.Deserialize<app.ItemAppointSetting>(root)!;
+
+            inputBuilder.Objects = [(RszObjectNode)RszSerializer.Serialize(rootRszType, userData)];
+            var output = inputBuilder.Build();
+
+            Assert.True(input.Data.Span.SequenceEqual(output.Data.Span));
+        }
+
         [Fact]
         public void RE9_CRAFTRECIPECATALOGUSERDATA()
         {
@@ -347,6 +369,33 @@ namespace chainsaw
 
 namespace app
 {
+    internal class ItemAppointSetting
+    {
+        public List<AppointGimmickData> _AppointGimmicks { get; set; } = [];
+
+        internal class AppointGimmickData
+        {
+            public ContextIDRef<GimmickCore> _Target { get; set; } = null!;
+        }
+    }
+
+    internal class AppUserdataBase
+    {
+    }
+
+    internal class AppObjectBase
+    {
+    }
+
+    internal class ContextIDRef<T> : AppObjectBase
+    {
+        public Guid _RawContextID { get; set; }
+    }
+
+    internal class GimmickCore : AppObjectBase
+    {
+    }
+
     internal class CraftRecipeCatalogUserData
     {
         public RszUserDataNode _SoundCatalogUserData { get; set; } = new();

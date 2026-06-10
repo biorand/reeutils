@@ -49,7 +49,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     Repository = repo,
                     Id = typeModel.Id,
                     Crc = typeModel.Crc,
-                    Name = typeModel.Name ?? ""
+                    TypeName = new RszTypeName(typeModel.Name ?? "")
                 });
             }
 

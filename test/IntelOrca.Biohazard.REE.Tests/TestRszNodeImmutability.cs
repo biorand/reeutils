@@ -77,7 +77,7 @@ namespace IntelOrca.Biohazard.REE.Tests
                 Repository = repository,
                 Id = 1,
                 Crc = 1,
-                Name = typeName,
+                TypeName = new RszTypeName(typeName),
                 Fields = fields
                     .Select(x => new RszTypeField
                     {
