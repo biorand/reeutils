@@ -212,13 +212,12 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
             });
         }
 
-        [McpServerTool(Name = "read", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Reads a supported REE file and returns its contents as JSON. First use find to get the full pak path, then pass it here. Requires set_game to have completed first. For large scenes, use an iterative workflow: (1) read(path) to browse object names with collapsed details, (2) read(path, expand_nodes=['ObjectName']) to expand components for just those objects. Avoid full=true if possible — it produces very large output.")]
+        [McpServerTool(Name = "read", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Reads a supported REE file and returns its contents as JSON. First use find to get the full pak path, then pass it here. Requires set_game to have completed first. Use an iterative workflow: (1) read(path) to browse object names with collapsed component details, (2) read(path, expand_nodes=['ObjectName']) to get full component data (Position, fields) for specific objects.")]
         public static string Read(
             [Description("A disk path or pak-internal path to read. Supported: .scn, .pfb, .user, .msg, .tex, .fsm")] string path,
             McpSession session,
-            [Description("Names, GUIDs, or forward-slash paths (e.g. 'Gm16_007_01', 'Player', 'Root/Enemy', 'aaaaaaaa-bbbb-...') of objects to expand so their component data (Position, Rotation, fields) becomes visible. For .scn/.pfb: expands collapsed component details. For .user: collapses un-matched sub-objects to @type. For .msg: filters entries by name. NOT XPath syntax.")] string[]? expand_nodes = null,
-            [Description("When true, expands ALL game object components and prevents collapsing. Prefer expand_nodes for selective expansion.")] bool full = false,
-            [Description("Limits JSON tree depth. Use to get a skeleton view. Omit for full depth.")] int? max_depth = null)
+            [Description("Names, GUIDs, or forward-slash paths (e.g. 'Gm16_007_01', 'Player', 'Root/Enemy', 'aaaaaaaa-bbbb-...') of objects to expand so their component data (Position, Rotation, Scale, fields) becomes visible. For .scn/.pfb: expands collapsed component details for matched objects. For .user: collapses un-matched sub-objects to @type. For .msg: filters entries by name. Also supports prefix matching: 'Root' expands 'Root' and all descendants. NOT XPath syntax.")] string[]? expand_nodes = null,
+            [Description("Limits JSON tree depth. Use max_depth=1 for a skeleton view showing only top-level objects. Omit for full depth.")] int? max_depth = null)
         {
             var data = session.ReadFileData(path, out var resolvedPath);
             try
@@ -230,16 +229,15 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
                 using var json = handler.GetJson(new TreeOptions
                 {
                     ExpandNodes = expand_nodes ?? [],
-                    Full = full,
                     MaxDepth = max_depth
                 });
                 var jsonText = JsonSupport.ToJsonString(json);
 
                 var hints = new List<string>();
-                if (full && jsonText.Length > 10240)
+                if (jsonText.Length > 20480)
                     hints.Add("Large output. Consider using expand_nodes to target specific objects or max_depth for a skeleton view.");
-                else if ((expand_nodes == null || expand_nodes.Length == 0) && !full && (resolvedPath.EndsWith(".scn", StringComparison.OrdinalIgnoreCase) || resolvedPath.EndsWith(".pfb", StringComparison.OrdinalIgnoreCase) || resolvedPath.EndsWith(".user", StringComparison.OrdinalIgnoreCase)))
-                    hints.Add("Tip: Use expand_nodes to get full component details for specific objects.");
+                else if ((expand_nodes == null || expand_nodes.Length == 0) && (resolvedPath.EndsWith(".scn", StringComparison.OrdinalIgnoreCase) || resolvedPath.EndsWith(".pfb", StringComparison.OrdinalIgnoreCase) || resolvedPath.EndsWith(".user", StringComparison.OrdinalIgnoreCase)))
+                    hints.Add("Tip: Use expand_nodes with object names to see full component data (Position, fields).");
                 if (expand_nodes != null && expand_nodes.Length > 0)
                 {
                     var anyMatched = expand_nodes.Any(n => jsonText.Contains(n, StringComparison.OrdinalIgnoreCase));
