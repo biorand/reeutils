@@ -15,7 +15,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
     [McpServerToolType]
     internal sealed class PakTools
     {
-        [McpServerTool(Name = "search", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Searches files in the current pak similarly to the grep command.")]
+        [McpServerTool(Name = "search", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("SLOW. Searches file CONTENTS using a regex pattern across matching pak entries. Decompresses and reads file data — expensive. Prefer find + read instead. Only use when you need to grep for specific values inside files (e.g. a GUID or specific field value). Requires set_game to have completed first.")]
         public static string Search(
             [Description("Regex pattern to search for in paths or values.")] string regex,
             [Description("Pak paths, prefixes, or wildcard patterns to search within.")] string[] paths,
@@ -30,7 +30,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
                 throw new McpException("max_results must be greater than zero.");
 
             var pak = session.Pak ?? throw new McpException("No pak is open. Call open_pak first.");
-            var pakList = session.PakList ?? throw new McpException("No pak list is loaded. Call open_pak_list or set_game first.");
+            var pakList = session.PakList ?? throw new McpException("No pak list is loaded. Call set_game first and wait for it to complete before calling search. Do not send tool calls in parallel.");
             var pattern = new Regex(regex, RegexOptions.IgnoreCase);
             var results = new List<SearchResult>();
             var matchedEntries = MatchPakEntries(pakList, paths).ToArray();
@@ -77,7 +77,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
             });
         }
 
-        [McpServerTool(Name = "find", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Finds files in the current pak matching the given path patterns. Requires a loaded pak list.")]
+        [McpServerTool(Name = "find", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("DISCOVERS file paths inside the open pak using substring or glob pattern matching on filenames. FAST — hash-only lookup, no file reading. Returns full pak-internal paths. Use this to locate a file when you know its name but not its full path, then pass the result to read. Requires set_game to have completed first (call it before this, not in parallel).")]
         public static string Find(
             [Description("One or more path patterns.")] string[] patterns,
             McpSession session)
@@ -86,7 +86,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
                 throw new McpException("At least one pattern must be specified.");
 
             var pak = session.Pak ?? throw new McpException("No pak is open. Call open_pak first.");
-            var pakList = session.PakList ?? throw new McpException("No pak list is loaded. Call open_pak_list or set_game first.");
+            var pakList = session.PakList ?? throw new McpException("No pak list is loaded. Call set_game first and wait for it to complete before calling find. Do not send tool calls in parallel.");
             var paths = PakPathMatcher.FindMatchingEntries(pak, pakList, patterns);
 
             return ToJson(new
@@ -96,7 +96,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
             });
         }
 
-        [McpServerTool(Name = "list_files", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Lists files or directories in the current pak similarly to the ls command.")]
+        [McpServerTool(Name = "list_files", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Lists files and directories in the open pak (like ls). Use to browse the pak directory structure. For targeted file discovery when you know the filename, prefer find with a specific pattern instead.")]
         public static string ListFiles(
             [Description("Optional pak directory or file path. Leave empty to list the pak root.")] string? path,
             McpSession session)
@@ -212,7 +212,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
             });
         }
 
-        [McpServerTool(Name = "read", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Reads a supported REE file and returns JSON.")]
+        [McpServerTool(Name = "read", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Reads a file from the open pak by its full pak-internal path and returns its contents as JSON (for .msg, .user, .scn, .pfb files). Call find first to discover the correct full path. Requires set_game to have completed first.")]
         public static string Read(
             [Description("A disk path or pak-internal path to read.")] string path,
             McpSession session,
