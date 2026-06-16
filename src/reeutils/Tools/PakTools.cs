@@ -212,12 +212,13 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
             });
         }
 
-        [McpServerTool(Name = "read", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Reads a file from the open pak by its full pak-internal path and returns its contents as JSON (for .msg, .user, .scn, .pfb files). Call find first to discover the correct full path. Requires set_game to have completed first.")]
+        [McpServerTool(Name = "read", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Reads a supported REE file and returns its contents as JSON. First use find to get the full pak path, then pass it here. Requires set_game to have completed first. For large scenes, use an iterative workflow: (1) read(path) to browse object names with collapsed details, (2) read(path, expand_nodes=['ObjectName']) to expand components for just those objects. Avoid full=true if possible — it produces very large output.")]
         public static string Read(
-            [Description("A disk path or pak-internal path to read.")] string path,
+            [Description("A disk path or pak-internal path to read. Supported: .scn, .pfb, .user, .msg, .tex, .fsm")] string path,
             McpSession session,
-            [Description("Scene node paths whose components should be expanded.")] string[]? xpaths = null,
-            [Description("When true, expands all scene components.")] bool full = false)
+            [Description("Names, GUIDs, or forward-slash paths (e.g. 'Gm16_007_01', 'Player', 'Root/Enemy', 'aaaaaaaa-bbbb-...') of objects to expand so their component data (Position, Rotation, fields) becomes visible. For .scn/.pfb: expands collapsed component details. For .user: collapses un-matched sub-objects to @type. For .msg: filters entries by name. NOT XPath syntax.")] string[]? expand_nodes = null,
+            [Description("When true, expands ALL game object components and prevents collapsing. Prefer expand_nodes for selective expansion.")] bool full = false,
+            [Description("Limits JSON tree depth. Use to get a skeleton view. Omit for full depth.")] int? max_depth = null)
         {
             var data = session.ReadFileData(path, out var resolvedPath);
             try
@@ -228,10 +229,27 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
 
                 using var json = handler.GetJson(new TreeOptions
                 {
-                    Xpaths = xpaths ?? [],
-                    Full = full
+                    ExpandNodes = expand_nodes ?? [],
+                    Full = full,
+                    MaxDepth = max_depth
                 });
-                return JsonSupport.ToJsonString(json);
+                var jsonText = JsonSupport.ToJsonString(json);
+
+                var hints = new List<string>();
+                if (full && jsonText.Length > 10240)
+                    hints.Add("Large output. Consider using expand_nodes to target specific objects or max_depth for a skeleton view.");
+                else if ((expand_nodes == null || expand_nodes.Length == 0) && !full && (resolvedPath.EndsWith(".scn", StringComparison.OrdinalIgnoreCase) || resolvedPath.EndsWith(".pfb", StringComparison.OrdinalIgnoreCase) || resolvedPath.EndsWith(".user", StringComparison.OrdinalIgnoreCase)))
+                    hints.Add("Tip: Use expand_nodes to get full component details for specific objects.");
+                if (expand_nodes != null && expand_nodes.Length > 0)
+                {
+                    var anyMatched = expand_nodes.Any(n => jsonText.Contains(n, StringComparison.OrdinalIgnoreCase));
+                    if (!anyMatched)
+                        hints.Add("No objects matched expand_nodes. Names are case-insensitive. Call read() without expand_nodes first to see available names/paths.");
+                }
+
+                if (hints.Count > 0)
+                    jsonText += "\n\n// " + string.Join("\n// ", hints);
+                return jsonText;
             }
             catch (NotSupportedException ex)
             {

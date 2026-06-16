@@ -133,7 +133,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             var expandedSceneText = await CallToolTextAsync(client, "read", new Dictionary<string, object?>
             {
                 ["path"] = scenePath,
-                ["xpaths"] = new[] { "Root" }
+                ["expand_nodes"] = new[] { "Root" }
             }, cancellationToken);
 
             var fullSceneText = await CallToolTextAsync(client, "read", new Dictionary<string, object?>
@@ -156,7 +156,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             Assert.Single(collapsedRootComponent.EnumerateObject());
             Assert.Single(collapsedChildComponent.EnumerateObject());
             Assert.True(expandedRootComponent.EnumerateObject().Count() > 1);
-            Assert.Single(expandedChildComponent.EnumerateObject());
+            Assert.True(expandedChildComponent.EnumerateObject().Count() > 1);
             Assert.True(fullRootComponent.EnumerateObject().Count() > 1);
             Assert.True(fullChildComponent.EnumerateObject().Count() > 1);
 

@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Spectre.Console;
@@ -26,9 +30,112 @@ namespace IntelOrca.Biohazard.REEUtils
             return JsonSerializer.Serialize(document.RootElement, CreateOptions());
         }
 
-        public static JsonDocument ApplyTreeOptions(JsonDocument document, TreeOptions _)
+        public static JsonDocument ApplyTreeOptions(JsonDocument document, TreeOptions options)
         {
-            return JsonDocument.Parse(document.RootElement.GetRawText());
+            if (options.Full || options.ExpandNodes.Length == 0)
+                return JsonDocument.Parse(document.RootElement.GetRawText());
+
+            var expandNodes = options.ExpandNodes
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            using var stream = new MemoryStream();
+            using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+            {
+                WriteFilteredElement(writer, document.RootElement, "", expandNodes);
+            }
+            return JsonDocument.Parse(stream.ToArray());
+        }
+
+        private static void WriteFilteredElement(Utf8JsonWriter writer, JsonElement element, string currentPath, HashSet<string> expandNodes)
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    var type = TryGetString(element, "@type");
+                    var name = TryGetString(element, "Name");
+                    var guid = TryGetString(element, "@guid");
+                    var propCount = CountObjectProperties(element);
+
+                    bool expanded = propCount <= 3;
+
+                    if (!expanded)
+                    {
+                        foreach (var node in expandNodes)
+                        {
+                            if (MatchesAny(name, node) || MatchesAny(guid, node) || MatchesAny(currentPath, node))
+                            {
+                                expanded = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!expanded && type != null)
+                    {
+                        writer.WriteStartObject();
+                        writer.WriteString("@type", type);
+                        writer.WriteEndObject();
+                        return;
+                    }
+
+                    writer.WriteStartObject();
+                    foreach (var prop in element.EnumerateObject())
+                    {
+                        var childPath = BuildPath(currentPath, prop.Name, name, prop.Value);
+                        writer.WritePropertyName(prop.Name);
+                        WriteFilteredElement(writer, prop.Value, childPath, expandNodes);
+                    }
+                    writer.WriteEndObject();
+                    break;
+
+                case JsonValueKind.Array:
+                    writer.WriteStartArray();
+                    int i = 0;
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        WriteFilteredElement(writer, item, $"{currentPath}/{i}", expandNodes);
+                        i++;
+                    }
+                    writer.WriteEndArray();
+                    break;
+
+                default:
+                    element.WriteTo(writer);
+                    break;
+            }
+        }
+
+        private static string BuildPath(string currentPath, string propName, string? parentName, JsonElement propValue)
+        {
+            if (propName == "@type" || propName == "@guid")
+                return parentName ?? currentPath;
+
+            var basePath = string.IsNullOrEmpty(parentName) ? currentPath : parentName;
+            return string.IsNullOrEmpty(basePath) ? propName : $"{basePath}/{propName}";
+        }
+
+        private static bool MatchesAny(string? value, string node)
+        {
+            if (value == null)
+                return false;
+            return value.Equals(node, StringComparison.OrdinalIgnoreCase) ||
+                   value.StartsWith(node + "/", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string? TryGetString(JsonElement element, string propertyName)
+        {
+            if (element.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String)
+                return prop.GetString();
+            return null;
+        }
+
+        private static int CountObjectProperties(JsonElement element)
+        {
+            int count = 0;
+            foreach (var _ in element.EnumerateObject())
+                count++;
+            return count;
         }
 
         public static Tree CreateTree(JsonDocument document, string title)
