@@ -27,10 +27,4 @@
     </Content>
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Include="Fixtures\*.fsmv2.40">
-      <LogicalName>Fixtures.%(Filename)%(Extension)</LogicalName>
-    </EmbeddedResource>
-  </ItemGroup>
-
 </Project>
