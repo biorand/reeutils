@@ -21,6 +21,7 @@ namespace IntelOrca.Biohazard.REEUtils
             {
                 ".msg" => new MessageFileHandler(path, data),
                 ".fsm" => new HfsmFileHandler(path, data),
+                ".fsmv2" => new Fsmv2FileHandler(path, data, GetVersionOrDefault(info, 40), repository),
                 ".user" => new UserFileHandler(path, data, GetVersionOrDefault(info, 2), repository),
                 ".scn" => new SceneFileHandler(path, data, GetVersionOrDefault(info, 20), repository),
                 ".pfb" => new PrefabFileHandler(path, data, GetVersionOrDefault(info, 17), repository),
