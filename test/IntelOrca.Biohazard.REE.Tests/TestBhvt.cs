@@ -74,13 +74,18 @@ namespace IntelOrca.Biohazard.REE.Tests
                 var originalTree = file.ReadTree(repository);
 
                 // Build() fully regenerates the file from the tree rather than preserving the original
-                // bytes (unlike HfsmFile), so round-trip correctness is checked semantically: re-reading
-                // the rebuilt file must produce the same node names, resolved actions/conditions/selectors,
-                // and state/transition/allstate targets as the original.
+                // bytes (unlike HfsmFile), so round-trip correctness is checked semantically instead of
+                // byte-for-byte: re-reading the rebuilt file must produce the exact same tree -- every
+                // structural field on every node, plus the full field values (not just the class) of
+                // every embedded RSZ object, plus file-level resources/game-object-references.
                 var rebuilt = file.ToBuilder(repository).Build();
                 var rebuiltTree = new BhvtFile(Version, rebuilt.Data).ReadTree(repository);
 
                 AssertSameTree(path, originalTree, rebuiltTree);
+                Assert.Equal(file.Resources, rebuilt.Resources);
+                Assert.Equal(
+                    file.GameObjectReferences.Select(Dump),
+                    rebuilt.GameObjectReferences.Select(Dump));
             }
             catch (SkipException)
             {
@@ -102,21 +107,40 @@ namespace IntelOrca.Biohazard.REE.Tests
             }
         }
 
+        private static string Dump(BhvtGameObjectReference r) =>
+            $"{r.Guid}:{string.Join(",", r.Values)}";
+
+        /// <summary>Full field values, not just the class name -- so a corrupted field inside an
+        /// otherwise-correctly-classified object still fails the comparison.</summary>
+        private static string Obj(RszObjectNode? o) => o == null ? "-" : RszJsonSerializer.Serialize(o);
+
         private static string Dump(BhvtNode node)
         {
-            static string ActionId(RszObjectNode obj) =>
-                obj.Children.Length > 1 && obj.Children[1] is RszValueNode v ? v.ToString() ?? "?" : "?";
-
             var sb = new System.Text.StringBuilder();
             void Visit(BhvtNode n)
             {
                 sb.Append(n.Name).Append('|')
-                  .Append(n.Selector?.Type.Name).Append('|')
-                  .Append(string.Join(",", n.Actions.Select(a => $"{a.Instance.Type.Name}:{ActionId(a.Instance)}"))).Append('|')
-                  .Append(string.Join(",", n.States.Select(s => $"{s.Target}->{s.Condition?.Type.Name}"))).Append('|')
-                  .Append(string.Join(",", n.Transitions.Select(t => $"->{t.Start}"))).Append('|')
-                  .Append(string.Join(",", n.AllStates.Select(s => $"->{s.Target}:{s.Condition?.Type.Name}"))).Append('\n');
-                foreach (var c in n.Children) Visit(c.Node);
+                  .Append(n.Attributes).Append('|')
+                  .Append(n.Priority).Append('|')
+                  .Append(n.IsBranch).Append('|')
+                  .Append(n.IsEnd).Append('|')
+                  .Append(n.WorkFlags).Append('|')
+                  .Append(n.NameHash).Append('|')
+                  .Append(n.FullNameHash).Append('|')
+                  .Append(string.Join(",", n.Tags)).Append('|')
+                  .Append(Obj(n.Selector)).Append('|')
+                  .Append(Obj(n.SelectorCallerCondition)).Append('|')
+                  .Append(string.Join(",", n.SelectorCallers.Select(Obj))).Append('|')
+                  .Append(string.Join(",", n.Actions.Select(a => $"{Obj(a.Instance)}:{a.ActionEx}"))).Append('|')
+                  .Append(string.Join(",", n.States.Select(s => $"{s.Target}->{Obj(s.Condition)}:{s.TransitionMapId}:{s.StateEx}:[{string.Join(",", s.Events.Select(Obj))}]"))).Append('|')
+                  .Append(string.Join(",", n.Transitions.Select(t => $"{t.Start}->{Obj(t.Condition)}"))).Append('|')
+                  .Append(string.Join(",", n.AllStates.Select(s => $"{s.Target}->{Obj(s.Condition)}:{s.TransitionMapId}:{s.TransitionAttributes}"))).Append('|')
+                  .Append(n.ReferenceTree).Append('\n');
+                foreach (var c in n.Children)
+                {
+                    sb.Append("child-condition:").Append(Obj(c.Condition)).Append('\n');
+                    Visit(c.Node);
+                }
             }
             Visit(node);
             return sb.ToString();
