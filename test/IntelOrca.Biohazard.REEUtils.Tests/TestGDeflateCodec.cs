@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using IntelOrca.Biohazard.REE.Graphics;
@@ -18,7 +19,17 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             {
                 Encoder = IntelOrca.Biohazard.REEUtils.GDeflate.Instance
             };
-            var packedTexture = dds.ToTextureFile(250813143, options);
+
+            TextureFile packedTexture;
+            try
+            {
+                packedTexture = dds.ToTextureFile(250813143, options);
+            }
+            catch (DllNotFoundException ex)
+            {
+                Assert.Skip($"Skipping because the native libgdeflate library is not available: {ex.Message}");
+                return;
+            }
 
             Assert.True(packedTexture.UsesPackedMips);
             Assert.True(packedTexture.GetMipData(options: options).ToArray().SequenceEqual(expectedMipData));
