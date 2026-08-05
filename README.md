@@ -9,7 +9,7 @@ A .NET library for working with RE Engine resource formats and PAK files. Primar
 Add the package to your project by referencing the NuGet package in your `.csproj`:
 
 ```xml
-<PackageReference Include="IntelOrca.Biohazard.REE" Version="1.4.7" />
+<PackageReference Include="IntelOrca.Biohazard.REE" Version="1.4.8" />
 ```
 
 Basic example showing how to open a file from the game's patched pak files, modify it and write a new patch pak:
