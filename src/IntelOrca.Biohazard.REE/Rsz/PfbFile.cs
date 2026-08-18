@@ -58,7 +58,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public RszScene ReadScene(RszTypeRepository repository)
         {
-            var objectList = Rsz.ReadObjectList(repository);
+            return ReadScene(repository, Rsz.ReadObjectList(repository));
+        }
+
+        private RszScene ReadScene(RszTypeRepository repository, ImmutableArray<RszObjectNode> objectList)
+        {
             var gameObjectInfoList = GameObjectInfoList.ToImmutableArray();
             var gameObjectRefs = GameObjectRefInfoList.ToArray();
             return BuildRoot();
@@ -137,11 +141,42 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         {
                             gameObjectGuid = RszSerializer.Deserialize<Guid>(sourceObject[i]);
                         }
+                        break;
                     }
                 }
 
                 return new RszGameObject(gameObjectGuid, null, settings, components.ToImmutable(), children.ToImmutable());
             }
+        }
+
+        /// <summary>
+        /// Returns the RSZ objects that are not part of the game object tree. The engine can still
+        /// reference such objects via <c>GameObjectRef</c> fields, so they must be preserved when
+        /// rebuilding or the file will be corrupted.
+        /// </summary>
+        private List<RszObjectNode> ReadOrphans(RszTypeRepository repository, ImmutableArray<RszObjectNode> objectList)
+        {
+            var claimedObjectIds = new HashSet<int>();
+            var gameObjectInfoList = GameObjectInfoList;
+            for (var i = 0; i < gameObjectInfoList.Length; i++)
+            {
+                var info = gameObjectInfoList[i];
+                claimedObjectIds.Add(info.ObjectId);
+                for (var componentIndex = 1; componentIndex <= info.ComponentCount; componentIndex++)
+                {
+                    claimedObjectIds.Add(info.ObjectId + componentIndex);
+                }
+            }
+
+            var orphans = new List<RszObjectNode>();
+            for (var i = 0; i < objectList.Length; i++)
+            {
+                if (!claimedObjectIds.Contains(i))
+                {
+                    orphans.Add(objectList[i]);
+                }
+            }
+            return orphans;
         }
 
         public Builder ToBuilder(RszTypeRepository repository)
@@ -156,6 +191,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public int RszVersion { get; }
             public List<string> Resources { get; } = [];
             public RszScene Scene { get; set; } = new RszScene();
+            public List<RszObjectNode> OrphanObjects { get; } = [];
 
             public Builder(RszTypeRepository repository, int version, int rszVersion)
             {
@@ -170,7 +206,39 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 Version = instance.Version;
                 RszVersion = instance.Rsz.Version;
                 Resources = instance.Resources.ToList();
-                Scene = instance.ReadScene(repository);
+                // Read the object list once so that the scene and the orphan objects share node
+                // references, keeping shared instances (e.g. prefab trigger objects) intact.
+                var objectList = instance.Rsz.ReadObjectList(repository);
+                Scene = instance.ReadScene(repository, objectList);
+                OrphanObjects = instance.ReadOrphans(repository, objectList);
+
+                // The RSZ dump doesn't contain property IDs for every field, and the read pass only
+                // assigns them to the first source object of each ref. Assign the remaining property
+                // IDs (from the original ref table) to the orphan fields so their refs can be
+                // regenerated, since orphan objects are not part of the game object tree.
+                var orphanSet = OrphanObjects.ToHashSet();
+                foreach (var refInfo in instance.GameObjectRefInfoList)
+                {
+                    if (refInfo.ObjectId < 0 || refInfo.ObjectId >= objectList.Length)
+                        continue;
+                    if (objectList[refInfo.ObjectId] is not RszObjectNode sourceObject ||
+                        !orphanSet.Contains(sourceObject))
+                    {
+                        continue;
+                    }
+                    foreach (var field in sourceObject.Type.Fields)
+                    {
+                        if (field.Type != RszFieldType.GameObjectRef)
+                            continue;
+                        if (field.Id == refInfo.PropertyId)
+                            break;
+                        if (field.Id == null)
+                        {
+                            field.Id = refInfo.PropertyId;
+                            break;
+                        }
+                    }
+                }
             }
 
             public Builder AddMissingResources()
@@ -203,6 +271,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var objectList = ImmutableArray.CreateBuilder<RszObjectNode>();
                 Traverse(-1, Scene);
 
+                // Preserve RSZ objects that are not part of the game object tree, as the engine can
+                // still reference them through GameObjectRef fields (e.g. via app.InteractTrigger*).
+                foreach (var orphan in OrphanObjects)
+                {
+                    objectList.Add(orphan);
+                }
+
                 var rszBuilder = new RszFile.Builder(Repository, RszVersion);
                 rszBuilder.Objects = objectList.ToImmutable();
                 var rsz = rszBuilder.Build();
@@ -223,6 +298,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 // Game object refs
                 var gameObjectRefOffset = ms.Position;
                 var gameObjectRefCount = 0;
+
+                // Refs for objects can be regenerated from the scene. Orphan fields have their
+                // property IDs assigned during construction, so they are regenerated too.
                 for (var i = 0; i < objectList.Count; i++)
                 {
                     var sourceObject = (RszObjectNode)objectList[i];

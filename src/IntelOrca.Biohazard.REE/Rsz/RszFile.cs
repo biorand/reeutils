@@ -142,53 +142,76 @@ namespace IntelOrca.Biohazard.REE.Rsz
 #if DEBUG_RSZ
                 var instanceIds = Enumerable.Range(0, instanceInfoList.Length).ToHashSet();
 #endif
+            // Resolve object/user data references. References must point at the same canonical node
+            // for each instance (memoized) so that sharing is preserved: a prefab object that is
+            // both referenced from a component and listed in the RSZ object list stays a single
+            // instance when serialized again.
+            var resolvedCache = new Dictionary<int, IRszNode>();
             for (var i = 0; i < instanceInfoList.Length; i++)
             {
-                var value = result[i].Value;
-                if (value is IRszNodeContainer container)
-                {
-                    result[i] = new RszInstance(result[i].Id, container.Visit(node =>
-                    {
-                        if (node is RszValueNode valueNode)
-                        {
-                            if (valueNode.Type == RszFieldType.Object)
-                            {
-                                var instanceId = valueNode.AsInt32();
-#if DEBUG_RSZ
-                                    if (!instanceIds.Remove(instanceId))
-                                    {
-                                        Console.WriteLine("HMM");
-                                    }
-#endif
-                                if (instanceId >= 0 && instanceId < result.Count)
-                                {
-                                    return result[instanceId].Value;
-                                }
-                                return new RszNullNode();
-                            }
-                            else if (valueNode.Type == RszFieldType.UserData)
-                            {
-                                var instanceId = valueNode.AsInt32();
-#if DEBUG_RSZ
-                                    if (!instanceIds.Remove(instanceId))
-                                    {
-                                        Console.WriteLine("HMM");
-                                    }
-#endif
-                                if (instanceId == 0) return new RszUserDataNode();
-
-                                if (instanceId > 0 && instanceId < result.Count)
-                                {
-                                    return result[instanceId].Value;
-                                }
-                                return new RszUserDataNode();
-                            }
-                        }
-                        return node;
-                    }));
-                }
+                result[i] = new RszInstance(result[i].Id, ResolveInstance(i));
             }
 
+            IRszNode ResolveInstance(int instanceId)
+            {
+                if (resolvedCache.TryGetValue(instanceId, out var cached))
+                {
+                    return cached;
+                }
+
+                var resolved = Resolve(result[instanceId].Value);
+                resolvedCache[instanceId] = resolved;
+                return resolved;
+            }
+
+            IRszNode Resolve(IRszNode node)
+            {
+                if (node is RszValueNode valueNode)
+                {
+                    if (valueNode.Type == RszFieldType.Object)
+                    {
+                        var instanceId = valueNode.AsInt32();
+#if DEBUG_RSZ
+                        if (!instanceIds.Remove(instanceId))
+                        {
+                            Console.WriteLine("HMM");
+                        }
+#endif
+                        if (instanceId >= 0 && instanceId < result.Count)
+                        {
+                            return ResolveInstance(instanceId);
+                        }
+                        return new RszNullNode();
+                    }
+                    else if (valueNode.Type == RszFieldType.UserData)
+                    {
+                        var instanceId = valueNode.AsInt32();
+#if DEBUG_RSZ
+                        if (!instanceIds.Remove(instanceId))
+                        {
+                            Console.WriteLine("HMM");
+                        }
+#endif
+                        if (instanceId == 0) return new RszUserDataNode();
+
+                        if (instanceId > 0 && instanceId < result.Count)
+                        {
+                            return ResolveInstance(instanceId);
+                        }
+                        return new RszUserDataNode();
+                    }
+                }
+                else if (node is IRszNodeContainer container)
+                {
+                    var children = container.Children.ToBuilder();
+                    for (var i = 0; i < children.Count; i++)
+                    {
+                        children[i] = Resolve(children[i]);
+                    }
+                    return container.WithChildren(children.ToImmutable());
+                }
+                return node;
+            }
 #if DEBUG_RSZ
             foreach (var o in ObjectInstanceIds)
             {
@@ -252,10 +275,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     q.Enqueue(instance.Id);
                 }
-                var getInstance = new Func<IRszNode, RszInstanceId>(node =>
-                    node is RszUserDataNode
-                        ? dict[node].Peek()
-                        : dict[node].Dequeue());
+                var getInstance = new Func<IRszNode, RszInstanceId>(node => dict[node].Peek());
 
                 var ms = new MemoryStream();
                 var bw = new BinaryWriter(ms);
@@ -386,18 +406,22 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 var instanceList = ImmutableArray.CreateBuilder<RszInstance>();
                 var objectList = ImmutableArray.CreateBuilder<RszInstance>();
+                var instanceByNode = new Dictionary<IRszNode, RszInstance>();
 
                 // There is always a NULL instance at 0 (probably to prevent 0 from being used as a reference ID)
                 instanceList.Add(new RszInstance(new RszInstanceId(0), new RszNullNode()));
 
                 foreach (var obj in Objects)
                 {
-                    objectList.Add(CreateInstanceTree(obj, instanceList));
+                    objectList.Add(CreateInstanceTree(obj, instanceList, instanceByNode));
                 }
                 return (instanceList.ToImmutable(), objectList.ToImmutable());
             }
 
-            private static RszInstance CreateInstanceTree(IRszNode node, ImmutableArray<RszInstance>.Builder builder)
+            private static RszInstance CreateInstanceTree(
+                IRszNode node,
+                ImmutableArray<RszInstance>.Builder builder,
+                Dictionary<IRszNode, RszInstance> instanceByNode)
             {
                 if (node is RszObjectNode objectNode)
                 {
@@ -411,6 +435,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                 void AddInstances(RszObjectNode node)
                 {
+                    // Shared object nodes are only allocated once (e.g. orphan prefab objects that
+                    // are also referenced from the game object tree).
+                    if (instanceByNode.ContainsKey(node))
+                        return;
+
                     var rszType = node.Type;
                     for (var i = 0; i < rszType.Fields.Length; i++)
                     {
@@ -488,9 +517,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
                             }
                         }
                     }
+                    else if (instanceByNode.TryGetValue(node, out var existing))
+                    {
+                        return existing;
+                    }
 
                     var instance = new RszInstance(new RszInstanceId(builder.Count), node);
                     builder.Add(instance);
+                    instanceByNode[node] = instance;
                     return instance;
                 }
             }
