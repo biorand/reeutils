@@ -1,0 +1,8 @@
+Prompt:
+    In chap5_02_st50_027_gimmick_unique_insanity.scn.21, what kind of door can you find
+    and what are the coordinates?
+
+Expected:
+    There is a sliding door [8a479ecb-058e-42ae-8e6d-02a6270277b5]
+    located at:
+        76.769997, 26.5, -59.25

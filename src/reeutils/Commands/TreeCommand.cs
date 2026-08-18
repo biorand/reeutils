@@ -28,8 +28,8 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             public string? PathArgument { get; init; }
 
             [Description("Node paths to fully expand")]
-            [CommandArgument(1, "[xpaths...]")]
-            public string[] Xpaths { get; init; } = [];
+            [CommandArgument(1, "[expand_nodes...]")]
+            public string[] ExpandNodes { get; init; } = [];
 
             [Description("Always expand all components")]
             [CommandOption("--full")]
@@ -90,7 +90,7 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
             var treeOptions = new TreeOptions
             {
-                Xpaths = settings.Xpaths,
+                ExpandNodes = settings.ExpandNodes,
                 Full = settings.Full
             };
             if (settings.Json)

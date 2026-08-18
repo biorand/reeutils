@@ -23,11 +23,17 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
         public override JsonDocument GetJson(TreeOptions options)
         {
             var msg = new MsgFile(Data).ToBuilder();
+            var entries = msg.Messages.AsEnumerable();
+            if (options.ExpandNodes.Length > 0)
+            {
+                var filter = new HashSet<string>(options.ExpandNodes, System.StringComparer.OrdinalIgnoreCase);
+                entries = entries.Where(x => filter.Contains(x.Name));
+            }
             var output = new SerializableMsg
             {
                 Version = msg.Version,
                 Languages = [.. msg.Languages.Cast<int>()],
-                Entries = [.. msg.Messages.Select(x => new SerializableMsg.Entry
+                Entries = [.. entries.Select(x => new SerializableMsg.Entry
                 {
                     Guid = x.Guid,
                     Name = x.Name,
