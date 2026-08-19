@@ -348,9 +348,26 @@ namespace IntelOrca.Biohazard.REE.Rsz
         /// Clones the game object tree, generating new GUIDs for all game objects,
         /// and fixing any references to the old GUID.
         /// </summary>
-        /// <param name="gameObject"></param>
+        /// <param name="rootGameObject"></param>
         /// <returns></returns>
         public static RszGameObject Clone(this RszGameObject rootGameObject)
+        {
+            return rootGameObject.Clone(_ => Guid.NewGuid());
+        }
+
+        /// <summary>
+        /// Clones the game object tree, generating new GUIDs for all game objects,
+        /// and fixing any references to the old GUID.
+        /// </summary>
+        /// <param name="rootGameObject"></param>
+        /// <param name="newGuid">
+        /// Callback invoked for each game object being cloned, receiving its current
+        /// GUID and returning the new GUID to assign. This replaces the default
+        /// behaviour of generating a random <see cref="Guid"/>; it does not affect the
+        /// <c>GameObjectRef</c> remapping, which continues to follow the old→new map.
+        /// </param>
+        /// <returns></returns>
+        public static RszGameObject Clone(this RszGameObject rootGameObject, Func<Guid, Guid> newGuid)
         {
             var map = new Dictionary<Guid, Guid>();
 
@@ -359,9 +376,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 .VisitGameObjects(gameObject =>
                 {
                     // Change to new guid (keep map of old to new)
-                    var newGuid = Guid.NewGuid();
-                    map[gameObject.Guid] = newGuid;
-                    return gameObject.WithGuid(newGuid);
+                    var newGuidValue = newGuid(gameObject.Guid);
+                    map[gameObject.Guid] = newGuidValue;
+                    return gameObject.WithGuid(newGuidValue);
                 });
 
             // Fix references
