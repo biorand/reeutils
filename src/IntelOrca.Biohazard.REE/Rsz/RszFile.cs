@@ -236,6 +236,22 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return objectList.ToImmutable();
         }
 
+        /// <summary>
+        /// Indices into the instance list that form the RSZ object list (the engine's scene-graph
+        /// entry points).
+        /// </summary>
+        public int[] ReadObjectInstanceIndices()
+        {
+            var ids = ObjectInstanceIds;
+            var result = new List<int>();
+            for (var i = 0; i < ids.Length; i++)
+            {
+                if (ids[i].Index >= 0)
+                    result.Add(ids[i].Index);
+            }
+            return result.ToArray();
+        }
+
         public Builder ToBuilder(RszTypeRepository repository)
         {
             return new Builder(repository, this);
@@ -275,7 +291,15 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     q.Enqueue(instance.Id);
                 }
-                var getInstance = new Func<IRszNode, RszInstanceId>(node => dict[node].Peek());
+                // Object references consume a distinct instance per occurrence (value-type
+                // semantics): each reference edge created its own instance, so pairing them 1:1
+                // in creation order keeps every instance referenced. User data is deduped by path,
+                // so all references resolve to the single shared instance via Peek.
+                var getInstance = new Func<IRszNode, RszFieldType, RszInstanceId>((node, type) =>
+                {
+                    var q = dict[node];
+                    return type == RszFieldType.UserData ? q.Peek() : q.Dequeue();
+                });
 
                 var ms = new MemoryStream();
                 var bw = new BinaryWriter(ms);
@@ -406,126 +430,133 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 var instanceList = ImmutableArray.CreateBuilder<RszInstance>();
                 var objectList = ImmutableArray.CreateBuilder<RszInstance>();
-                var instanceByNode = new Dictionary<IRszNode, RszInstance>();
 
                 // There is always a NULL instance at 0 (probably to prevent 0 from being used as a reference ID)
                 instanceList.Add(new RszInstance(new RszInstanceId(0), new RszNullNode()));
 
+                // Nodes that were instantiated while expanding the children of another object (i.e. reached
+                // through an Object reference), and the instance created for each. A root that is already in
+                // this set was reached from the scene graph, so its own entry in the object list reuses that
+                // single instance instead of instantiating it a second time. Genuine repeated roots - e.g. two
+                // game objects that share the same settings node after a clone - are NOT in this set, so they
+                // are still expanded into separate instances, preserving the value-type model.
+                var childInstantiated = new HashSet<IRszNode>();
+                var instanceByNode = new Dictionary<IRszNode, RszInstance>();
+
                 foreach (var obj in Objects)
                 {
-                    objectList.Add(CreateInstanceTree(obj, instanceList, instanceByNode));
-                }
-                return (instanceList.ToImmutable(), objectList.ToImmutable());
-            }
-
-            private static RszInstance CreateInstanceTree(
-                IRszNode node,
-                ImmutableArray<RszInstance>.Builder builder,
-                Dictionary<IRszNode, RszInstance> instanceByNode)
-            {
-                if (node is RszObjectNode objectNode)
-                {
-                    AddInstances(objectNode);
-                    return AddInstance(objectNode);
-                }
-                else
-                {
-                    throw new NotSupportedException("Non struct node added to object list.");
-                }
-
-                void AddInstances(RszObjectNode node)
-                {
-                    // Shared object nodes are only allocated once (e.g. orphan prefab objects that
-                    // are also referenced from the game object tree).
-                    if (instanceByNode.ContainsKey(node))
-                        return;
-
-                    var rszType = node.Type;
-                    for (var i = 0; i < rszType.Fields.Length; i++)
+                    if (childInstantiated.Contains(obj))
                     {
-                        var child = node.Children[i];
-                        var rszField = rszType.Fields[i];
-                        if (rszField.IsArray)
+                        // Already instantiated while expanding a parent: keep it in the object list (so its
+                        // GameObjectRef entries are still regenerated) but do not create a second instance.
+                        objectList.Add(instanceByNode[obj]);
+                    }
+                    else
+                    {
+                        objectList.Add(CreateInstanceTree(obj));
+                    }
+                }
+
+                return (instanceList.ToImmutable(), objectList.ToImmutable());
+
+                RszInstance CreateInstanceTree(IRszNode node)
+                {
+                    if (node is RszObjectNode objectNode)
+                    {
+                        AddInstances(objectNode);
+                        return AddInstance(objectNode);
+                    }
+                    else
+                    {
+                        throw new NotSupportedException("Non struct node added to object list.");
+                    }
+
+                    void AddInstances(RszObjectNode n)
+                    {
+                        var rszType = n.Type;
+                        for (var i = 0; i < rszType.Fields.Length; i++)
                         {
-                            var childArray = (RszArrayNode)child;
-                            for (var j = 0; j < childArray.Children.Length; j++)
+                            var child = n.Children[i];
+                            var rszField = rszType.Fields[i];
+                            if (rszField.IsArray)
                             {
-                                if (childArray.Children[j] is RszObjectNode childobjectNode)
+                                var childArray = (RszArrayNode)child;
+                                for (var j = 0; j < childArray.Children.Length; j++)
+                                {
+                                    if (childArray.Children[j] is RszObjectNode childobjectNode)
+                                    {
+                                        AddInstances(childobjectNode);
+                                        AddInstance(childobjectNode);
+                                        childInstantiated.Add(childobjectNode);
+                                    }
+                                    else if (childArray.Children[j] is RszUserDataNode userDataNode)
+                                    {
+                                        AddInstance(userDataNode);
+                                    }
+                                    else if (childArray.Children[j] is RszEmbeddedUserValueNode embeddedUserValueNode)
+                                    {
+                                        AddInstance(embeddedUserValueNode);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                if (child is RszObjectNode childobjectNode)
                                 {
                                     AddInstances(childobjectNode);
-                                    AddInstance(childobjectNode);
+                                    if (rszField.Type == RszFieldType.Object ||
+                                        rszField.Type == RszFieldType.UserData)
+                                    {
+                                        AddInstance(child);
+                                        childInstantiated.Add(childobjectNode);
+                                    }
                                 }
-                                else if (childArray.Children[j] is RszUserDataNode userDataNode)
+                                else if (child is RszUserDataNode userDataNode)
                                 {
                                     AddInstance(userDataNode);
                                 }
-                                else if (childArray.Children[j] is RszEmbeddedUserValueNode embeddedUserValueNode)
+                                else if (child is RszEmbeddedUserValueNode embeddedUserValueNode)
                                 {
                                     AddInstance(embeddedUserValueNode);
                                 }
                             }
                         }
-                        else
-                        {
-                            if (child is RszObjectNode childobjectNode)
-                            {
-                                AddInstances(childobjectNode);
-                                if (rszField.Type == RszFieldType.Object ||
-                                    rszField.Type == RszFieldType.UserData)
-                                {
-                                    AddInstance(child);
-                                }
-                            }
-                            else if (child is RszUserDataNode userDataNode)
-                            {
-                                AddInstance(userDataNode);
-                            }
-                            else if (child is RszEmbeddedUserValueNode embeddedUserValueNode)
-                            {
-                                AddInstance(embeddedUserValueNode);
-                            }
-                        }
                     }
-                }
 
-                RszInstance AddInstance(IRszNode node)
-                {
-                    if (node is RszNullNode)
+                    RszInstance AddInstance(IRszNode node)
                     {
-                        return builder[0];
-                    }
-                    else if (node is RszUserDataNode userDataNode)
-                    {
-                        if (userDataNode.IsEmpty)
+                        if (node is RszNullNode)
                         {
-                            return builder[0];
+                            return instanceList[0];
                         }
-                        else
+                        else if (node is RszUserDataNode userDataNode)
                         {
-                            // Avoid duplicate user data entries
-                            var path = userDataNode.Path;
-                            foreach (var b in builder)
+                            if (userDataNode.IsEmpty)
                             {
-                                if (b.Value is RszUserDataNode otherUserValueNode && otherUserValueNode.Path == userDataNode.Path)
+                                return instanceList[0];
+                            }
+                            else
+                            {
+                                // Avoid duplicate user data entries
+                                var path = userDataNode.Path;
+                                foreach (var b in instanceList)
                                 {
-                                    if (otherUserValueNode.Type != userDataNode.Type)
+                                    if (b.Value is RszUserDataNode otherUserValueNode && otherUserValueNode.Path == userDataNode.Path)
                                     {
-                                        throw new Exception($"Mismatch of RSZ type for user data: {path}");
+                                        if (otherUserValueNode.Type != userDataNode.Type)
+                                        {
+                                            throw new Exception($"Mismatch of RSZ type for user data: {path}");
+                                        }
+                                        return b;
                                     }
-                                    return b;
                                 }
                             }
                         }
+                        var instance = new RszInstance(new RszInstanceId(instanceList.Count), node);
+                        instanceList.Add(instance);
+                        instanceByNode[node] = instance;
+                        return instance;
                     }
-                    else if (instanceByNode.TryGetValue(node, out var existing))
-                    {
-                        return existing;
-                    }
-
-                    var instance = new RszInstance(new RszInstanceId(builder.Count), node);
-                    builder.Add(instance);
-                    instanceByNode[node] = instance;
-                    return instance;
                 }
             }
         }

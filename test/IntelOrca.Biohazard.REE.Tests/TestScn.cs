@@ -8,6 +8,12 @@ namespace IntelOrca.Biohazard.REE.Tests
     public sealed class TestScn : IDisposable
     {
         private readonly OriginalPakHelper _pakHelper = OriginalPakHelper.Default;
+        private readonly ITestOutputHelper _output;
+
+        public TestScn(ITestOutputHelper output)
+        {
+            _output = output;
+        }
 
         public void Dispose()
         {
@@ -84,6 +90,46 @@ namespace IntelOrca.Biohazard.REE.Tests
         public void Rebuild_RE9_CHAP5_03_ITEM()
         {
             AssertRebuild(GameNames.RE9, "natives/stm/leveldesign/item/scene/chap5_03/chap5_03_item.scn.21");
+        }
+
+        [Fact]
+        public void Build_RE9_Clone_GameObject_ProducesSeparateRszInstance()
+        {
+            var repo = _pakHelper.GetTypeRepository(GameNames.RE9);
+            var path = "natives/stm/gameassets/character/scene/chap1_01/chap1_01_weaponpool.scn.21";
+
+            // Start off with a blank scn.21 (re9 rsz)
+            var builder = new ScnFile(FileVersion.FromPath(path), _pakHelper.GetFileData(GameNames.RE9, path)).ToBuilder(repo);
+            builder.Scene = new RszScene();
+            builder.Resources.Clear();
+
+            // Add a new game object named "test"
+            var gameObject = new RszGameObject(
+                Guid.NewGuid(),
+                null,
+                repo.Create("via.GameObject").Set("Name", "test"),
+                [],
+                []);
+            builder.Scene = builder.Scene.Add(gameObject);
+
+            // Clone the object and add it to the scene
+            var clonedGameObject = gameObject.Clone();
+            builder.Scene = builder.Scene.Add(clonedGameObject);
+
+            // Build it
+            var output = builder.Build();
+
+            // Output the list of RSZ instances from the built scn
+            var instances = output.Rsz.ReadInstanceList(repo);
+            for (var i = 0; i < instances.Length; i++)
+            {
+                _output.WriteLine($"[{i}] {instances[i]}");
+            }
+
+            // Each game object must produce its own RSZ instance (the clone must not
+            // share the settings node, otherwise they collapse into a single instance).
+            var gameObjectInstanceCount = instances.Count(x => x.Value is RszObjectNode o && o.Type.Name == "via.GameObject");
+            Assert.Equal(2, gameObjectInstanceCount);
         }
 
         [Fact]

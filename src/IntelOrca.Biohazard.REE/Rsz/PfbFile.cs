@@ -20,7 +20,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         private ReadOnlySpan<GameObjectRefInfo> GameObjectRefInfoList => data.Get<GameObjectRefInfo>(Header.GameObjectRefOffset, Header.GameObjectRefCount);
         private ReadOnlySpan<ResourceInfo> ResourceInfoList => data.Get<ResourceInfo>(Header.ResourceOffset, Header.ResourceCount);
         private ReadOnlySpan<UserDataInfo> UserDataInfoList => data.Get<UserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
-        private RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
+        public RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
 
         public int InstanceCount => Rsz.InstanceCount;
 

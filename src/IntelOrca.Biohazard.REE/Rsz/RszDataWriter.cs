@@ -7,13 +7,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
     internal class RszDataWriter
     {
         private readonly Stream _stream;
-        private readonly Func<IRszNode, RszInstanceId> _getInstance;
+        private readonly Func<IRszNode, RszFieldType, RszInstanceId> _getInstance;
         private readonly BinaryWriter _bw;
         private readonly long _baseAddress;
 
         public int BytesWritten => (int)(_stream.Position - _baseAddress);
 
-        public RszDataWriter(Stream stream, Func<IRszNode, RszInstanceId> getInstance)
+        public RszDataWriter(Stream stream, Func<IRszNode, RszFieldType, RszInstanceId> getInstance)
         {
             _stream = stream;
             _getInstance = getInstance;
@@ -98,7 +98,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             if (field.Type == RszFieldType.Object || field.Type == RszFieldType.UserData)
             {
-                var instanceId = node is RszNullNode || (node is RszUserDataNode userDataNode && userDataNode.IsEmpty) ? default : _getInstance(node);
+                var instanceId = GetInstance(node, field);
                 _bw.Write(instanceId.Index);
             }
             else if (field.Type == RszFieldType.String || field.Type == RszFieldType.Resource)
@@ -129,6 +129,18 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     throw new Exception($"{field.Name} is {field.Size} bytes, but {bytesWritten} was written.");
                 }
             }
+        }
+
+        private RszInstanceId GetInstance(IRszNode node, RszTypeField field)
+        {
+            if (node is RszNullNode || (node is RszUserDataNode userDataNode && userDataNode.IsEmpty))
+                return default;
+
+            // Object references consume a distinct instance per occurrence (value-type semantics):
+            // each reference edge created its own instance, so pairing them 1:1 in creation order
+            // keeps every instance referenced. User data is deduped by path, so all references
+            // resolve to the single shared instance.
+            return _getInstance(node, field.Type);
         }
     }
 }
