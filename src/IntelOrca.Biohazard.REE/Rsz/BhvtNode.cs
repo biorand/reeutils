@@ -51,6 +51,34 @@ namespace IntelOrca.Biohazard.REE.Rsz
             ReferenceTree = referenceTree;
         }
 
+        internal static BhvtNode FromRaw(
+            BhvtNodeId id,
+            string name,
+            BhvtNodeAttributes attributes,
+            int priority,
+            bool isBranch,
+            bool isEnd,
+            BhvtWorkFlags workFlags,
+            uint nameHash,
+            uint fullNameHash,
+            ImmutableArray<uint> tags,
+            RszObjectNode? selector,
+            RszObjectNode? selectorCallerCondition,
+            ImmutableArray<RszObjectNode> selectorCallers,
+            ImmutableArray<BhvtAction> actions,
+            ImmutableArray<BhvtChild> children,
+            ImmutableArray<BhvtState> states,
+            ImmutableArray<BhvtTransition> transitions,
+            ImmutableArray<BhvtAllState> allStates,
+            string? referenceTree,
+            ImmutableArray<(uint Action, uint ActionEx)> rawActionSlots)
+        {
+            return new BhvtNode(id, name, attributes, priority, isBranch, isEnd, workFlags, nameHash, fullNameHash, tags, selector, selectorCallerCondition, selectorCallers, actions, children, states, transitions, allStates, referenceTree)
+            {
+                RawActionSlots = rawActionSlots
+            };
+        }
+
         public BhvtNodeId Id { get; }
         public string Name { get; }
         public BhvtNodeAttributes Attributes { get; }
@@ -80,6 +108,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         /// <summary>Path to another .bhvt tree this node embeds, if <see cref="BhvtNodeAttributes.HasReferenceTree"/> is set.</summary>
         public string? ReferenceTree { get; }
+
+        /// <summary>
+        /// Exact (actionId, actionEx) slot words read from the source file, including slots whose id
+        /// didn't resolve to an action object in the RSZ tables. Preserved so rebuilds roundtrip
+        /// files that reference actions the type repository can't decode; null once edited.
+        /// </summary>
+        internal ImmutableArray<(uint Action, uint ActionEx)>? RawActionSlots { get; private set; }
 
         public BhvtNode With(
             BhvtNodeId? id = null,
