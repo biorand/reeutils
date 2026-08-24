@@ -132,30 +132,44 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var newNode = cb(node);
                 if (newNode is RszGameObject gameObject)
                 {
-                    var components = gameObject.Components.ToBuilder();
-                    for (var i = 0; i < components.Count; i++)
+                    var components = ImmutableArray.CreateBuilder<RszObjectNode>(gameObject.Components.Length);
+                    var anyComponentChanged = false;
+                    for (var i = 0; i < gameObject.Components.Length; i++)
                     {
-                        components[i] = (RszObjectNode)VisitInternal(components[i], cb);
+                        var newChild = (RszObjectNode)VisitInternal(gameObject.Components[i], cb);
+                        anyComponentChanged |= !ReferenceEquals(newChild, gameObject.Components[i]);
+                        components.Add(newChild);
                     }
 
-                    var children = gameObject.Children.ToBuilder();
-                    for (var i = 0; i < children.Count; i++)
+                    var children = ImmutableArray.CreateBuilder<RszGameObject>(gameObject.Children.Length);
+                    var anyChildChanged = false;
+                    for (var i = 0; i < gameObject.Children.Length; i++)
                     {
-                        children[i] = (RszGameObject)VisitInternal(children[i], cb);
+                        var newChild = (RszGameObject)VisitInternal(gameObject.Children[i], cb);
+                        anyChildChanged |= !ReferenceEquals(newChild, gameObject.Children[i]);
+                        children.Add(newChild);
                     }
+
+                    if (!anyComponentChanged && !anyChildChanged)
+                        return newNode;
 
                     return gameObject
-                        .WithComponents(components.ToImmutable())
-                        .WithChildren(children.ToImmutable());
+                        .WithComponents(components.MoveToImmutable())
+                        .WithChildren(children.MoveToImmutable());
                 }
                 if (newNode is IRszNodeContainer container)
                 {
-                    var children = container.Children.ToBuilder();
-                    for (var i = 0; i < children.Count; i++)
+                    var children = ImmutableArray.CreateBuilder<IRszNode>(container.Children.Length);
+                    var anyChanged = false;
+                    for (var i = 0; i < container.Children.Length; i++)
                     {
-                        children[i] = VisitInternal(children[i], cb);
+                        var newChild = VisitInternal(container.Children[i], cb);
+                        anyChanged |= !ReferenceEquals(newChild, container.Children[i]);
+                        children.Add(newChild);
                     }
-                    return container.WithChildren(children.ToImmutable());
+                    if (!anyChanged)
+                        return newNode;
+                    return container.WithChildren(children.MoveToImmutable());
                 }
                 else
                 {

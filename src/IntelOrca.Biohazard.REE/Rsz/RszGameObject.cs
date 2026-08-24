@@ -6,6 +6,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
 {
     public sealed class RszGameObject : IRszSceneNode
     {
+        public const short UnknownPadding = -1;
+
         public RszGameObject(Guid guid, string? prefab, RszObjectNode settings, ImmutableArray<RszObjectNode> components, ImmutableArray<RszGameObject> children)
         {
             Guid = guid;
@@ -17,12 +19,23 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public Guid Guid { get; }
         public string? Prefab { get; }
+        public short Padding { get; }
         public RszObjectNode Settings { get; }
         public ImmutableArray<RszObjectNode> Components { get; }
         public ImmutableArray<RszGameObject> Children { get; }
 
-        public RszGameObject WithGuid(Guid guid) => new RszGameObject(guid, Prefab, Settings, Components, Children);
-        public RszGameObject WithPrefab(string prefab) => new RszGameObject(Guid, prefab, Settings, Components, Children);
+        public RszGameObject(Guid guid, string? prefab, short padding, RszObjectNode settings, ImmutableArray<RszObjectNode> components, ImmutableArray<RszGameObject> children)
+        {
+            Guid = guid;
+            Prefab = prefab;
+            Padding = padding;
+            Settings = ValidateSettings(settings);
+            Components = components;
+            Children = children;
+        }
+
+        public RszGameObject WithGuid(Guid guid) => new RszGameObject(guid, Prefab, Padding, Settings, Components, Children);
+        public RszGameObject WithPrefab(string prefab) => new RszGameObject(Guid, prefab, Padding, Settings, Components, Children);
 
         public string Name => ((RszStringNode)Settings[0]).Value;
 
@@ -41,7 +54,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return new RszGameObject(
                 Guid,
                 Prefab,
-                ValidateSettings(settings),
+                Padding,
+                settings,
                 Components,
                 Children);
         }
@@ -51,6 +65,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return new RszGameObject(
                 Guid,
                 Prefab,
+                Padding,
                 Settings,
                 components,
                 Children);
@@ -61,6 +76,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return new RszGameObject(
                 Guid,
                 Prefab,
+                Padding,
                 Settings,
                 Components,
                 children);
@@ -98,7 +114,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public override string ToString() => Name;
 
-        private static RszObjectNode ValidateSettings(RszObjectNode settings)
+        private RszObjectNode ValidateSettings(RszObjectNode settings)
         {
             if (settings?.Type.Name != "via.GameObject")
             {

@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace IntelOrca.Biohazard.REE.Rsz
@@ -198,6 +199,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.Mat4 => MemoryMarshal.Read<Matrix4x4>(node.Data.Span),
                 RszFieldType.Quaternion => MemoryMarshal.Read<Quaternion>(node.Data.Span),
                 RszFieldType.Guid or RszFieldType.GameObjectRef => MemoryMarshal.Read<Guid>(node.Data.Span),
+                // RE2 (v16) stores GameObjectRef guid values in Uri-typed fields too.
+                RszFieldType.Uri when node.Data.Length == 16 => MemoryMarshal.Read<Guid>(node.Data.Span),
                 RszFieldType.Uint2 => MemoryMarshal.Read<via.Uint2>(node.Data.Span),
                 RszFieldType.Uint3 => MemoryMarshal.Read<via.Uint3>(node.Data.Span),
                 RszFieldType.Uint4 => MemoryMarshal.Read<via.Uint4>(node.Data.Span),
@@ -219,7 +222,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.RangeI => MemoryMarshal.Read<via.RangeI>(node.Data.Span),
                 RszFieldType.Ray => MemoryMarshal.Read<via.Ray>(node.Data.Span),
                 RszFieldType.RayY => MemoryMarshal.Read<via.RayY>(node.Data.Span),
-                RszFieldType.Segment => MemoryMarshal.Read<via.Segment>(node.Data.Span),
+                RszFieldType.Segment => ReadSized<via.Segment>(node, 32),
                 RszFieldType.Size => MemoryMarshal.Read<via.Size>(node.Data.Span),
                 RszFieldType.Sphere => MemoryMarshal.Read<via.Sphere>(node.Data.Span),
                 RszFieldType.Triangle => MemoryMarshal.Read<via.Triangle>(node.Data.Span),
@@ -292,6 +295,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.Mat4 => new RszValueNode(type, ToMemory<Matrix4x4>(obj)),
                 RszFieldType.Quaternion => new RszValueNode(type, ToMemory<Quaternion>(obj)),
                 RszFieldType.Guid or RszFieldType.GameObjectRef => new RszValueNode(type, ToMemory<Guid>(obj)),
+                // RE2 (v16) stores GameObjectRef values in Uri-typed fields as well
+                // (e.g. FlashLightReflectionEffect.TargetLight); treat them as guids there too.
+                RszFieldType.Uri when obj is Guid uriGuid => new RszValueNode(type, ToMemory<Guid>(uriGuid)),
                 RszFieldType.Uint2 => new RszValueNode(type, ToMemory<via.Uint2>(obj)),
                 RszFieldType.Uint3 => new RszValueNode(type, ToMemory<via.Uint3>(obj)),
                 RszFieldType.Uint4 => new RszValueNode(type, ToMemory<via.Uint4>(obj)),
@@ -313,7 +319,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.RangeI => new RszValueNode(type, ToMemory<via.RangeI>(obj)),
                 RszFieldType.Ray => new RszValueNode(type, ToMemory<via.Ray>(obj)),
                 RszFieldType.RayY => new RszValueNode(type, ToMemory<via.RayY>(obj)),
-                RszFieldType.Segment => new RszValueNode(type, ToMemory<via.Segment>(obj)),
+                RszFieldType.Segment => new RszValueNode(type, ToMemory<via.Segment>(obj, 32)),
                 RszFieldType.Size => new RszValueNode(type, ToMemory<via.Size>(obj)),
                 RszFieldType.Sphere => new RszValueNode(type, ToMemory<via.Sphere>(obj)),
                 RszFieldType.Triangle => new RszValueNode(type, ToMemory<via.Triangle>(obj)),
@@ -375,11 +381,34 @@ namespace IntelOrca.Biohazard.REE.Rsz
         }
 
         private static ReadOnlyMemory<byte> ToMemory<T>(object value) where T : struct
+            => ToMemory<T>(value, Unsafe.SizeOf<T>());
+
+        // RE2 declares some value fields (e.g. via.gui.Memo.FontSize as Segment) smaller than the
+        // managed struct; honour the declared size by zero-padding the serialised form.
+        private static ReadOnlyMemory<byte> ToMemory<T>(object value, int size) where T : struct
         {
             var result = (T)Convert.ChangeType(value, typeof(T));
             var span = MemoryMarshal.CreateReadOnlySpan(ref result, 1);
             var bytes = MemoryMarshal.Cast<T, byte>(span);
-            return new ReadOnlyMemory<byte>(bytes.ToArray());
+            if (bytes.Length == size)
+                return new ReadOnlyMemory<byte>(bytes.ToArray());
+            if (bytes.Length < size)
+            {
+                var padded = new byte[size];
+                bytes.CopyTo(padded);
+                return new ReadOnlyMemory<byte>(padded);
+            }
+            return new ReadOnlyMemory<byte>(bytes.Slice(0, size).ToArray());
+        }
+
+        private static object ReadSized<T>(RszValueNode node, int size) where T : struct
+        {
+            var data = node.Data.Span;
+            if (data.Length >= size)
+                return MemoryMarshal.Read<T>(data);
+            var padded = new byte[size];
+            data.CopyTo(padded);
+            return MemoryMarshal.Read<T>(padded);
         }
 
         public static object CreateImmutableArray(Array items)

@@ -202,6 +202,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     Vector3 vec3 => new { vec3.X, vec3.Y, vec3.Z },
                     Vector4 vec4 => new { vec4.X, vec4.Y, vec4.Z, vec4.W },
                     Quaternion quaternion => new { quaternion.X, quaternion.Y, quaternion.Z, quaternion.W },
+                    // Uri-typed fields can hold GameObjectRef guid values (RE2 v16).
+                    Guid guid when valueNode.Type == RszFieldType.Uri => new { @ref = guid },
                     _ => value
                 };
                 JsonSerializer.Serialize(writer, valueToSerialize, options);
@@ -343,7 +345,18 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.UserData => new RszUserDataNode(
                     ResolveType(element.GetProperty("@type").GetString() ?? throw new InvalidOperationException("Missing @type.")),
                     element.GetProperty("@path").GetString() ?? ""),
+                RszFieldType.Uri when element.TryGetProperty("@ref", out var refElement)
+                    => RszSerializer.Serialize(fieldType, ReadGuidValue(refElement), _repository),
                 _ => RszSerializer.Serialize(fieldType, ReadValue(element, fieldType, options), _repository)
+            };
+        }
+
+        private static Guid ReadGuidValue(JsonElement element)
+        {
+            return element.ValueKind switch
+            {
+                JsonValueKind.String => element.GetString() is { } s ? Guid.Parse(s) : Guid.Empty,
+                _ => element.GetGuid()
             };
         }
 
@@ -418,6 +431,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.Mat4 => typeof(Matrix4x4),
                 RszFieldType.Quaternion => typeof(Quaternion),
                 RszFieldType.Guid or RszFieldType.GameObjectRef => typeof(Guid),
+                // Uri-typed fields hold guid values in RE2 (v16); JSON may use a bare
+                // string or the { "@ref": ... } shape for GameObjectRef-style values.
+                RszFieldType.Uri => typeof(Guid),
+                // RE2 (v16) stores GameObjectRef guid values in Uri-typed fields too.
                 RszFieldType.Uint2 => typeof(global::via.Uint2),
                 RszFieldType.Uint3 => typeof(global::via.Uint3),
                 RszFieldType.Uint4 => typeof(global::via.Uint4),

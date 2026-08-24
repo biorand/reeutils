@@ -207,7 +207,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 using var ms = new MemoryStream();
                 using var bw = new BinaryWriter(ms);
-                var stringTable = new StringPoolBuilder(ms, reuseOffsets: true);
+                var stringTable = new StringPoolBuilder(ms);
 
                 // Reserve space for header
                 bw.WriteZeros(RcolHeader.GetSize(Version));

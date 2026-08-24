@@ -23,11 +23,30 @@ namespace IntelOrca.Biohazard.REE.Rsz
         internal ReadOnlySpan<EmbeddedUserDataInfo> EmbeddedUserDataInfoList => Version >= 16
             ? throw new InvalidOperationException()
             : data.Get<EmbeddedUserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
+        // RE2 (RSZ v8) scn/pfb files store user data as v15-style embedded RSZ blobs even though
+        // the RSZ version itself is 8; the userdata table entry size identifies the layout.
+        private bool IsEmbeddedUserDataTableLayout()
+        {
+            if (Version >= 16 || Header.UserDataOffset == 0)
+                return Version < 16;
+            // Embedded entries are 24 bytes wide and packed between the userdata table and
+            // the instance data section; path-style entries are 16 bytes wide.
+            var tableSize = Header.DataOffset - Header.UserDataOffset;
+            if (tableSize < 0 || tableSize % 24 != 0)
+                return false;
+            if (tableSize / 24 == Header.UserDataCount)
+                return true;
+            if (tableSize % 16 == 0 && tableSize / 16 == Header.UserDataCount)
+                return false;
+            return tableSize / 24 >= Header.UserDataCount;
+        }
         private ReadOnlySpan<byte> InstanceData => data.Slice((int)Header.DataOffset).Span;
 
         internal int Version => (int)Header.Version;
 
         public int InstanceCount => InstanceInfoList.Length;
+
+        public int UserDataCount => (int)Header.UserDataCount;
 
         internal ImmutableArray<string> UserDataInfoPaths
         {
@@ -51,7 +70,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             get
             {
                 var result = ImmutableArray.CreateBuilder<RszFile>();
-                foreach (var userData in EmbeddedUserDataInfoList)
+                foreach (var userData in data.Get<EmbeddedUserDataInfo>(Header.UserDataOffset, Header.UserDataCount))
                 {
                     result.Add(new RszFile(Data.Slice((int)userData.Offset, (int)userData.Size)));
                 }
@@ -92,9 +111,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
             var result = ImmutableArray.CreateBuilder<RszInstance>();
             result.Count = instanceInfoList.Length;
 
-            if (Version < 16)
+            if (Version < 16 || (Version == 8 && IsEmbeddedUserDataTableLayout()))
             {
-                var userDataInfoList = EmbeddedUserDataInfoList;
+                var userDataInfoList = data.Get<EmbeddedUserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
                 for (var i = 0; i < userDataInfoList.Length; i++)
                 {
                     var instanceIndex = userDataInfoList[i].InstanceId;
@@ -132,71 +151,80 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var rszType = instanceRszTypes[i];
 
                 if (rszType == null) continue;
-                var rszValue = rszType.Id == 0 ? new RszNullNode() : (IRszNode)rszDataReader.ReadStruct(rszType);
-                if (i < result.Count)
+                try
                 {
-                    result[i] = new RszInstance(new RszInstanceId(i), rszValue);
+                    var rszValue = rszType.Id == 0 ? new RszNullNode() : (IRszNode)rszDataReader.ReadStruct(rszType);
+                    if (i < result.Count)
+                    {
+                        result[i] = new RszInstance(new RszInstanceId(i), rszValue);
+                    }
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to read instance {i} of type '{rszType.Name}' (id {rszType.Id}) at data offset {rszDataReader.BytesRead}", e);
                 }
             }
 
-#if DEBUG_RSZ
-                var instanceIds = Enumerable.Range(0, instanceInfoList.Length).ToHashSet();
-#endif
+            // Resolve instance references. Every reference to instance i must resolve to the
+            // SAME node object: the builder de-duplicates instances by node identity, so
+            // per-parent clones would promote shared instances into duplicates and change
+            // the instance table on rebuild.
+            var resolved = new Dictionary<int, IRszNode>();
             for (var i = 0; i < instanceInfoList.Length; i++)
             {
-                var value = result[i].Value;
-                if (value is IRszNodeContainer container)
+                Resolve(i);
+            }
+
+            return result.ToImmutable();
+
+            IRszNode Resolve(int index)
+            {
+                if (resolved.TryGetValue(index, out var cached))
+                    return cached;
+
+                var node = result[index].Value;
+                // Mark before recursing so cyclic references cannot recurse forever. If a
+                // back-edge resolves to this node while it is still being visited, it gets
+                // the pre-visit identity; the unchanged fast-path in Visit guarantees that
+                // identity is kept whenever no descendant of this node actually changed,
+                // so pre-visit and post-visit identities converge.
+                resolved[index] = node;
+
+                if (node is IRszNodeContainer container)
                 {
-                    result[i] = new RszInstance(result[i].Id, container.Visit(node =>
+                    node = container.Visit(child =>
                     {
-                        if (node is RszValueNode valueNode)
+                        if (child is RszValueNode valueNode)
                         {
                             if (valueNode.Type == RszFieldType.Object)
                             {
                                 var instanceId = valueNode.AsInt32();
-#if DEBUG_RSZ
-                                    if (!instanceIds.Remove(instanceId))
-                                    {
-                                        Console.WriteLine("HMM");
-                                    }
-#endif
                                 if (instanceId >= 0 && instanceId < result.Count)
                                 {
-                                    return result[instanceId].Value;
+                                    return Resolve(instanceId);
                                 }
                                 return new RszNullNode();
                             }
                             else if (valueNode.Type == RszFieldType.UserData)
                             {
                                 var instanceId = valueNode.AsInt32();
-#if DEBUG_RSZ
-                                    if (!instanceIds.Remove(instanceId))
-                                    {
-                                        Console.WriteLine("HMM");
-                                    }
-#endif
                                 if (instanceId == 0) return new RszUserDataNode();
 
                                 if (instanceId > 0 && instanceId < result.Count)
                                 {
-                                    return result[instanceId].Value;
+                                    return Resolve(instanceId);
                                 }
                                 return new RszUserDataNode();
                             }
                         }
-                        return node;
-                    }));
+                        return child;
+                    });
+                    resolved[index] = node;
+                    result[index] = new RszInstance(result[index].Id, node);
                 }
-            }
 
-#if DEBUG_RSZ
-            foreach (var o in ObjectInstanceIds)
-            {
-                instanceIds.Remove(o.Index);
+                return node;
             }
-#endif
-
-            return result.ToImmutable();
         }
 
         public ImmutableArray<RszObjectNode> ReadObjectList(RszTypeRepository repository)
@@ -225,6 +253,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public ImmutableArray<RszObjectNode> Objects { get; set; } = [];
             public long AlignOffset { get; set; }
 
+            // RE2 (v<16): one instance per distinct object node. Later versions: no de-dup.
+            private bool _dedupeInstances;
+            private readonly Dictionary<IRszNode, RszInstance> _instanceByNode = [];
+
             public Builder(RszTypeRepository repository, int version)
             {
                 Repository = repository;
@@ -245,6 +277,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var dict = new Dictionary<IRszNode, Queue<RszInstanceId>>();
                 foreach (var instance in instanceList)
                 {
+                    if (instance.Value is RszNullNode)
+                        continue;
                     if (!dict.TryGetValue(instance.Value, out var q))
                     {
                         q = new Queue<RszInstanceId>();
@@ -253,7 +287,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     q.Enqueue(instance.Id);
                 }
                 var getInstance = new Func<IRszNode, RszInstanceId>(node =>
-                    node is RszUserDataNode
+                    // In de-duplicated (v<16) output a shared node owns ONE instance id that
+                    // every reference reuses, so never consume it. Without dedupe each
+                    // reference got its own instance/id pair (RE4/RE9 behaviour).
+                    (_dedupeInstances || node is RszUserDataNode)
                         ? dict[node].Peek()
                         : dict[node].Dequeue());
 
@@ -331,6 +368,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     else if (instanceList[i].Value is RszEmbeddedUserValueNode embeddedUserValueNode)
                     {
+                        if (Version >= 16)
+                            throw new NotSupportedException();
+
                         bw.Write(i);
                         bw.Write(embeddedUserValueNode.Type.Id);
                         bw.Write(embeddedUserValueNode.Hash);
@@ -390,6 +430,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 // There is always a NULL instance at 0 (probably to prevent 0 from being used as a reference ID)
                 instanceList.Add(new RszInstance(new RszInstanceId(0), new RszNullNode()));
 
+                _dedupeInstances = Version < 16;
+                _instanceByNode.Clear();
+
                 foreach (var obj in Objects)
                 {
                     objectList.Add(CreateInstanceTree(obj, instanceList));
@@ -397,7 +440,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 return (instanceList.ToImmutable(), objectList.ToImmutable());
             }
 
-            private static RszInstance CreateInstanceTree(IRszNode node, ImmutableArray<RszInstance>.Builder builder)
+            private RszInstance CreateInstanceTree(IRszNode node, ImmutableArray<RszInstance>.Builder builder)
             {
                 if (node is RszObjectNode objectNode)
                 {
@@ -421,6 +464,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
                             var childArray = (RszArrayNode)child;
                             for (var j = 0; j < childArray.Children.Length; j++)
                             {
+                                // Struct-typed arrays hold inline nested structs which are part of
+                                // the parent's instance data, not standalone instances.
+                                if (rszField.Type != RszFieldType.Object &&
+                                    rszField.Type != RszFieldType.UserData)
+                                {
+                                    continue;
+                                }
+
                                 if (childArray.Children[j] is RszObjectNode childobjectNode)
                                 {
                                     AddInstances(childobjectNode);
@@ -465,7 +516,21 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     {
                         return builder[0];
                     }
-                    else if (node is RszUserDataNode userDataNode)
+
+                    // RE2 scn/pfb (RSZ v8) files share one instance for every reference to the
+                    // same object (e.g. post-effect params shared across filter settings), so
+                    // de-duplicate by node identity. Later engine versions re-emit each
+                    // reference as a separate instance; changing that behaviour would alter
+                    // existing RE4/RE9 output.
+                    if (_dedupeInstances && !(node is RszUserDataNode))
+                    {
+                        if (_instanceByNode.TryGetValue(node, out var shared))
+                        {
+                            return shared;
+                        }
+                    }
+
+                    if (node is RszUserDataNode userDataNode)
                     {
                         if (userDataNode.IsEmpty)
                         {
@@ -490,6 +555,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
 
                     var instance = new RszInstance(new RszInstanceId(builder.Count), node);
+                    if (_dedupeInstances && !(node is RszUserDataNode))
+                    {
+                        _instanceByNode.Add(node, instance);
+                    }
                     builder.Add(instance);
                     return instance;
                 }
@@ -513,6 +582,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         }
 
 #pragma warning disable 649
+        [StructLayout(LayoutKind.Sequential)]
         internal struct EmbeddedUserDataInfo
         {
             public int InstanceId;

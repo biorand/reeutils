@@ -86,6 +86,17 @@ namespace IntelOrca.Biohazard.REE.Rsz
                             children.Add(field.ObjectType.Create());
                         }
                     }
+                    else if (field.Type == RszFieldType.Struct)
+                    {
+                        if (field.ObjectType == null)
+                        {
+                            throw new NotImplementedException();
+                        }
+                        else
+                        {
+                            children.Add(field.ObjectType.Create());
+                        }
+                    }
                     else if (field.Type == RszFieldType.UserData)
                     {
                         children.Add(new RszUserDataNode());

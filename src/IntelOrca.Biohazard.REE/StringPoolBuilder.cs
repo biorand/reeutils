@@ -10,11 +10,10 @@ namespace IntelOrca.Biohazard.REE
     /// after writing the strings to the end of the stream.
     /// </summary>
     /// <param name="stream"></param>
-    internal sealed class StringPoolBuilder(Stream stream, bool reuseOffsets = false)
+    internal sealed class StringPoolBuilder(Stream stream)
     {
         private readonly Stream _stream = stream;
         private readonly List<Entry> _entries = [];
-        private readonly Dictionary<string, int> _reuse = [];
 
         public void WriteStringOffset32(string s) => WriteStringOffset(s, 4);
         public void WriteStringOffset64(string s) => WriteStringOffset(s, 8);
@@ -28,38 +27,37 @@ namespace IntelOrca.Biohazard.REE
                 RefOffset = streamPosition,
                 Length = length
             });
-            _reuse.TryAdd(s, _entries.Count - 1);
             _stream.Position = streamPosition + length;
         }
 
         public void WriteStrings()
         {
             var bw = new BinaryWriter(_stream);
+            var strOffsetByStr = new Dictionary<string, long>();
             for (var i = 0; i < _entries.Count; i++)
             {
                 var e = _entries[i];
-                e.StrOffset = _stream.Position;
-                _entries[i] = e;
+                // The game physically writes one copy of the string per reference, but backpatches
+                // every reference to point at the FIRST occurrence of that string.
+                if (!strOffsetByStr.TryGetValue(e.Str, out var shared))
+                {
+                    strOffsetByStr[e.Str] = _stream.Position;
+                }
 
+                e.StrOffset = _stream.Position;
                 foreach (var ch in e.Str)
                 {
                     bw.Write((short)ch);
                 }
                 bw.Write((short)0);
+                _entries[i] = e;
             }
 
             var backupPosition = _stream.Position;
             foreach (var e in _entries)
             {
                 _stream.Position = e.RefOffset;
-                var strOffset = e.StrOffset;
-                if (reuseOffsets)
-                {
-                    if (_reuse.TryGetValue(e.Str, out var firstEntryIndex))
-                    {
-                        strOffset = _entries[firstEntryIndex].StrOffset;
-                    }
-                }
+                var strOffset = strOffsetByStr[e.Str];
 
                 if (e.Length == 4)
                     bw.Write((uint)strOffset);

@@ -57,7 +57,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         private string GetString(ulong offset)
         {
-            if (offset != 0)
+            if (offset != 0 && offset < (ulong)data.Length)
             {
                 var span = MemoryMarshal.Cast<byte, char>(Data.Slice((int)offset).Span);
                 for (var i = 0; i < span.Length; i++)
@@ -83,7 +83,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 return new RszScene(CollectChildren(-1));
             }
-
             RszFolder BuildFolder(int id)
             {
                 var info = folderInfoList[id];
@@ -149,7 +148,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                 }
 
-                return new RszGameObject(info.Guid, prefab, settings, components.ToImmutable(), children.ToImmutable());
+                return new RszGameObject(info.Guid, prefab, info.Padding, settings, components.ToImmutable(), children.ToImmutable());
             }
         }
 
@@ -160,10 +159,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public class Builder
         {
+            private int HeaderSize => Version >= 19 ? 64 : 56;
+
             public RszTypeRepository Repository { get; }
             public int Version { get; }
             public int RszVersion { get; }
             public List<string> Resources { get; } = [];
+            public List<string> Prefabs { get; } = [];
             public RszScene Scene { get; set; } = new RszScene();
 
             public Builder(RszTypeRepository repository, int version, int rszVersion)
@@ -179,6 +181,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 Version = instance.Version;
                 RszVersion = instance.Rsz.Version;
                 Resources = instance.Resources.ToList();
+                Prefabs = instance.Prefabs.ToList();
                 Scene = instance.ReadScene(repository);
             }
 
@@ -209,8 +212,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 var folders = new List<FolderInfo>();
                 var gameObjects = new List<GameObjectInfo>();
-                var prefabs = new List<string>();
-                var prefabToId = new Dictionary<string, int>();
+                var prefabs = new List<string>(Prefabs);
+                var prefabToId = prefabs
+                    .Select((path, index) => (path, index))
+                    .GroupBy(x => x.path, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First().index, StringComparer.OrdinalIgnoreCase);
                 var objectList = ImmutableArray.CreateBuilder<RszObjectNode>();
                 Traverse(-1, Scene);
 
@@ -222,8 +228,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var bw = new BinaryWriter(ms);
                 var stringPool = new StringPoolBuilder(ms);
 
+                long folderOffset;
+                long resourceOffset;
+                long prefabOffset;
+                long userDataOffset = 0;
+
                 // Reserve space for header
-                bw.WriteZeros(Version >= 19 ? 64 : 56);
+                bw.WriteZeros(HeaderSize);
 
                 // Game objects
                 foreach (var gameObject in gameObjects)
@@ -231,53 +242,32 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     bw.Write(gameObject);
                 }
 
-                // Folders
-                bw.Align(16);
-                var folderOffset = ms.Position;
-                foreach (var folder in folders)
+                if (Version == 19)
                 {
-                    bw.Write(folder);
+                    // v19 packs all tables tightly with no alignment between sections.
+                    WriteTablesV19(bw, ms, stringPool, rsz);
                 }
-
-                // Resources
-                bw.Align(16);
-                var resourceOffset = ms.Position;
-                foreach (var resource in Resources)
+                else
                 {
-                    stringPool.WriteStringOffset64(resource);
-                }
-
-                // Prefabs
-                bw.Align(16);
-                var prefabOffset = ms.Position;
-                foreach (var prefab in prefabs)
-                {
-                    stringPool.WriteStringOffset64(prefab);
-                }
-
-                // Userdata
-                var userDataOffset = 0L;
-                var userDataCount = 0;
-                if (Version >= 20)
-                {
-                    bw.Align(16);
-                    userDataOffset = ms.Position;
-                    var userDataList = rsz.UserDataInfoList;
-                    var userDataListPaths = rsz.UserDataInfoPaths;
-                    for (var i = 0; i < userDataList.Length; i++)
-                    {
-                        bw.Write(userDataList[i].TypeId);
-                        bw.Write(0);
-                        stringPool.WriteStringOffset64(userDataListPaths[i]);
-                    }
-                    userDataCount = userDataList.Length;
+                    WriteTablesV20Plus(bw, ms, stringPool, rsz);
                 }
 
                 // String data
-                bw.Align(16);
-                stringPool.WriteStrings();
+                if (Version >= 19)
+                {
+                    stringPool.WriteStrings();
+                }
+                else
+                {
+                    bw.Align(16);
+                    stringPool.WriteStrings();
+                }
 
-                // Instance data
+                // Instance data (v19+ RSZ starts immediately after strings with no alignment)
+                if (Version < 19)
+                {
+                    bw.Align(16);
+                }
                 var rszDataOffset = ms.Position;
                 rszBuilder.AlignOffset = rszDataOffset;
                 rsz = rszBuilder.Build();
@@ -289,15 +279,110 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 bw.Write(gameObjects.Count); // Game object count
                 bw.Write(Resources.Count); // Resource count
                 bw.Write(folders.Count); // Folder count
-                bw.Write(prefabs.Count); // Prefab count
-                bw.Write(userDataCount); // User data count
+                if (Version >= 20)
+                {
+                    bw.Write(prefabs.Count); // Prefab count
+                    bw.Write(rsz.UserDataCount); // User data count
+                }
+                else if (Version == 19)
+                {
+                    // v19: scn-level userdata table is unused (offset always 0 in the wild);
+                    // the inner RSZ's embedded user data is not reflected here.
+                    bw.Write(0); // User data count
+                    bw.Write(prefabs.Count); // Prefab count
+                }
+                else
+                {
+                    bw.Write(rsz.UserDataCount); // User data count
+                    bw.Write(prefabs.Count); // Prefab count
+                }
                 bw.Write(folderOffset); // Folder offset
+                // All known scn versions share the offset order
+                // [folder][resource][prefab][userdata][rsz]; v18- has no userdata field.
                 bw.Write(resourceOffset); // Resource offset
-                bw.Write(prefabOffset); // Resource offset
-                bw.Write(userDataOffset); // User data offset
+                bw.Write(prefabOffset);   // Prefab offset
+                if (Version >= 19)
+                {
+                    bw.Write(userDataOffset); // User data offset (0 when unused)
+                }
                 bw.Write(rszDataOffset); // RSZ data offset
 
                 return new ScnFile(Version, ms.ToArray());
+
+                void WriteTablesV19(BinaryWriter bw, MemoryStream ms, StringPoolBuilder stringPool, RszFile rsz)
+                {
+                    // v19 layout (validated on the full 2912-file corpus):
+                    // [header 64][GO table @64][folder table @fo][pad16][resource table @ro][pad16][prefab table @po][strings][RSZ @do]
+                    // Folder/resource/prefab tables are u64 absolute string offsets (folders are two i32s).
+                    folderOffset = ms.Position;
+                    foreach (var folder in folders)
+                    {
+                        bw.Write(folder);
+                    }
+
+                    bw.Align(16);
+                    resourceOffset = ms.Position;
+                    foreach (var resource in Resources)
+                    {
+                        stringPool.WriteStringOffset64(resource);
+                    }
+
+                    bw.Align(16);
+                    prefabOffset = ms.Position;
+                    foreach (var prefab in prefabs)
+                    {
+                        stringPool.WriteStringOffset64(prefab);
+                    }
+                }
+
+                void WriteTablesV20Plus(BinaryWriter bw, MemoryStream ms, StringPoolBuilder stringPool, RszFile rsz)
+                {
+                    // Folders
+                    bw.Align(16);
+                    folderOffset = ms.Position;
+                    foreach (var folder in folders)
+                    {
+                        bw.Write(folder);
+                    }
+
+                    // Resources
+                    bw.Align(16);
+                    resourceOffset = ms.Position;
+                    foreach (var resource in Resources)
+                    {
+                        stringPool.WriteStringOffset64(resource);
+                    }
+
+                    // Prefabs
+                    bw.Align(16);
+                    prefabOffset = ms.Position;
+                    foreach (var prefab in prefabs)
+                    {
+                        stringPool.WriteStringOffset64(prefab);
+                    }
+
+                    // Userdata
+                    userDataOffset = 0;
+                    if (rsz.UserDataCount > 0)
+                    {
+                        bw.Align(16);
+                        userDataOffset = ms.Position;
+                        var userDataList = rsz.UserDataInfoList;
+                        var userDataListPaths = rsz.UserDataInfoPaths;
+                        for (var i = 0; i < userDataList.Length; i++)
+                        {
+                            bw.Write(userDataList[i].TypeId);
+                            bw.Write(0);
+                            stringPool.WriteStringOffset64(userDataListPaths[i]);
+                        }
+                    }
+                    else
+                    {
+                        // Files with an empty userdata table still point the offset at the
+                        // string pool start rather than writing 0.
+                        userDataOffset = ms.Position;
+                    }
+                }
 
                 int AddObject(RszObjectNode node)
                 {
@@ -341,6 +426,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                             ObjectId = id,
                             ParentId = parentId,
                             ComponentCount = (short)gameObjectNode.Components.Length,
+                            Padding = gameObjectNode.Padding,
                             PrefabId = AddPrefab(gameObjectNode.Prefab)
                         });
                         foreach (var component in gameObjectNode.Components)

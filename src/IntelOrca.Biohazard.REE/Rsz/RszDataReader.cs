@@ -1,4 +1,5 @@
 ﻿using System.Collections.Immutable;
+using System;
 
 namespace IntelOrca.Biohazard.REE.Rsz
 {
@@ -68,6 +69,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 _reader.Align(4);
                 var value = _reader.ReadString();
                 return new RszResourceNode(value);
+            }
+            else if (field.Type == RszFieldType.Struct)
+            {
+                var objectType = field.ObjectType ?? throw new InvalidOperationException($"Struct field '{field.Name}' has no object type");
+                return ReadStruct(objectType);
             }
             else
             {
