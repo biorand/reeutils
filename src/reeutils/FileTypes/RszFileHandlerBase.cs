@@ -13,9 +13,9 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
 
         public override bool RequiresTypeRepository => true;
 
-        protected static JsonDocument SerializeNode(IRszNode node, TreeOptions options)
+        protected JsonDocument SerializeNode(IRszNode node, TreeOptions options)
         {
-            using var raw = JsonDocument.Parse(RszJsonSerializer.Serialize(node, JsonSupport.CreateOptions()));
+            using var raw = JsonDocument.Parse(RszJsonSerializer.Serialize(node, Repository, JsonSupport.CreateOptions()));
             return JsonSupport.ApplyTreeOptions(raw, options);
         }
 

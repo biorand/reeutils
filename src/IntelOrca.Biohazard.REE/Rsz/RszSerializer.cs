@@ -193,9 +193,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.U64 => MemoryMarshal.Read<ulong>(node.Data.Span),
                 RszFieldType.F32 => MemoryMarshal.Read<float>(node.Data.Span),
                 RszFieldType.F64 => MemoryMarshal.Read<double>(node.Data.Span),
-                RszFieldType.Vec2 => MemoryMarshal.Read<Vector2>(node.Data.Span),
-                RszFieldType.Vec3 => MemoryMarshal.Read<Vector3>(node.Data.Span),
-                RszFieldType.Vec4 => MemoryMarshal.Read<Vector4>(node.Data.Span),
+                RszFieldType.Vec2 or RszFieldType.Float2 => MemoryMarshal.Read<Vector2>(node.Data.Span),
+                RszFieldType.Vec3 or RszFieldType.Float3 => MemoryMarshal.Read<Vector3>(node.Data.Span),
+                RszFieldType.Vec4 or RszFieldType.Float4 => MemoryMarshal.Read<Vector4>(node.Data.Span),
                 RszFieldType.Mat4 => MemoryMarshal.Read<Matrix4x4>(node.Data.Span),
                 RszFieldType.Quaternion => MemoryMarshal.Read<Quaternion>(node.Data.Span),
                 RszFieldType.Guid or RszFieldType.GameObjectRef => MemoryMarshal.Read<Guid>(node.Data.Span),
@@ -257,6 +257,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 };
             }
 
+            // byte[] implements IList; an explicit byte[] payload always means raw value
+            // bytes (e.g. ukn_error fields, base64 round-trips of via.* structs).
+            if (obj is byte[] rawBytes)
+            {
+                return new RszValueNode(type, (ReadOnlyMemory<byte>)rawBytes);
+            }
+
             if (obj is IList list)
             {
                 var children = ImmutableArray.CreateBuilder<IRszNode>(list.Count);
@@ -265,9 +272,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     children.Add(Serialize(type, list[i], typeRepository));
                 }
                 return new RszArrayNode(type, children.ToImmutable());
-            }
-
-            if (obj is RszValueNode valueNode)
+            }            if (obj is RszValueNode valueNode)
             {
                 if (valueNode.Type != type)
                 {
@@ -289,9 +294,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.U64 => new RszValueNode(type, ToMemory<ulong>(obj)),
                 RszFieldType.F32 => new RszValueNode(type, ToMemory<float>(obj)),
                 RszFieldType.F64 => new RszValueNode(type, ToMemory<double>(obj)),
-                RszFieldType.Vec2 => new RszValueNode(type, ToMemory<Vector2>(obj)),
-                RszFieldType.Vec3 => new RszValueNode(type, ToMemory<Vector3>(obj)),
-                RszFieldType.Vec4 => new RszValueNode(type, ToMemory<Vector4>(obj)),
+                RszFieldType.Vec2 or RszFieldType.Float2 => new RszValueNode(type, ToMemory<Vector2>(obj)),
+                RszFieldType.Vec3 or RszFieldType.Float3 => new RszValueNode(type, ToMemory<Vector3>(obj)),
+                RszFieldType.Vec4 or RszFieldType.Float4 => new RszValueNode(type, ToMemory<Vector4>(obj)),
                 RszFieldType.Mat4 => new RszValueNode(type, ToMemory<Matrix4x4>(obj)),
                 RszFieldType.Quaternion => new RszValueNode(type, ToMemory<Quaternion>(obj)),
                 RszFieldType.Guid or RszFieldType.GameObjectRef => new RszValueNode(type, ToMemory<Guid>(obj)),
@@ -343,6 +348,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     ? resourceNode
                     : new RszResourceNode((string)obj),
                 RszFieldType.UserData => (RszUserDataNode)obj,
+                // Unknown dump types round-trip as raw little-endian bytes.
+                RszFieldType.ukn_error => obj switch
+                {
+                    byte[] bytes => new RszValueNode(type, (ReadOnlyMemory<byte>)bytes),
+                    byte b => new RszValueNode(type, new ReadOnlyMemory<byte>([b])),
+                    _ => throw new NotSupportedException($"Cannot serialize '{obj.GetType()}' as raw bytes."),
+                },
                 RszFieldType.Object => typeRepository == null
                     ? throw new ArgumentException("Unable to serialize objects without a repository")
                     : Serialize(typeRepository.FromName(RszTypeName.FromClrType(obj.GetType()).FullName) ?? throw new ArgumentException($"{obj.GetType().FullName} not found in repository."), obj),

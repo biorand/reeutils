@@ -97,6 +97,19 @@ namespace IntelOrca.Biohazard.REE.Rsz
         /// </summary>
         internal ImmutableArray<RszObjectNode>? OriginalObjectList { get; private set; }
 
+        public int GameObjectRefCount => (int)Header.GameObjectRefCount;
+
+        /// <summary>
+        /// Copies the raw v16 game object ref table (16 bytes per entry) into
+        /// <paramref name="destination"/>. Length must equal
+        /// <see cref="GameObjectRefCount"/> * 16.
+        /// </summary>
+        public void ReadGameObjectRefData(byte[] destination)
+        {
+            var span = data.Get<GameObjectRefInfo>(Header.GameObjectRefOffset, Header.GameObjectRefCount);
+            MemoryMarshal.AsBytes(span).CopyTo(destination);
+        }
+
         public RszScene ReadScene(RszTypeRepository repository)
         {
             var objectList = Rsz.ReadObjectList(repository);
@@ -257,6 +270,13 @@ namespace IntelOrca.Biohazard.REE.Rsz
             internal ImmutableArray<RszObjectNode>? OriginalObjectList { get; set; }
             internal ImmutableArray<GameObjectRefInfo> PreservedGameObjectRefs { get; set; } = [];
 
+            /// <summary>
+            /// Raw v16 game object ref table as read from the original file (16 bytes per entry).
+            /// Set this on a template-free builder so <see cref="Build"/> can replay engine-assigned
+            /// property ids that are not present in RSZ type dumps.
+            /// </summary>
+            public ReadOnlyMemory<byte>? PreservedGameObjectRefData { get; set; }
+
             public Builder(RszTypeRepository repository, int version, int rszVersion)
             {
                 Repository = repository;
@@ -295,6 +315,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             public Builder RebuildResources()
             {
+                // RE2 (v16) resource blobs can contain paths not referenced by any RSZ node
+                // (e.g. sound prefabs); they cannot be rediscovered from the scene graph, so
+                // keep the seeded list and only append newly seen resources.
+                if (Version < 17)
+                    return AddMissingResources();
+
                 Resources.Clear();
                 return AddMissingResources();
             }
@@ -330,7 +356,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 // Game object refs
                 var gameObjectRefOffset = ms.Position;
                 var gameObjectRefCount = 0;
-                if (Version < 17 && PreservedGameObjectRefs.Length > 0)
+                if (Version < 17 && PreservedGameObjectRefs.Length == 0 && PreservedGameObjectRefData is { Length: > 0 } rawRefs)
+                {
+                    // Template-free build: replay the raw ref table verbatim (object ids are
+                    // positional, so they stay valid as long as the scene shape is unchanged).
+                    gameObjectRefCount = rawRefs.Length / 16; // sizeof(GameObjectRefInfo)
+                    bw.Write(rawRefs.Span);
+                }
+                else if (Version < 17 && PreservedGameObjectRefs.Length > 0)
                 {
                     gameObjectRefCount = WritePreservedGameObjectRefs();
                 }
@@ -343,6 +376,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var resourceOffset = ms.Position;
                 if (Version < 17)
                 {
+                    bw.Align(4);
+                    resourceOffset = ms.Position;
+
                     // RE2 (v16): resources are packed NUL-terminated UTF16 strings,
                     // not a table of offsets into a string pool.
                     foreach (var resource in Resources)

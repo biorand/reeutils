@@ -8,25 +8,25 @@ namespace IntelOrca.Biohazard.REE.Rsz
         RszObjectNode? condition,
         uint transitionMapId,
         uint stateEx,
-    ImmutableArray<RszObjectNode> events,
-    ImmutableArray<uint>? rawEventIds = null)
+        ImmutableArray<RszObjectNode> events)
     {
-    public BhvtNodeId Target { get; } = target;
-    public RszObjectNode? Condition { get; } = condition;
-    public uint TransitionMapId { get; } = transitionMapId;
-    public uint StateEx { get; } = stateEx;
-    public ImmutableArray<RszObjectNode> Events { get; } = events;
+        public BhvtNodeId Target { get; } = target;
+        public RszObjectNode? Condition { get; } = condition;
+        public uint TransitionMapId { get; } = transitionMapId;
+        public uint StateEx { get; } = stateEx;
+        public ImmutableArray<RszObjectNode> Events { get; } = events;
 
-    /// <summary>
-    /// Exact raw id words read from the source file, one per event slot (including slots that
-    /// didn't resolve to a <see cref="TransitionEvent"/> object). Used to roundtrip ids the
-    /// object model can't represent; null once the caller has edited the state.
-    /// </summary>
-    internal ImmutableArray<uint>? RawEventIds { get; } = rawEventIds;
+        /// <summary>
+        /// Exact raw id words read from the source file, one per event slot (including slots that
+        /// didn't resolve to a <see cref="TransitionEvent"/> object). Used to roundtrip ids the
+        /// object model can't represent; serialization layers set this when reconstructing a tree
+        /// from text; leave it null for newly authored or edited states.
+        /// </summary>
+        public ImmutableArray<uint>? RawEventIds { get; set; }
 
-    public BhvtState WithTarget(BhvtNodeId target) => new(target, Condition, TransitionMapId, StateEx, Events);
-    public BhvtState WithCondition(RszObjectNode? condition) => new(Target, condition, TransitionMapId, StateEx, Events);
-    public BhvtState WithEvents(ImmutableArray<RszObjectNode> events) => new(Target, Condition, TransitionMapId, StateEx, events);
+        public BhvtState WithTarget(BhvtNodeId target) => new(target, Condition, TransitionMapId, StateEx, Events) { RawEventIds = RawEventIds };
+        public BhvtState WithCondition(RszObjectNode? condition) => new(Target, condition, TransitionMapId, StateEx, Events) { RawEventIds = RawEventIds };
+        public BhvtState WithEvents(ImmutableArray<RszObjectNode> events) => new(Target, Condition, TransitionMapId, StateEx, events);
 
         public override string ToString() => $"=> {Target}";
     }

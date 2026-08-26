@@ -54,6 +54,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public UvarFile UserVariables => new(data.Slice((int)Header.VariableOffset));
 
+        /// <summary>Absolute offset of the embedded UVar section within the file.</summary>
+        public long UvarOffset => Header.VariableOffset;
+
+        /// <summary>Absolute offset of the sub-variable-tree table within the file.</summary>
+        public long BaseVariableOffset => Header.BaseVariableOffset;
+
         public ImmutableArray<UvarFile> SubVariables
         {
             get
@@ -110,18 +116,40 @@ namespace IntelOrca.Biohazard.REE.Rsz
         /// Overload letting callers supply their own decodes of the static tables -- the returned
         /// nodes reference the very same object instances, so rebuilding preserves static placement.
         /// </summary>
-        private BhvtNode ReadTree(RszTypeRepository repository,
+        public BhvtNode ReadTree(RszTypeRepository repository,
             ImmutableArray<RszObjectNode> staticActionObjects,
             ImmutableArray<RszObjectNode> staticSelectorCallerObjects,
             ImmutableArray<RszObjectNode> staticConditionObjects,
             ImmutableArray<RszObjectNode> staticTransitionEventObjects)
         {
-            var actionObjects = ActionRsz.ReadObjectList(repository);
-            var selectorObjects = SelectorRsz.ReadObjectList(repository);
-            var selectorCallerObjects = SelectorCallerRsz.ReadObjectList(repository);
-            var conditionObjects = ConditionsRsz.ReadObjectList(repository);
-            var transitionEventObjects = TransitionEventRsz.ReadObjectList(repository);
+            return ReadTree(repository,
+                staticActionObjects,
+                staticSelectorCallerObjects,
+                staticConditionObjects,
+                staticTransitionEventObjects,
+                ActionRsz.ReadObjectList(repository),
+                SelectorRsz.ReadObjectList(repository),
+                SelectorCallerRsz.ReadObjectList(repository),
+                ConditionsRsz.ReadObjectList(repository),
+                TransitionEventRsz.ReadObjectList(repository));
+        }
 
+        /// <summary>
+        /// Overload letting callers supply their own decodes of every object table (static and
+        /// dynamic). The returned tree references exactly those instances, so a caller can index
+        /// them for identity-based table references that survive the JSON roundtrip.
+        /// </summary>
+        public BhvtNode ReadTree(RszTypeRepository repository,
+            ImmutableArray<RszObjectNode> staticActionObjects,
+            ImmutableArray<RszObjectNode> staticSelectorCallerObjects,
+            ImmutableArray<RszObjectNode> staticConditionObjects,
+            ImmutableArray<RszObjectNode> staticTransitionEventObjects,
+            ImmutableArray<RszObjectNode> actionObjects,
+            ImmutableArray<RszObjectNode> selectorObjects,
+            ImmutableArray<RszObjectNode> selectorCallerObjects,
+            ImmutableArray<RszObjectNode> conditionObjects,
+            ImmutableArray<RszObjectNode> transitionEventObjects)
+        {
             RszObjectNode? ResolveCondition(RawId id) => id.HasValue
                 ? GetByIndex(id.IsStatic ? staticConditionObjects : conditionObjects, id.Index)
                 : null;
@@ -134,7 +162,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             var rszVersion = RszVersion;
             var rawNodes = ReadRawNodes(rszVersion);
-            var byId = rawNodes.ToDictionary(n => n.Id.Packed);
+            var byId = new Dictionary<ulong, (RawNode Raw, int TableIndex)>();
+            for (var i = 0; i < rawNodes.Length; i++)
+                byId[rawNodes[i].Id.Packed] = (rawNodes[i], i);
 
             // Actions are matched by content (their own id field), not table position, and matching is
             // order-dependent when ids repeat -- replay the same order (flat node-table order) the
@@ -150,22 +180,30 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var children = ImmutableArray.CreateBuilder<BhvtChild>(raw.Children.Length);
                 foreach (var (childId, conditionId) in raw.Children)
                 {
-                    if (!byId.TryGetValue(childId.Packed, out var childRaw))
+                    if (!byId.TryGetValue(childId.Packed, out var childEntry))
                         throw new InvalidDataException($"BHVT node {raw.Id} references missing child {childId}.");
-                    children.Add(new BhvtChild(Build(childRaw), ResolveCondition(conditionId)));
+                    children.Add(new BhvtChild(Build(childEntry.Raw), ResolveCondition(conditionId)));
                 }
 
                 var states = raw.States.Select(s =>
                 {
                     var resolved = new RszObjectNode?[s.EventIds.Length];
                     for (var i = 0; i < s.EventIds.Length; i++) resolved[i] = ResolveTransitionEvent(s.EventIds[i]);
-                    return new BhvtState(
+                    var events = s.EventIds
+                        .Select((e, i) => (Resolved: resolved[i], Raw: e))
+                        .Where(x => x.Resolved != null)
+                        .Select(x => x.Resolved!)
+                        .ToImmutableArray();
+                    var state = new BhvtState(
                         s.Target,
                         ResolveCondition(s.ConditionId),
                         s.TransitionMapId,
                         s.StateEx,
-                        [.. resolved.Where(x => x != null)!],
-                        [.. s.EventIds.Select(e => e.Index | (((uint)e.Unknown) << 16) | (((uint)e.IdType) << 24))]);
+                        events)
+                    {
+                        RawEventIds = [.. s.EventIds.Select(e => e.Index | (((uint)e.Unknown) << 16) | (((uint)e.IdType) << 24))],
+                    };
+                    return state;
                 }).ToImmutableArray();
 
                 var transitions = raw.Transitions.Select(t => new BhvtTransition(
@@ -200,6 +238,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     allStates,
                     raw.ReferenceTree,
                     raw.Actions);
+                node.OriginalTableIndex = byId[raw.Id.Packed].TableIndex;
 
                 built[raw.Id.Packed] = node;
                 return node;
@@ -247,6 +286,64 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             /// <summary>Extra resource-dependency paths to declare beyond what's scanned automatically.</summary>
             public List<string> ExtraResources { get; } = [];
+
+            /// <summary>
+            /// Seeds the static object tables with decoded nodes in source-file order. Objects added
+            /// here are matched by reference first when rebuilding, so they land back in their
+            /// original table slots; anything not seeded goes to the dynamic tables.
+            /// </summary>
+            public void AddStaticAction(RszObjectNode node) => staticActions.Add(node);
+            public void AddStaticSelectorCaller(RszObjectNode node) => staticSelectorCallers.Add(node);
+            public void AddStaticCondition(RszObjectNode node) => staticConditions.Add(node);
+            public void AddStaticTransitionEvent(RszObjectNode node) => staticTransitionEvents.Add(node);
+
+            private readonly List<RszObjectNode> seedActions = [];
+            private readonly List<RszObjectNode> seedSelectors = [];
+            private readonly List<RszObjectNode> seedSelectorCallers = [];
+            private readonly List<RszObjectNode> seedConditions = [];
+            private readonly List<RszObjectNode> seedTransitionEvents = [];
+
+            /// <summary>
+            /// Seeds the dynamic object tables with decoded nodes in source-file order. Rebuilding
+            /// matches objects by reference first, so seeded objects land back in their original
+            /// table slots (and order) even though the tree walk discovers them in a different
+            /// sequence; unseeded objects are appended in discovery order.
+            /// </summary>
+            public void SeedDynamicTables(
+                IReadOnlyList<RszObjectNode>? actions = null,
+                IReadOnlyList<RszObjectNode>? selectors = null,
+                IReadOnlyList<RszObjectNode>? selectorCallers = null,
+                IReadOnlyList<RszObjectNode>? conditions = null,
+                IReadOnlyList<RszObjectNode>? transitionEvents = null)
+            {
+                if (actions != null) seedActions.AddRange(actions);
+                if (selectors != null) seedSelectors.AddRange(selectors);
+                if (selectorCallers != null) seedSelectorCallers.AddRange(selectorCallers);
+                if (conditions != null) seedConditions.AddRange(conditions);
+                if (transitionEvents != null) seedTransitionEvents.AddRange(transitionEvents);
+            }
+
+            /// <summary>
+            /// Resolves a serialized table reference back to the seeded instance. Returns null when
+            /// the table name is unknown or the index is out of range.
+            /// </summary>
+            public RszObjectNode? ResolveStaticRef(string table, int index)
+            {
+                var list = table switch
+                {
+                    "staticActions" => staticActions,
+                    "staticSelectorCallers" => staticSelectorCallers,
+                    "staticConditions" => staticConditions,
+                    "staticTransitionEvents" => staticTransitionEvents,
+                    "actions" => seedActions,
+                    "selectors" => seedSelectors,
+                    "selectorCallers" => seedSelectorCallers,
+                    "conditions" => seedConditions,
+                    "transitionEvents" => seedTransitionEvents,
+                    _ => null,
+                };
+                return list != null && (uint)index < (uint)list.Count ? list[index] : null;
+            }
 
             /// <summary>
             /// Raw bytes of the embedded UVar section (main variables + sub-variable trees, through end of
@@ -300,8 +397,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             public BhvtFile Build()
             {
-                // Flatten the tree (pre-order); node table order doesn't need to match the original, only
-                // needs to be internally consistent.
+                // Flatten the tree (pre-order), then restore the source file's node-table order:
+                // the game tolerates any order, but byte-identical roundtrips need the original
+                // sequence. Nodes not from a file (hand-authored) keep pre-order after all known ones.
                 var nodes = new List<BhvtNode>();
                 var parentOf = new Dictionary<BhvtNode, BhvtNode?>();
                 void Flatten(BhvtNode node, BhvtNode? parent)
@@ -311,6 +409,15 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     foreach (var child in node.Children) Flatten(child.Node, node);
                 }
                 Flatten(Root, null);
+                if (nodes.Any(n => n.OriginalTableIndex >= 0))
+                {
+                    nodes = nodes
+                        .Select((node, preorderIndex) => (node, preorderIndex))
+                        .OrderBy(t => t.node.OriginalTableIndex < 0 ? int.MaxValue : t.node.OriginalTableIndex)
+                        .ThenBy(t => t.preorderIndex)
+                        .Select(t => t.node)
+                        .ToList();
+                }
 
                 var seenIds = new HashSet<ulong>();
                 foreach (var n in nodes)
@@ -323,11 +430,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var staticSelectorCallerObjects = staticSelectorCallers;
                 var staticConditionObjects = staticConditions;
                 var staticTransitionEventObjects = staticTransitionEvents;
-                var selectorObjects = new List<RszObjectNode>();
-                var actionObjects = new List<RszObjectNode>();
-                var selectorCallerObjects = new List<RszObjectNode>();
-                var conditionObjects = new List<RszObjectNode>();
-                var transitionEventObjects = new List<RszObjectNode>();
+                var selectorObjects = new List<RszObjectNode>(seedSelectors);
+                var actionObjects = new List<RszObjectNode>(seedActions);
+                var selectorCallerObjects = new List<RszObjectNode>(seedSelectorCallers);
+                var conditionObjects = new List<RszObjectNode>(seedConditions);
+                var transitionEventObjects = new List<RszObjectNode>(seedTransitionEvents);
 
                 // Static tables are pre-seeded from the source file (see ctor); new objects go dynamic.
                 // FindOrAdd relies on RszObjectNode not overriding Equals (List.IndexOf falls back to

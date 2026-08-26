@@ -113,8 +113,17 @@ namespace IntelOrca.Biohazard.REE.Rsz
         /// Exact (actionId, actionEx) slot words read from the source file, including slots whose id
         /// didn't resolve to an action object in the RSZ tables. Preserved so rebuilds roundtrip
         /// files that reference actions the type repository can't decode; null once edited.
+        /// Serialization layers set this when reconstructing a tree from text; leave it null for
+        /// newly authored or edited nodes.
         /// </summary>
-        internal ImmutableArray<(uint Action, uint ActionEx)>? RawActionSlots { get; private set; }
+        public ImmutableArray<(uint Action, uint ActionEx)>? RawActionSlots { get; set; }
+
+        /// <summary>
+        /// Position of this node in the source file's node table, or -1 for nodes not from a file
+        /// (hand-authored). Rebuilds emit nodes in this order so unchanged files roundtrip exactly;
+        /// new nodes are appended after all known ones.
+        /// </summary>
+        public int OriginalTableIndex { get; set; } = -1;
 
         public BhvtNode With(
             BhvtNodeId? id = null,
