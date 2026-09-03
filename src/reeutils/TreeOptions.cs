@@ -7,7 +7,8 @@ namespace IntelOrca.Biohazard.REEUtils
             Full = true
         };
 
-        public string[] Xpaths { get; init; } = [];
+        public string[] ExpandNodes { get; init; } = [];
         public bool Full { get; init; }
+        public int? MaxDepth { get; init; }
     }
 }

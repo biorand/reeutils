@@ -133,32 +133,21 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             var expandedSceneText = await CallToolTextAsync(client, "read", new Dictionary<string, object?>
             {
                 ["path"] = scenePath,
-                ["xpaths"] = new[] { "Root" }
-            }, cancellationToken);
-
-            var fullSceneText = await CallToolTextAsync(client, "read", new Dictionary<string, object?>
-            {
-                ["path"] = scenePath,
-                ["full"] = true
+                ["expand_nodes"] = new[] { "Root" }
             }, cancellationToken);
 
             using var collapsedSceneJson = JsonDocument.Parse(collapsedSceneText);
             using var expandedSceneJson = JsonDocument.Parse(expandedSceneText);
-            using var fullSceneJson = JsonDocument.Parse(fullSceneText);
 
             var collapsedRootComponent = GetFirstComponent(collapsedSceneJson.RootElement);
             var collapsedChildComponent = GetFirstChildComponent(collapsedSceneJson.RootElement);
             var expandedRootComponent = GetFirstComponent(expandedSceneJson.RootElement);
             var expandedChildComponent = GetFirstChildComponent(expandedSceneJson.RootElement);
-            var fullRootComponent = GetFirstComponent(fullSceneJson.RootElement);
-            var fullChildComponent = GetFirstChildComponent(fullSceneJson.RootElement);
 
             Assert.Single(collapsedRootComponent.EnumerateObject());
             Assert.Single(collapsedChildComponent.EnumerateObject());
             Assert.True(expandedRootComponent.EnumerateObject().Count() > 1);
-            Assert.Single(expandedChildComponent.EnumerateObject());
-            Assert.True(fullRootComponent.EnumerateObject().Count() > 1);
-            Assert.True(fullChildComponent.EnumerateObject().Count() > 1);
+            Assert.True(expandedChildComponent.EnumerateObject().Count() > 1);
 
             var getTypeText = await CallToolTextAsync(client, "get_type", new Dictionary<string, object?>
             {

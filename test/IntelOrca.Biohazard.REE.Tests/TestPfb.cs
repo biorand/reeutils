@@ -26,7 +26,10 @@ namespace IntelOrca.Biohazard.REE.Tests
         [Fact]
         public void Rebuild_RE4_ARROWSHELL()
         {
-            AssertRebuild(GameNames.RE4, "natives/stm/_chainsaw/appsystem/prefab/shell/arrowshell.pfb.17", 4256);
+            // ARROWSHELL contains an orphan RSZ object (reached via an Object field but not part of the
+            // game object tree). It is instantiated once via the scene graph and also listed among the
+            // roots, so the rebuild must remain byte-identical to the original.
+            AssertRebuildIdentical(GameNames.RE4, "natives/stm/_chainsaw/appsystem/prefab/shell/arrowshell.pfb.17");
         }
 
         [Fact]
@@ -41,6 +44,36 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertRebuild(GameNames.RE9, "natives/stm/gameassets/item/prefab/layouter/it10_00_006.pfb.18");
         }
 
+        [Fact]
+        public void Rebuild_RE9_DS028_DETAIL()
+        {
+            // ds028_detail.pfb.18 references orphan RSZ objects (not part of the game object tree)
+            // via GameObjectRef fields to assign GUIDs to game objects. These must be preserved on
+            // rebuild, so assert the orphan count (and overall instance count) is carried through
+            // unchanged.
+            var repo = _pakHelper.GetTypeRepository(GameNames.RE9);
+            var path = "natives/stm/gameassets/detailsearch/prefab/detail/ds028_detail.pfb.18";
+            var input = new PfbFile(FileVersion.FromPath(path), _pakHelper.GetFileData(GameNames.RE9, path));
+            var inputBuilder = input.ToBuilder(repo);
+            var inputOrphanCount = inputBuilder.OrphanObjects.Count;
+            var inputInstanceCount = input.Rsz.InstanceCount;
+            var output = inputBuilder.Build();
+            var outputBuilder = output.ToBuilder(repo);
+            var outputOrphanCount = outputBuilder.OrphanObjects.Count;
+            var outputInstanceCount = output.Rsz.InstanceCount;
+
+            Assert.NotEqual(0, inputOrphanCount);
+            Assert.Equal(inputOrphanCount, outputOrphanCount);
+            Assert.Equal(inputInstanceCount, outputInstanceCount);
+        }
+
+        [Fact]
+        public void Rebuild_RE9_DS028_DETAIL_IsIdentical()
+        {
+            // Rebuilding ds028_detail.pfb.18 must produce a byte-for-byte identical file to the original.
+            AssertRebuildIdentical(GameNames.RE9, "natives/stm/gameassets/detailsearch/prefab/detail/ds028_detail.pfb.18");
+        }
+
         private void AssertRebuild(string gameName, string path, int? expectedLength = null)
         {
             var repo = _pakHelper.GetTypeRepository(gameName);
@@ -49,12 +82,22 @@ namespace IntelOrca.Biohazard.REE.Tests
             var output = inputBuilder.Build();
             var outputBuilder = output.ToBuilder(repo);
 
-            // We currently don't keep prefabs that have no owner, so file size might be different
+            // We don't always reproduce the exact layout of the original file (e.g. RSZ instance
+            // renumbering), so allow a known-good rebuild length to be specified.
             if (input.Data.Length == output.Data.Length)
             {
                 Assert.True(input.Data.Span.SequenceEqual(output.Data.Span));
             }
             Assert.Equal(expectedLength ?? input.Data.Length, output.Data.Length);
+        }
+
+        private void AssertRebuildIdentical(string gameName, string path)
+        {
+            var repo = _pakHelper.GetTypeRepository(gameName);
+            var input = new PfbFile(FileVersion.FromPath(path), _pakHelper.GetFileData(gameName, path));
+            var output = input.ToBuilder(repo).Build();
+            Assert.True(input.Data.Span.SequenceEqual(output.Data.Span),
+                "Rebuilt file must be byte-identical to the original.");
         }
     }
 }

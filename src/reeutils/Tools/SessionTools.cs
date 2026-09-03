@@ -12,7 +12,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
             return McpEmbeddedData.GetEngineDetailsMarkdown();
         }
 
-        [McpServerTool(Name = "open_pak", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = true), Description("Opens a pak file or RE Engine install directory for subsequent MCP tools.")]
+        [McpServerTool(Name = "open_pak", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = true), Description("REQUIRED FIRST STEP. Opens a .pak file or game install directory so other tools can access its contents. Call this first, then set_game.")]
         public static string OpenPak(
             [Description("Path to a .pak file or a game install directory.")] string path,
             McpSession session)
@@ -48,7 +48,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
             }.ToJson(camelCase: true);
         }
 
-        [McpServerTool(Name = "set_game", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false), Description("Sets the active game using embedded RSZ and pak-list data.")]
+        [McpServerTool(Name = "set_game", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false), Description("REQUIRED AFTER open_pak. Loads the embedded pak file listing (path map) and RSZ type data for the given game. Must complete before find, read, search, or list_files can work. Call this after open_pak, then wait for the result before calling any other tool.")]
         public static string SetGame(
             [Description("Game identifier, such as re2, re4, re7, re8, or re9.")] string game,
             McpSession session)

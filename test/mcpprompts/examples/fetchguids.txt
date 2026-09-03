@@ -1,0 +1,9 @@
+Prompt:
+    List me all the root level game object guids in chap5_02_st50_027_gimmick_unique_insanity.scn.21
+
+Expected:
+    40d35259-73d3-4601-9992-0ecab04fd213
+    1803ffff-a567-401b-90bb-fb683b9e699a
+    707f2fe9-b142-4243-a033-2594017c1b58
+    f468c697-c24d-435c-b56f-99c9268c3893
+    8a479ecb-058e-42ae-8e6d-02a6270277b5

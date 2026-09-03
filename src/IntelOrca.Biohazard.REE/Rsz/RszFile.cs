@@ -165,65 +165,134 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
             }
 
-            // Resolve instance references. Every reference to instance i must resolve to the
-            // SAME node object: the builder de-duplicates instances by node identity, so
-            // per-parent clones would promote shared instances into duplicates and change
-            // the instance table on rebuild.
-            var resolved = new Dictionary<int, IRszNode>();
-            for (var i = 0; i < instanceInfoList.Length; i++)
+            // Resolve object/user data references so every reference to an instance resolves to the
+            // SAME canonical node (memoized), keeping shared objects a single instance on rebuild.
+            // The two engine eras need different traversal and are gated by RSZ version:
+            //   * v<16 (RE2 non-RT): the de-duplicating builder is sensitive to node identity, so
+            //     resolve through Visit (whose unchanged fast-path keeps identity stable) and mark
+            //     each instance before recursing so cyclic references terminate.
+            //   * v>=16 (RE4/RE9+): rebuild each container's children directly.
+            if (Version < 16)
             {
-                Resolve(i);
-            }
-
-            return result.ToImmutable();
-
-            IRszNode Resolve(int index)
-            {
-                if (resolved.TryGetValue(index, out var cached))
-                    return cached;
-
-                var node = result[index].Value;
-                // Mark before recursing so cyclic references cannot recurse forever. If a
-                // back-edge resolves to this node while it is still being visited, it gets
-                // the pre-visit identity; the unchanged fast-path in Visit guarantees that
-                // identity is kept whenever no descendant of this node actually changed,
-                // so pre-visit and post-visit identities converge.
-                resolved[index] = node;
-
-                if (node is IRszNodeContainer container)
+                var resolved = new Dictionary<int, IRszNode>();
+                for (var i = 0; i < instanceInfoList.Length; i++)
                 {
-                    node = container.Visit(child =>
-                    {
-                        if (child is RszValueNode valueNode)
-                        {
-                            if (valueNode.Type == RszFieldType.Object)
-                            {
-                                var instanceId = valueNode.AsInt32();
-                                if (instanceId >= 0 && instanceId < result.Count)
-                                {
-                                    return Resolve(instanceId);
-                                }
-                                return new RszNullNode();
-                            }
-                            else if (valueNode.Type == RszFieldType.UserData)
-                            {
-                                var instanceId = valueNode.AsInt32();
-                                if (instanceId == 0) return new RszUserDataNode();
-
-                                if (instanceId > 0 && instanceId < result.Count)
-                                {
-                                    return Resolve(instanceId);
-                                }
-                                return new RszUserDataNode();
-                            }
-                        }
-                        return child;
-                    });
-                    resolved[index] = node;
-                    result[index] = new RszInstance(result[index].Id, node);
+                    Resolve(i);
                 }
 
-                return node;
+                return result.ToImmutable();
+
+                IRszNode Resolve(int index)
+                {
+                    if (resolved.TryGetValue(index, out var cached))
+                        return cached;
+
+                    var node = result[index].Value;
+                    // Mark before recursing so cyclic references cannot recurse forever. If a
+                    // back-edge resolves to this node while it is still being visited, it gets
+                    // the pre-visit identity; the unchanged fast-path in Visit guarantees that
+                    // identity is kept whenever no descendant of this node actually changed,
+                    // so pre-visit and post-visit identities converge.
+                    resolved[index] = node;
+
+                    if (node is IRszNodeContainer container)
+                    {
+                        node = container.Visit(child =>
+                        {
+                            if (child is RszValueNode valueNode)
+                            {
+                                if (valueNode.Type == RszFieldType.Object)
+                                {
+                                    var instanceId = valueNode.AsInt32();
+                                    if (instanceId >= 0 && instanceId < result.Count)
+                                    {
+                                        return Resolve(instanceId);
+                                    }
+                                    return new RszNullNode();
+                                }
+                                else if (valueNode.Type == RszFieldType.UserData)
+                                {
+                                    var instanceId = valueNode.AsInt32();
+                                    if (instanceId == 0) return new RszUserDataNode();
+
+                                    if (instanceId > 0 && instanceId < result.Count)
+                                    {
+                                        return Resolve(instanceId);
+                                    }
+                                    return new RszUserDataNode();
+                                }
+                            }
+                            return child;
+                        });
+                        resolved[index] = node;
+                        result[index] = new RszInstance(result[index].Id, node);
+                    }
+
+                    return node;
+                }
+            }
+            else
+            {
+                // Resolve object/user data references. References must point at the same canonical
+                // node for each instance (memoized) so that sharing is preserved: a prefab object
+                // that is both referenced from a component and listed in the RSZ object list stays a
+                // single instance when serialized again.
+                var resolvedCache = new Dictionary<int, IRszNode>();
+                for (var i = 0; i < instanceInfoList.Length; i++)
+                {
+                    result[i] = new RszInstance(result[i].Id, ResolveInstance(i));
+                }
+
+                return result.ToImmutable();
+
+                IRszNode ResolveInstance(int instanceId)
+                {
+                    if (resolvedCache.TryGetValue(instanceId, out var cached))
+                    {
+                        return cached;
+                    }
+
+                    var res = Resolve(result[instanceId].Value);
+                    resolvedCache[instanceId] = res;
+                    return res;
+                }
+
+                IRszNode Resolve(IRszNode node)
+                {
+                    if (node is RszValueNode valueNode)
+                    {
+                        if (valueNode.Type == RszFieldType.Object)
+                        {
+                            var instanceId = valueNode.AsInt32();
+                            if (instanceId >= 0 && instanceId < result.Count)
+                            {
+                                return ResolveInstance(instanceId);
+                            }
+                            return new RszNullNode();
+                        }
+                        else if (valueNode.Type == RszFieldType.UserData)
+                        {
+                            var instanceId = valueNode.AsInt32();
+                            if (instanceId == 0) return new RszUserDataNode();
+
+                            if (instanceId > 0 && instanceId < result.Count)
+                            {
+                                return ResolveInstance(instanceId);
+                            }
+                            return new RszUserDataNode();
+                        }
+                    }
+                    else if (node is IRszNodeContainer container)
+                    {
+                        var children = container.Children.ToBuilder();
+                        for (var i = 0; i < children.Count; i++)
+                        {
+                            children[i] = Resolve(children[i]);
+                        }
+                        return container.WithChildren(children.ToImmutable());
+                    }
+                    return node;
+                }
             }
         }
 
@@ -239,6 +308,22 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
             }
             return objectList.ToImmutable();
+        }
+
+        /// <summary>
+        /// Indices into the instance list that form the RSZ object list (the engine's scene-graph
+        /// entry points).
+        /// </summary>
+        public int[] ReadObjectInstanceIndices()
+        {
+            var ids = ObjectInstanceIds;
+            var result = new List<int>();
+            for (var i = 0; i < ids.Length; i++)
+            {
+                if (ids[i].Index >= 0)
+                    result.Add(ids[i].Index);
+            }
+            return result.ToArray();
         }
 
         public Builder ToBuilder(RszTypeRepository repository)
@@ -286,13 +371,19 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     q.Enqueue(instance.Id);
                 }
-                var getInstance = new Func<IRszNode, RszInstanceId>(node =>
-                    // In de-duplicated (v<16) output a shared node owns ONE instance id that
-                    // every reference reuses, so never consume it. Without dedupe each
-                    // reference got its own instance/id pair (RE4/RE9 behaviour).
-                    (_dedupeInstances || node is RszUserDataNode)
-                        ? dict[node].Peek()
-                        : dict[node].Dequeue());
+                // v<16 (RE2 non-RT): a shared node owns ONE instance id that every reference reuses,
+                // so never consume it (Peek). v>=16: object references consume a distinct instance
+                // per occurrence (value-type semantics) - each reference edge created its own
+                // instance, so pairing them 1:1 in creation order keeps every instance referenced.
+                // User data is always deduped by path, so all its references resolve to the single
+                // shared instance via Peek.
+                var getInstance = new Func<IRszNode, RszFieldType, RszInstanceId>((node, type) =>
+                {
+                    var q = dict[node];
+                    return (_dedupeInstances || type == RszFieldType.UserData)
+                        ? q.Peek()
+                        : q.Dequeue();
+                });
 
                 var ms = new MemoryStream();
                 var bw = new BinaryWriter(ms);
@@ -431,16 +522,147 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 instanceList.Add(new RszInstance(new RszInstanceId(0), new RszNullNode()));
 
                 _dedupeInstances = Version < 16;
-                _instanceByNode.Clear();
+
+                if (_dedupeInstances)
+                {
+                    // RE2 non-RT (RSZ v<16): de-duplicate shared instances by node identity so a
+                    // node referenced from several places serializes back to a single instance.
+                    _instanceByNode.Clear();
+                    foreach (var obj in Objects)
+                    {
+                        objectList.Add(CreateInstanceTreeDeduped(obj, instanceList));
+                    }
+                    return (instanceList.ToImmutable(), objectList.ToImmutable());
+                }
+
+                // v>=16 (RE4/RE9+): one instance per Object-reference occurrence.
+                // Nodes that were instantiated while expanding the children of another object (i.e. reached
+                // through an Object reference), and the instance created for each. A root that is already in
+                // this set was reached from the scene graph, so its own entry in the object list reuses that
+                // single instance instead of instantiating it a second time. Genuine repeated roots - e.g. two
+                // game objects that share the same settings node after a clone - are NOT in this set, so they
+                // are still expanded into separate instances, preserving the value-type model.
+                var childInstantiated = new HashSet<IRszNode>();
+                var instanceByNode = new Dictionary<IRszNode, RszInstance>();
 
                 foreach (var obj in Objects)
                 {
-                    objectList.Add(CreateInstanceTree(obj, instanceList));
+                    if (childInstantiated.Contains(obj))
+                    {
+                        // Already instantiated while expanding a parent: keep it in the object list (so its
+                        // GameObjectRef entries are still regenerated) but do not create a second instance.
+                        objectList.Add(instanceByNode[obj]);
+                    }
+                    else
+                    {
+                        objectList.Add(CreateInstanceTree(obj));
+                    }
                 }
+
                 return (instanceList.ToImmutable(), objectList.ToImmutable());
+
+                RszInstance CreateInstanceTree(IRszNode node)
+                {
+                    if (node is RszObjectNode objectNode)
+                    {
+                        AddInstances(objectNode);
+                        return AddInstance(objectNode);
+                    }
+                    else
+                    {
+                        throw new NotSupportedException("Non struct node added to object list.");
+                    }
+
+                    void AddInstances(RszObjectNode n)
+                    {
+                        var rszType = n.Type;
+                        for (var i = 0; i < rszType.Fields.Length; i++)
+                        {
+                            var child = n.Children[i];
+                            var rszField = rszType.Fields[i];
+                            if (rszField.IsArray)
+                            {
+                                var childArray = (RszArrayNode)child;
+                                for (var j = 0; j < childArray.Children.Length; j++)
+                                {
+                                    if (childArray.Children[j] is RszObjectNode childobjectNode)
+                                    {
+                                        AddInstances(childobjectNode);
+                                        AddInstance(childobjectNode);
+                                        childInstantiated.Add(childobjectNode);
+                                    }
+                                    else if (childArray.Children[j] is RszUserDataNode userDataNode)
+                                    {
+                                        AddInstance(userDataNode);
+                                    }
+                                    else if (childArray.Children[j] is RszEmbeddedUserValueNode embeddedUserValueNode)
+                                    {
+                                        AddInstance(embeddedUserValueNode);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                if (child is RszObjectNode childobjectNode)
+                                {
+                                    AddInstances(childobjectNode);
+                                    if (rszField.Type == RszFieldType.Object ||
+                                        rszField.Type == RszFieldType.UserData)
+                                    {
+                                        AddInstance(child);
+                                        childInstantiated.Add(childobjectNode);
+                                    }
+                                }
+                                else if (child is RszUserDataNode userDataNode)
+                                {
+                                    AddInstance(userDataNode);
+                                }
+                                else if (child is RszEmbeddedUserValueNode embeddedUserValueNode)
+                                {
+                                    AddInstance(embeddedUserValueNode);
+                                }
+                            }
+                        }
+                    }
+
+                    RszInstance AddInstance(IRszNode node)
+                    {
+                        if (node is RszNullNode)
+                        {
+                            return instanceList[0];
+                        }
+                        else if (node is RszUserDataNode userDataNode)
+                        {
+                            if (userDataNode.IsEmpty)
+                            {
+                                return instanceList[0];
+                            }
+                            else
+                            {
+                                // Avoid duplicate user data entries
+                                var path = userDataNode.Path;
+                                foreach (var b in instanceList)
+                                {
+                                    if (b.Value is RszUserDataNode otherUserValueNode && otherUserValueNode.Path == userDataNode.Path)
+                                    {
+                                        if (otherUserValueNode.Type != userDataNode.Type)
+                                        {
+                                            throw new Exception($"Mismatch of RSZ type for user data: {path}");
+                                        }
+                                        return b;
+                                    }
+                                }
+                            }
+                        }
+                        var instance = new RszInstance(new RszInstanceId(instanceList.Count), node);
+                        instanceList.Add(instance);
+                        instanceByNode[node] = instance;
+                        return instance;
+                    }
+                }
             }
 
-            private RszInstance CreateInstanceTree(IRszNode node, ImmutableArray<RszInstance>.Builder builder)
+            private RszInstance CreateInstanceTreeDeduped(IRszNode node, ImmutableArray<RszInstance>.Builder builder)
             {
                 if (node is RszObjectNode objectNode)
                 {

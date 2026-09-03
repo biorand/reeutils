@@ -26,6 +26,8 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
 
         public override JsonDocument GetJson(TreeOptions options)
         {
+            if (options.ExpandNodes.Length > 0)
+                throw new System.NotSupportedException("expand_nodes is not supported for .fsm files.");
             var graph = HfsmGraphDocument.FromFile(new HfsmFile(Data));
             using var document = JsonSupport.ToDocument(graph, JsonSupport.CreateOptions());
             return JsonSupport.ApplyTreeOptions(document, options);

@@ -21,7 +21,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         private ReadOnlySpan<GameObjectRefInfo> GameObjectRefInfoList => data.Get<GameObjectRefInfo>(Header.GameObjectRefOffset, Header.GameObjectRefCount);
         private ReadOnlySpan<ResourceInfo> ResourceInfoList => Version < 17 ? default : data.Get<ResourceInfo>(Header.ResourceOffset, Header.ResourceCount);
         private ReadOnlySpan<UserDataInfo> UserDataInfoList => data.Get<UserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
-        private RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
+        public RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
 
         public int InstanceCount => Rsz.InstanceCount;
 
@@ -112,7 +112,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         public RszScene ReadScene(RszTypeRepository repository)
         {
-            var objectList = Rsz.ReadObjectList(repository);
+            return ReadScene(repository, Rsz.ReadObjectList(repository));
+        }
+
+        private RszScene ReadScene(RszTypeRepository repository, ImmutableArray<RszObjectNode> objectList)
+        {
             var gameObjectInfoList = GameObjectInfoList.ToImmutableArray();
             // RE2 (v16) packs arrayIndex/propertyId into one u32:
             // packed = (arrayIndex << 16) | propertyId
@@ -241,11 +245,42 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         {
                             gameObjectGuid = RszSerializer.Deserialize<Guid>(sourceObject[i]);
                         }
+                        break;
                     }
                 }
 
                 return new RszGameObject(gameObjectGuid, null, settings, components.ToImmutable(), children.ToImmutable());
             }
+        }
+
+        /// <summary>
+        /// Returns the RSZ objects that are not part of the game object tree. The engine can still
+        /// reference such objects via <c>GameObjectRef</c> fields, so they must be preserved when
+        /// rebuilding or the file will be corrupted.
+        /// </summary>
+        private List<RszObjectNode> ReadOrphans(RszTypeRepository repository, ImmutableArray<RszObjectNode> objectList)
+        {
+            var claimedObjectIds = new HashSet<int>();
+            var gameObjectInfoList = GameObjectInfoList;
+            for (var i = 0; i < gameObjectInfoList.Length; i++)
+            {
+                var info = gameObjectInfoList[i];
+                claimedObjectIds.Add(info.ObjectId);
+                for (var componentIndex = 1; componentIndex <= info.ComponentCount; componentIndex++)
+                {
+                    claimedObjectIds.Add(info.ObjectId + componentIndex);
+                }
+            }
+
+            var orphans = new List<RszObjectNode>();
+            for (var i = 0; i < objectList.Length; i++)
+            {
+                if (!claimedObjectIds.Contains(i))
+                {
+                    orphans.Add(objectList[i]);
+                }
+            }
+            return orphans;
         }
 
         public Builder ToBuilder(RszTypeRepository repository)
@@ -260,6 +295,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public int RszVersion { get; }
             public List<string> Resources { get; } = [];
             public RszScene Scene { get; set; } = new RszScene();
+            public List<RszObjectNode> OrphanObjects { get; } = [];
 
             /// <summary>
             /// Standalone objects not owned by any game object. RE2 (v16) prefabs use these
@@ -290,10 +326,50 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 Version = instance.Version;
                 RszVersion = instance.Rsz.Version;
                 Resources = instance.Resources.ToList();
-                Scene = instance.ReadScene(repository);
+                // Read the object list once so the scene, the v16 loose objects, and the orphan
+                // objects all share node references, keeping shared instances (e.g. prefab trigger
+                // objects) intact.
+                var objectList = instance.Rsz.ReadObjectList(repository);
+                Scene = instance.ReadScene(repository, objectList);
+
+                // RE2 non-RT (v16): raw game-object-ref replay data captured by ReadScene.
                 LooseObjects.AddRange(instance.LooseObjects);
                 OriginalObjectList = instance.OriginalObjectList;
                 PreservedGameObjectRefs = instance.PreservedGameObjectRefs;
+
+                OrphanObjects = instance.ReadOrphans(repository, objectList);
+
+                if (Version >= 17)
+                {
+                    // The RSZ dump doesn't contain property IDs for every field, and the read pass
+                    // only assigns them to the first source object of each ref. Assign the remaining
+                    // property IDs (from the original ref table) to the orphan fields so their refs
+                    // can be regenerated, since orphan objects are not part of the game object tree.
+                    // v16 replays its ref table verbatim and never consults field.Id, so skip it.
+                    var orphanSet = OrphanObjects.ToHashSet();
+                    foreach (var refInfo in instance.GameObjectRefInfoList)
+                    {
+                        if (refInfo.ObjectId < 0 || refInfo.ObjectId >= objectList.Length)
+                            continue;
+                        if (objectList[refInfo.ObjectId] is not RszObjectNode sourceObject ||
+                            !orphanSet.Contains(sourceObject))
+                        {
+                            continue;
+                        }
+                        foreach (var field in sourceObject.Type.Fields)
+                        {
+                            if (field.Type != RszFieldType.GameObjectRef)
+                                continue;
+                            if (field.Id == refInfo.PropertyIdPacked)
+                                break;
+                            if (field.Id == null)
+                            {
+                                field.Id = refInfo.PropertyIdPacked;
+                                break;
+                            }
+                        }
+                    }
+                }
             }
 
             public Builder AddMissingResources()
@@ -331,9 +407,24 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var gameObjects = new List<GameObjectInfo>();
                 var objectList = ImmutableArray.CreateBuilder<RszObjectNode>();
                 Traverse(-1, Scene);
-                foreach (var looseObject in LooseObjects)
+
+                // Preserve RSZ objects that are not part of the game object tree, as the engine can
+                // still reference them through GameObjectRef fields (e.g. via app.InteractTrigger*).
+                // v16 tracks these as LooseObjects (raw-ref replay); v17+ as OrphanObjects (Ted's
+                // orphan-preservation path). They describe the same set, so append exactly one.
+                if (Version < 17)
                 {
-                    objectList.Add(looseObject);
+                    foreach (var looseObject in LooseObjects)
+                    {
+                        objectList.Add(looseObject);
+                    }
+                }
+                else
+                {
+                    foreach (var orphan in OrphanObjects)
+                    {
+                        objectList.Add(orphan);
+                    }
                 }
 
                 var rszBuilder = new RszFile.Builder(Repository, RszVersion);
@@ -356,6 +447,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 // Game object refs
                 var gameObjectRefOffset = ms.Position;
                 var gameObjectRefCount = 0;
+                // v16 with a preserved raw ref table: replay it (property ids are engine-assigned
+                // and absent from RSZ dumps). Otherwise regenerate refs from the scene - orphan
+                // fields had their property ids assigned during construction, so they regenerate
+                // too (Ted's b2f61dd/6051d93 orphan-preservation path for v17+).
                 if (Version < 17 && PreservedGameObjectRefs.Length == 0 && PreservedGameObjectRefData is { Length: > 0 } rawRefs)
                 {
                     // Template-free build: replay the raw ref table verbatim (object ids are

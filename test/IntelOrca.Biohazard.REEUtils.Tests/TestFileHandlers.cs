@@ -125,13 +125,13 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
 
             var handler = new SceneFileHandler("test.scn.20", BuildSceneFile(repo, scene), 20, repo);
             var collapsed = RenderTree(handler.GetTree(new TreeOptions()));
-            var expanded = RenderTree(handler.GetTree(new TreeOptions { Xpaths = ["Root"] }));
+            var expanded = RenderTree(handler.GetTree(new TreeOptions { ExpandNodes = ["Root"] }));
 
             Assert.DoesNotContain("{via.Transform}", collapsed);
             Assert.Contains("{via.Transform}", expanded);
             Assert.Contains("Child", collapsed);
             Assert.Contains("Child", expanded);
-            Assert.Equal(1, CountOccurrences(expanded, "{via.Transform}"));
+            Assert.Equal(2, CountOccurrences(expanded, "{via.Transform}"));
         }
 
         [Fact]
@@ -180,7 +180,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
                     [])]));
 
             var handler = new SceneFileHandler("test.scn.20", BuildSceneFile(repo, scene), 20, repo);
-            using var json = handler.GetJson(new TreeOptions { Xpaths = ["Root"] });
+            using var json = handler.GetJson(new TreeOptions { ExpandNodes = ["Root"] });
 
             var rootObject = Assert.Single(json.RootElement.GetProperty("@children").EnumerateArray());
             var childObject = Assert.Single(rootObject.GetProperty("@children").EnumerateArray());
@@ -188,7 +188,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             var childComponent = Assert.Single(childObject.GetProperty("@components").EnumerateArray());
 
             Assert.True(rootComponent.EnumerateObject().Count() > 1);
-            Assert.Single(childComponent.EnumerateObject());
+            Assert.True(childComponent.EnumerateObject().Count() > 1);
             Assert.Equal("Child", childObject.GetProperty("Name").GetString());
         }
 

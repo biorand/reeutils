@@ -15,7 +15,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
     [McpServerToolType]
     internal sealed class PakTools
     {
-        [McpServerTool(Name = "search", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Searches files in the current pak similarly to the grep command.")]
+        [McpServerTool(Name = "search", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("SLOW. Searches file CONTENTS using a regex pattern across matching pak entries. Decompresses and reads file data — expensive. Prefer find + read instead. Only use when you need to grep for specific values inside files (e.g. a GUID or specific field value). Requires set_game to have completed first.")]
         public static string Search(
             [Description("Regex pattern to search for in paths or values.")] string regex,
             [Description("Pak paths, prefixes, or wildcard patterns to search within.")] string[] paths,
@@ -30,7 +30,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
                 throw new McpException("max_results must be greater than zero.");
 
             var pak = session.Pak ?? throw new McpException("No pak is open. Call open_pak first.");
-            var pakList = session.PakList ?? throw new McpException("No pak list is loaded. Call open_pak_list or set_game first.");
+            var pakList = session.PakList ?? throw new McpException("No pak list is loaded. Call set_game first and wait for it to complete before calling search. Do not send tool calls in parallel.");
             var pattern = new Regex(regex, RegexOptions.IgnoreCase);
             var results = new List<SearchResult>();
             var matchedEntries = MatchPakEntries(pakList, paths).ToArray();
@@ -77,7 +77,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
             });
         }
 
-        [McpServerTool(Name = "find", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Finds files in the current pak matching the given path patterns. Requires a loaded pak list.")]
+        [McpServerTool(Name = "find", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("DISCOVERS file paths inside the open pak using substring or glob pattern matching on filenames. FAST — hash-only lookup, no file reading. Returns full pak-internal paths. Use this to locate a file when you know its name but not its full path, then pass the result to read. Requires set_game to have completed first (call it before this, not in parallel).")]
         public static string Find(
             [Description("One or more path patterns.")] string[] patterns,
             McpSession session)
@@ -86,7 +86,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
                 throw new McpException("At least one pattern must be specified.");
 
             var pak = session.Pak ?? throw new McpException("No pak is open. Call open_pak first.");
-            var pakList = session.PakList ?? throw new McpException("No pak list is loaded. Call open_pak_list or set_game first.");
+            var pakList = session.PakList ?? throw new McpException("No pak list is loaded. Call set_game first and wait for it to complete before calling find. Do not send tool calls in parallel.");
             var paths = PakPathMatcher.FindMatchingEntries(pak, pakList, patterns);
 
             return ToJson(new
@@ -96,7 +96,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
             });
         }
 
-        [McpServerTool(Name = "list_files", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Lists files or directories in the current pak similarly to the ls command.")]
+        [McpServerTool(Name = "list_files", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Lists files and directories in the open pak (like ls). Use to browse the pak directory structure. For targeted file discovery when you know the filename, prefer find with a specific pattern instead.")]
         public static string ListFiles(
             [Description("Optional pak directory or file path. Leave empty to list the pak root.")] string? path,
             McpSession session)
@@ -212,12 +212,12 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
             });
         }
 
-        [McpServerTool(Name = "read", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Reads a supported REE file and returns JSON.")]
+        [McpServerTool(Name = "read", ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false), Description("Reads a supported REE file and returns its contents as JSON. First use find to get the full pak path, then pass it here. Requires set_game to have completed first. Use an iterative workflow: (1) read(path) to browse object names with collapsed component details, (2) read(path, expand_nodes=['ObjectName']) to get full component data (Position, fields) for specific objects.")]
         public static string Read(
-            [Description("A disk path or pak-internal path to read.")] string path,
+            [Description("A disk path or pak-internal path to read. Supported: .scn, .pfb, .user, .msg, .tex, .fsm")] string path,
             McpSession session,
-            [Description("Scene node paths whose components should be expanded.")] string[]? xpaths = null,
-            [Description("When true, expands all scene components.")] bool full = false)
+            [Description("Names, GUIDs, or forward-slash paths (e.g. 'Gm16_007_01', 'Player', 'Root/Enemy', 'aaaaaaaa-bbbb-...') of objects to expand so their component data (Position, Rotation, Scale, fields) becomes visible. For .scn/.pfb: expands collapsed component details for matched objects. For .user: collapses un-matched sub-objects to @type. For .msg: filters entries by name. Also supports prefix matching: 'Root' expands 'Root' and all descendants. NOT XPath syntax.")] string[]? expand_nodes = null,
+            [Description("Limits JSON tree depth. Use max_depth=1 for a skeleton view showing only top-level objects. Omit for full depth.")] int? max_depth = null)
         {
             var data = session.ReadFileData(path, out var resolvedPath);
             try
@@ -228,10 +228,26 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
 
                 using var json = handler.GetJson(new TreeOptions
                 {
-                    Xpaths = xpaths ?? [],
-                    Full = full
+                    ExpandNodes = expand_nodes ?? [],
+                    MaxDepth = max_depth
                 });
-                return JsonSupport.ToJsonString(json);
+                var jsonText = JsonSupport.ToJsonString(json);
+
+                var hints = new List<string>();
+                if (jsonText.Length > 20480)
+                    hints.Add("Large output. Consider using expand_nodes to target specific objects or max_depth for a skeleton view.");
+                else if ((expand_nodes == null || expand_nodes.Length == 0) && (resolvedPath.EndsWith(".scn", StringComparison.OrdinalIgnoreCase) || resolvedPath.EndsWith(".pfb", StringComparison.OrdinalIgnoreCase) || resolvedPath.EndsWith(".user", StringComparison.OrdinalIgnoreCase)))
+                    hints.Add("Tip: Use expand_nodes with object names to see full component data (Position, fields).");
+                if (expand_nodes != null && expand_nodes.Length > 0)
+                {
+                    var anyMatched = expand_nodes.Any(n => jsonText.Contains(n, StringComparison.OrdinalIgnoreCase));
+                    if (!anyMatched)
+                        hints.Add("No objects matched expand_nodes. Names are case-insensitive. Call read() without expand_nodes first to see available names/paths.");
+                }
+
+                if (hints.Count > 0)
+                    jsonText += "\n\n// " + string.Join("\n// ", hints);
+                return jsonText;
             }
             catch (NotSupportedException ex)
             {

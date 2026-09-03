@@ -1,0 +1,12 @@
+Prompt:
+    In natives/stm/leveldesign/gimmick/scene/chap3/common/st30_031_gimmick_common.scn.21
+    There are 4 coin lockers (app.Gm02_032).
+    Each one contains an item, some contain two depending on difficulty.
+    I want you to list each locker, the item, and the number of coins for each difficulty.
+    Do not list any other items that are not associated with the coin lockers.
+
+Expected:
+    item=it99_02_002 coins=4 difficulty=all | item=it10_20_007 coins=5 difficulty=ID0040
+    item=it99_50_011 coins=6 difficulty=all
+    item=it99_01_000 coins=3 difficulty=all
+    item=it99_02_004 coins=4 difficulty=all | item=it40_00_000 coins=5 difficulty=ID0040
