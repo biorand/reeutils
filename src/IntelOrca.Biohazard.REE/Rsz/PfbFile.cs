@@ -97,7 +97,19 @@ namespace IntelOrca.Biohazard.REE.Rsz
         /// </summary>
         internal ImmutableArray<RszObjectNode>? OriginalObjectList { get; private set; }
 
+        /// <summary>
+        /// Original RSZ data-section offset (v16). A handful of vanilla RE2 prefabs (the
+        /// <c>enemydead/emXXXX_dead.pfb.16</c> template family) carry ~12 bytes of gratuitous zero
+        /// padding before the RSZ block that no layout rule predicts; the engine seeks via this
+        /// header offset and ignores it. Captured so <see cref="Build"/> can replay the exact gap
+        /// and stay byte-identical.
+        /// </summary>
+        internal ulong? OriginalDataOffset { get; private set; }
+
         public int GameObjectRefCount => (int)Header.GameObjectRefCount;
+
+        /// <summary>Absolute offset of the RSZ data section as stored in the header.</summary>
+        public long DataOffset => (long)Header.DataOffset;
 
         /// <summary>
         /// Copies the raw v16 game object ref table (16 bytes per entry) into
@@ -135,6 +147,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     };
                 }
                 PreservedGameObjectRefs = GameObjectRefInfoList.ToImmutableArray();
+                OriginalDataOffset = Header.DataOffset;
             }
             OriginalObjectList = objectList;
             LooseObjects = ReadLooseObjects(objectList, gameObjectInfoList);
@@ -306,6 +319,15 @@ namespace IntelOrca.Biohazard.REE.Rsz
             internal ImmutableArray<RszObjectNode>? OriginalObjectList { get; set; }
             internal ImmutableArray<GameObjectRefInfo> PreservedGameObjectRefs { get; set; } = [];
 
+            /// <summary>Original v16 RSZ data-section offset; replayed verbatim to reproduce the
+            /// stray zero padding a few vanilla template prefabs carry. See
+            /// <see cref="PfbFile.OriginalDataOffset"/>.</summary>
+            public ulong? PreservedDataOffset { get; set; }
+
+            /// <summary>Leading padding before the RSZ instance-info table in the source file
+            /// (0 for all but a few RE2 template prefabs). See <see cref="RszFile.InstanceListPad"/>.</summary>
+            public int PreservedRszInstanceListPad { get; set; }
+
             /// <summary>
             /// Raw v16 game object ref table as read from the original file (16 bytes per entry).
             /// Set this on a template-free builder so <see cref="Build"/> can replay engine-assigned
@@ -336,6 +358,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 LooseObjects.AddRange(instance.LooseObjects);
                 OriginalObjectList = instance.OriginalObjectList;
                 PreservedGameObjectRefs = instance.PreservedGameObjectRefs;
+                PreservedDataOffset = instance.OriginalDataOffset;
+                PreservedRszInstanceListPad = instance.Rsz.InstanceListPad;
 
                 OrphanObjects = instance.ReadOrphans(repository, objectList);
 
@@ -429,6 +453,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                 var rszBuilder = new RszFile.Builder(Repository, RszVersion);
                 rszBuilder.Objects = objectList.ToImmutable();
+                rszBuilder.PreservedInstanceListPad = PreservedRszInstanceListPad;
                 var rsz = rszBuilder.Build();
 
                 var ms = new MemoryStream();
@@ -465,6 +490,19 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 else
                 {
                     WriteGameObjectRefs();
+                }
+
+                // A few vanilla v16 template prefabs (enemydead/emXXXX_dead) carry a small run of
+                // stray zero padding between the game-object-ref section and the RSZ block that no
+                // layout rule predicts; the engine seeks via the header offset and ignores it.
+                // These files always have an empty resource section, so replaying the gap here
+                // lands the resource offset, data offset and RSZ block byte-identically. Bounded
+                // to a single 16-byte step so a bogus preserved value can never balloon the file.
+                if (Version < 17 && Resources.Count == 0 && PreservedDataOffset is { } preservedDataOffset)
+                {
+                    var pad = (long)preservedDataOffset - ms.Position;
+                    if (pad > 0 && pad <= 16)
+                        bw.WriteZeros((int)pad);
                 }
 
                 // Resources

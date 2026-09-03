@@ -44,6 +44,21 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
         internal int Version => (int)Header.Version;
 
+        /// <summary>
+        /// Bytes of leading zero padding between the object-id list and the instance-info table.
+        /// A few vanilla RE2 (RSZ v8) template files 16-align that table; nothing in the format
+        /// predicts which, so a rebuild replays this captured run. 0 for the common case.
+        /// </summary>
+        public int InstanceListPad
+        {
+            get
+            {
+                var natural = Header.Size + (long)Header.ObjectCount * 4;
+                var pad = (long)Header.InstanceOffset - natural;
+                return pad > 0 && pad < 16 ? (int)pad : 0;
+            }
+        }
+
         public int InstanceCount => InstanceInfoList.Length;
 
         public int UserDataCount => (int)Header.UserDataCount;
@@ -338,6 +353,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public ImmutableArray<RszObjectNode> Objects { get; set; } = [];
             public long AlignOffset { get; set; }
 
+            /// <summary>Leading zero padding to re-emit before the instance-info table, for the
+            /// rare RE2 template files that had it. See <see cref="RszFile.InstanceListPad"/>.</summary>
+            public int PreservedInstanceListPad { get; set; }
+
             // RE2 (v<16): one instance per distinct object node. Later versions: no de-dup.
             private bool _dedupeInstances;
             private readonly Dictionary<IRszNode, RszInstance> _instanceByNode = [];
@@ -399,6 +418,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
 
                 // Instance list
+                // A few vanilla RE2 (RSZ v8) template files 16-align the instance-info table; the
+                // rest do not, and there is no layout rule that predicts which, so replay the
+                // original run of leading padding when it was captured.
+                if (Version < 16 && PreservedInstanceListPad > 0)
+                    bw.WriteZeros(PreservedInstanceListPad);
                 var instanceListOffset = ms.Position;
                 foreach (var instance in instanceList)
                 {

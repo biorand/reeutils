@@ -46,6 +46,15 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
                 metadata["@gorefs"] = refs;
             }
 
+            // A few vanilla v16 template prefabs carry stray zero padding before the RSZ block and
+            // before the RSZ instance table that no layout rule predicts; carry the original
+            // offsets so Import can replay the exact gaps. Harmless for the common (no-padding) case.
+            if (file.Version < 17)
+            {
+                metadata["@dataoffset"] = BitConverter.GetBytes(file.DataOffset);
+                metadata["@rszinstpad"] = BitConverter.GetBytes(file.Rsz.InstanceListPad);
+            }
+
             // The resource preload table is not derivable from the scene graph (entries
             // can exist without any RszResourceNode, and tables can be legitimately
             // empty); carry it verbatim for import — including the empty case.
@@ -100,6 +109,14 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
             if (metadata.TryGetValue("gorefs", out var gorefs))
             {
                 builder.PreservedGameObjectRefData = gorefs;
+            }
+            if (metadata.TryGetValue("dataoffset", out var dataOffset) && dataOffset.Length == 8)
+            {
+                builder.PreservedDataOffset = (ulong)BitConverter.ToInt64(dataOffset);
+            }
+            if (metadata.TryGetValue("rszinstpad", out var rszInstPad) && rszInstPad.Length == 4)
+            {
+                builder.PreservedRszInstanceListPad = BitConverter.ToInt32(rszInstPad);
             }
             if (metadata.ContainsKey("resources"))
             {

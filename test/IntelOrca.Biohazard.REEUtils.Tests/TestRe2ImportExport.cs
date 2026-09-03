@@ -31,6 +31,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
 
         [Theory]
         [InlineData("natives/x64/objectroot/setmodel/sm4x_gimmick/sm49/sm49_315_tylantbreakwall/sm49_315_tylantbrakewall.pfb.16")]
+        [InlineData("natives/x64/objectroot/prefab/character/enemydead/em0000_dead.pfb.16")]
         public async Task PfbFile16(string path)
         {
             await CheckFileAsync(path, ".pfb.16");
