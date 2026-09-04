@@ -44,6 +44,39 @@ namespace IntelOrca.Biohazard.REE.Tests
             AssertRebuildScene("natives/STM/GameDesign/System/Environment/Stage/Stage100/Area/Area.scn.21");
         }
 
+                [Fact]
+                        public void Rebuild_Oniws_Scene_Json_RoundTrip()
+                        {
+                            // The Area scene carries raw byte-blob (RszFieldType.Data) members; the JSON
+                            // export->import path must round-trip them as base64. Regression test for
+                            // "Unsupported RSZ value type 'Data'" on oniws scene import.
+                            var path = "natives/STM/GameDesign/System/Environment/Stage/Stage100/Area/Area.scn.21";
+                            var repo = _pakHelper.GetTypeRepository(GameNames.ONIWS);
+                            var input = new ScnFile(FileVersion.FromPath(path), _pakHelper.GetFileData(GameNames.ONIWS, path));
+                            var scene = input.ReadScene(repo);
+
+                            var json = RszJsonSerializer.Serialize(scene, repo);
+                            var rebuiltScene = (RszScene)RszJsonSerializer.Deserialize(json, repo);
+
+                            // JSON -> scene -> JSON is idempotent: the export faithfully captures the whole tree.
+                            var json2 = RszJsonSerializer.Serialize(rebuiltScene, repo);
+                            Assert.Equal(json, json2);
+
+                            var builder = new ScnFile.Builder(repo, input.Version, input.RszVersion);
+                            builder.Resources.AddRange(input.Resources);
+                            builder.Prefabs.AddRange(input.Prefabs);
+                            builder.Scene = rebuiltScene;
+                            var output = builder.Build();
+
+                            // The JSON-imported scene rebuilds to the exact same binary as the native
+                            // binary->builder->binary path; both may differ from the original in padding
+                            // layout (pre-existing scn v16 rebuild behavior, see AssertRebuildScene).
+                            var binOutput = input.ToBuilder(repo).Build();
+                            Assert.True(output.Data.Span.SequenceEqual(binOutput.Data.Span));
+                            Assert.Equal(input.InstanceCount, output.InstanceCount);
+                            Assert.Equal(16, input.RszVersion);
+                        }
+
         [Fact]
         public void Rebuild_Oniws_Prefab()
         {
