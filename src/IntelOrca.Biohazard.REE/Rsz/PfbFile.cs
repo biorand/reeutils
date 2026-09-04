@@ -15,10 +15,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public ReadOnlyMemory<byte> Data => data;
 
         public int Version => version;
-        private PfbHeader Header => new PfbHeader(Version, version < 17 ? data[..48] : data[..56]);
+        private PfbHeader Header => new PfbHeader(Version, version < 17 ? data[..HeaderSizeV16] : data[..56]);
+        private const int HeaderSizeV16 = 40;
         private ReadOnlySpan<GameObjectInfo> GameObjectInfoList => data.Get<GameObjectInfo>((ulong)Header.Size, Header.GameObjectCount);
         private ReadOnlySpan<GameObjectRefInfo> GameObjectRefInfoList => data.Get<GameObjectRefInfo>(Header.GameObjectRefOffset, Header.GameObjectRefCount);
-        private ReadOnlySpan<ResourceInfo> ResourceInfoList => data.Get<ResourceInfo>(Header.ResourceOffset, Header.ResourceCount);
+        private ReadOnlySpan<ResourceInfo> ResourceInfoList => Version < 17 ? default : data.Get<ResourceInfo>(Header.ResourceOffset, Header.ResourceCount);
         private ReadOnlySpan<UserDataInfo> UserDataInfoList => data.Get<UserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
         public RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
 
@@ -31,6 +32,31 @@ namespace IntelOrca.Biohazard.REE.Rsz
             get
             {
                 var result = ImmutableArray.CreateBuilder<string>();
+                if (Version < 17)
+                {
+                    // RE2 (v16): resource paths are packed NUL-terminated UTF16 strings
+                    // starting at ResourceOffset. There is no offset table.
+                    var span = MemoryMarshal.Cast<byte, char>(data.Span.Slice((int)Header.ResourceOffset));
+                    for (var i = 0; i < Header.ResourceCount; i++)
+                    {
+                        var start = 0;
+                        while (start < span.Length && span[start] == '\0')
+                        {
+                            start++;
+                        }
+
+                        var end = start;
+                        while (end < span.Length && span[end] != '\0')
+                        {
+                            end++;
+                        }
+
+                        result.Add(new string(span.Slice(start, end - start).ToArray()));
+                        span = span.Slice(Math.Min(end + 1, span.Length));
+                    }
+                    return result.ToImmutable();
+                }
+
                 var resourceInfoList = ResourceInfoList;
                 for (var i = 0; i < resourceInfoList.Length; i++)
                 {
@@ -56,6 +82,46 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return string.Empty;
         }
 
+        public ImmutableArray<RszObjectNode> LooseObjects { get; private set; } = [];
+
+        /// <summary>
+        /// Raw game object ref entries preserved from a v16 file. RE2 (v16) property ids are
+        /// engine-assigned and not present in the RSZ dumps, so entries are replayed verbatim
+        /// on build (with object id remapping) instead of being recomputed.
+        /// </summary>
+        internal ImmutableArray<GameObjectRefInfo> PreservedGameObjectRefs { get; private set; } = [];
+
+        /// <summary>
+        /// Object list as read from the file, captured by <see cref="ReadScene"/> so the builder
+        /// can remap preserved v16 game object refs to rebuilt object ids.
+        /// </summary>
+        internal ImmutableArray<RszObjectNode>? OriginalObjectList { get; private set; }
+
+        /// <summary>
+        /// Original RSZ data-section offset (v16). A handful of vanilla RE2 prefabs (the
+        /// <c>enemydead/emXXXX_dead.pfb.16</c> template family) carry ~12 bytes of gratuitous zero
+        /// padding before the RSZ block that no layout rule predicts; the engine seeks via this
+        /// header offset and ignores it. Captured so <see cref="Build"/> can replay the exact gap
+        /// and stay byte-identical.
+        /// </summary>
+        internal ulong? OriginalDataOffset { get; private set; }
+
+        public int GameObjectRefCount => (int)Header.GameObjectRefCount;
+
+        /// <summary>Absolute offset of the RSZ data section as stored in the header.</summary>
+        public long DataOffset => (long)Header.DataOffset;
+
+        /// <summary>
+        /// Copies the raw v16 game object ref table (16 bytes per entry) into
+        /// <paramref name="destination"/>. Length must equal
+        /// <see cref="GameObjectRefCount"/> * 16.
+        /// </summary>
+        public void ReadGameObjectRefData(byte[] destination)
+        {
+            var span = data.Get<GameObjectRefInfo>(Header.GameObjectRefOffset, Header.GameObjectRefCount);
+            MemoryMarshal.AsBytes(span).CopyTo(destination);
+        }
+
         public RszScene ReadScene(RszTypeRepository repository)
         {
             return ReadScene(repository, Rsz.ReadObjectList(repository));
@@ -64,8 +130,54 @@ namespace IntelOrca.Biohazard.REE.Rsz
         private RszScene ReadScene(RszTypeRepository repository, ImmutableArray<RszObjectNode> objectList)
         {
             var gameObjectInfoList = GameObjectInfoList.ToImmutableArray();
+            // RE2 (v16) packs arrayIndex/propertyId into one u32:
+            // packed = (arrayIndex << 16) | propertyId
             var gameObjectRefs = GameObjectRefInfoList.ToArray();
+            if (Version < 17)
+            {
+                for (var i = 0; i < gameObjectRefs.Length; i++)
+                {
+                    var packed = gameObjectRefs[i].PropertyIdPacked;
+                    gameObjectRefs[i] = new GameObjectRefInfo()
+                    {
+                        ObjectId = gameObjectRefs[i].ObjectId,
+                        PropertyIdPacked = packed & 0xFFFF,
+                        ArrayIndex = (packed >> 16) & 0xFFFF,
+                        TargetId = gameObjectRefs[i].TargetId
+                    };
+                }
+                PreservedGameObjectRefs = GameObjectRefInfoList.ToImmutableArray();
+                OriginalDataOffset = Header.DataOffset;
+            }
+            OriginalObjectList = objectList;
+            LooseObjects = ReadLooseObjects(objectList, gameObjectInfoList);
             return BuildRoot();
+
+            ImmutableArray<RszObjectNode> ReadLooseObjects(ImmutableArray<RszObjectNode> allObjects, ImmutableArray<GameObjectInfo> goInfos)
+            {
+                // Objects not reachable from any game object (settings + components). RE2 prefabs
+                // can append standalone objects that hold GameObjectRef values (e.g. camera targets).
+                var consumed = new bool[allObjects.Length];
+                foreach (var goInfo in goInfos)
+                {
+                    if (goInfo.ObjectId < consumed.Length)
+                        consumed[goInfo.ObjectId] = true;
+                    for (var i = 0; i < goInfo.ComponentCount; i++)
+                    {
+                        var componentIndex = goInfo.ObjectId + 1 + i;
+                        if (componentIndex < consumed.Length)
+                            consumed[componentIndex] = true;
+                    }
+                }
+
+                var loose = ImmutableArray.CreateBuilder<RszObjectNode>();
+                for (var i = 0; i < allObjects.Length; i++)
+                {
+                    if (!consumed[i])
+                        loose.Add(allObjects[i]);
+                }
+                return loose.ToImmutable();
+            }
 
             RszScene BuildRoot()
             {
@@ -88,7 +200,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var components = ImmutableArray.CreateBuilder<RszObjectNode>();
                 for (var i = 0; i < info.ComponentCount; i++)
                 {
-                    components.Add((RszObjectNode)objectList[info.ObjectId + 1 + i]);
+                    var componentIndex = info.ObjectId + 1 + i;
+                    if (componentIndex >= objectList.Length)
+                    {
+                        break;
+                    }
+                    components.Add((RszObjectNode)objectList[componentIndex]);
                 }
 
                 var children = ImmutableArray.CreateBuilder<RszGameObject>();
@@ -119,14 +236,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         // This is a very rough work around.
                         if (field.Id is int fieldId)
                         {
-                            if (fieldId != gameObjectRefInfo.PropertyId)
+                            if (fieldId != gameObjectRefInfo.PropertyIdPacked)
                             {
                                 continue;
                             }
                         }
                         else
                         {
-                            field.Id = gameObjectRefInfo.PropertyId;
+                            field.Id = gameObjectRefInfo.PropertyIdPacked;
                         }
                         if (field.IsArray)
                         {
@@ -193,6 +310,31 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public RszScene Scene { get; set; } = new RszScene();
             public List<RszObjectNode> OrphanObjects { get; } = [];
 
+            /// <summary>
+            /// Standalone objects not owned by any game object. RE2 (v16) prefabs use these
+            /// to hold GameObjectRef values. Appended after all game object objects.
+            /// </summary>
+            public List<RszObjectNode> LooseObjects { get; } = [];
+
+            internal ImmutableArray<RszObjectNode>? OriginalObjectList { get; set; }
+            internal ImmutableArray<GameObjectRefInfo> PreservedGameObjectRefs { get; set; } = [];
+
+            /// <summary>Original v16 RSZ data-section offset; replayed verbatim to reproduce the
+            /// stray zero padding a few vanilla template prefabs carry. See
+            /// <see cref="PfbFile.OriginalDataOffset"/>.</summary>
+            public ulong? PreservedDataOffset { get; set; }
+
+            /// <summary>Leading padding before the RSZ instance-info table in the source file
+            /// (0 for all but a few RE2 template prefabs). See <see cref="RszFile.InstanceListPad"/>.</summary>
+            public int PreservedRszInstanceListPad { get; set; }
+
+            /// <summary>
+            /// Raw v16 game object ref table as read from the original file (16 bytes per entry).
+            /// Set this on a template-free builder so <see cref="Build"/> can replay engine-assigned
+            /// property ids that are not present in RSZ type dumps.
+            /// </summary>
+            public ReadOnlyMemory<byte>? PreservedGameObjectRefData { get; set; }
+
             public Builder(RszTypeRepository repository, int version, int rszVersion)
             {
                 Repository = repository;
@@ -206,36 +348,49 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 Version = instance.Version;
                 RszVersion = instance.Rsz.Version;
                 Resources = instance.Resources.ToList();
-                // Read the object list once so that the scene and the orphan objects share node
-                // references, keeping shared instances (e.g. prefab trigger objects) intact.
+                // Read the object list once so the scene, the v16 loose objects, and the orphan
+                // objects all share node references, keeping shared instances (e.g. prefab trigger
+                // objects) intact.
                 var objectList = instance.Rsz.ReadObjectList(repository);
                 Scene = instance.ReadScene(repository, objectList);
+
+                // RE2 non-RT (v16): raw game-object-ref replay data captured by ReadScene.
+                LooseObjects.AddRange(instance.LooseObjects);
+                OriginalObjectList = instance.OriginalObjectList;
+                PreservedGameObjectRefs = instance.PreservedGameObjectRefs;
+                PreservedDataOffset = instance.OriginalDataOffset;
+                PreservedRszInstanceListPad = instance.Rsz.InstanceListPad;
+
                 OrphanObjects = instance.ReadOrphans(repository, objectList);
 
-                // The RSZ dump doesn't contain property IDs for every field, and the read pass only
-                // assigns them to the first source object of each ref. Assign the remaining property
-                // IDs (from the original ref table) to the orphan fields so their refs can be
-                // regenerated, since orphan objects are not part of the game object tree.
-                var orphanSet = OrphanObjects.ToHashSet();
-                foreach (var refInfo in instance.GameObjectRefInfoList)
+                if (Version >= 17)
                 {
-                    if (refInfo.ObjectId < 0 || refInfo.ObjectId >= objectList.Length)
-                        continue;
-                    if (objectList[refInfo.ObjectId] is not RszObjectNode sourceObject ||
-                        !orphanSet.Contains(sourceObject))
+                    // The RSZ dump doesn't contain property IDs for every field, and the read pass
+                    // only assigns them to the first source object of each ref. Assign the remaining
+                    // property IDs (from the original ref table) to the orphan fields so their refs
+                    // can be regenerated, since orphan objects are not part of the game object tree.
+                    // v16 replays its ref table verbatim and never consults field.Id, so skip it.
+                    var orphanSet = OrphanObjects.ToHashSet();
+                    foreach (var refInfo in instance.GameObjectRefInfoList)
                     {
-                        continue;
-                    }
-                    foreach (var field in sourceObject.Type.Fields)
-                    {
-                        if (field.Type != RszFieldType.GameObjectRef)
+                        if (refInfo.ObjectId < 0 || refInfo.ObjectId >= objectList.Length)
                             continue;
-                        if (field.Id == refInfo.PropertyId)
-                            break;
-                        if (field.Id == null)
+                        if (objectList[refInfo.ObjectId] is not RszObjectNode sourceObject ||
+                            !orphanSet.Contains(sourceObject))
                         {
-                            field.Id = refInfo.PropertyId;
-                            break;
+                            continue;
+                        }
+                        foreach (var field in sourceObject.Type.Fields)
+                        {
+                            if (field.Type != RszFieldType.GameObjectRef)
+                                continue;
+                            if (field.Id == refInfo.PropertyIdPacked)
+                                break;
+                            if (field.Id == null)
+                            {
+                                field.Id = refInfo.PropertyIdPacked;
+                                break;
+                            }
                         }
                     }
                 }
@@ -260,6 +415,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
             public Builder RebuildResources()
             {
+                // RE2 (v16) resource blobs can contain paths not referenced by any RSZ node
+                // (e.g. sound prefabs); they cannot be rediscovered from the scene graph, so
+                // keep the seeded list and only append newly seen resources.
+                if (Version < 17)
+                    return AddMissingResources();
+
                 Resources.Clear();
                 return AddMissingResources();
             }
@@ -273,13 +434,26 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                 // Preserve RSZ objects that are not part of the game object tree, as the engine can
                 // still reference them through GameObjectRef fields (e.g. via app.InteractTrigger*).
-                foreach (var orphan in OrphanObjects)
+                // v16 tracks these as LooseObjects (raw-ref replay); v17+ as OrphanObjects (Ted's
+                // orphan-preservation path). They describe the same set, so append exactly one.
+                if (Version < 17)
                 {
-                    objectList.Add(orphan);
+                    foreach (var looseObject in LooseObjects)
+                    {
+                        objectList.Add(looseObject);
+                    }
+                }
+                else
+                {
+                    foreach (var orphan in OrphanObjects)
+                    {
+                        objectList.Add(orphan);
+                    }
                 }
 
                 var rszBuilder = new RszFile.Builder(Repository, RszVersion);
                 rszBuilder.Objects = objectList.ToImmutable();
+                rszBuilder.PreservedInstanceListPad = PreservedRszInstanceListPad;
                 var rsz = rszBuilder.Build();
 
                 var ms = new MemoryStream();
@@ -287,7 +461,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var stringPool = new StringPoolBuilder(ms);
 
                 // Reserve space for header
-                bw.WriteZeros(Version < 17 ? 48 : 56);
+                bw.WriteZeros(Version < 17 ? HeaderSizeV16 : 56);
 
                 // Game objects
                 foreach (var gameObject in gameObjects)
@@ -298,18 +472,133 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 // Game object refs
                 var gameObjectRefOffset = ms.Position;
                 var gameObjectRefCount = 0;
-
-                // Refs for objects can be regenerated from the scene. Orphan fields have their
-                // property IDs assigned during construction, so they are regenerated too.
-                for (var i = 0; i < objectList.Count; i++)
+                // v16 with a preserved raw ref table: replay it (property ids are engine-assigned
+                // and absent from RSZ dumps). Otherwise regenerate refs from the scene - orphan
+                // fields had their property ids assigned during construction, so they regenerate
+                // too (Ted's b2f61dd/6051d93 orphan-preservation path for v17+).
+                if (Version < 17 && PreservedGameObjectRefs.Length == 0 && PreservedGameObjectRefData is { Length: > 0 } rawRefs)
                 {
-                    var sourceObject = (RszObjectNode)objectList[i];
-                    for (var j = 0; j < sourceObject.Children.Length; j++)
+                    // Template-free build: replay the raw ref table verbatim (object ids are
+                    // positional, so they stay valid as long as the scene shape is unchanged).
+                    gameObjectRefCount = rawRefs.Length / 16; // sizeof(GameObjectRefInfo)
+                    bw.Write(rawRefs.Span);
+                }
+                else if (Version < 17 && PreservedGameObjectRefs.Length > 0)
+                {
+                    gameObjectRefCount = WritePreservedGameObjectRefs();
+                }
+                else
+                {
+                    WriteGameObjectRefs();
+                }
+
+                // A few vanilla v16 template prefabs (enemydead/emXXXX_dead) carry a small run of
+                // stray zero padding between the game-object-ref section and the RSZ block that no
+                // layout rule predicts; the engine seeks via the header offset and ignores it.
+                // These files always have an empty resource section, so replaying the gap here
+                // lands the resource offset, data offset and RSZ block byte-identically. Bounded
+                // to a single 16-byte step so a bogus preserved value can never balloon the file.
+                if (Version < 17 && Resources.Count == 0 && PreservedDataOffset is { } preservedDataOffset)
+                {
+                    var pad = (long)preservedDataOffset - ms.Position;
+                    if (pad > 0 && pad <= 16)
+                        bw.WriteZeros((int)pad);
+                }
+
+                // Resources
+                var resourceOffset = ms.Position;
+                if (Version < 17)
+                {
+                    bw.Align(4);
+                    resourceOffset = ms.Position;
+
+                    // RE2 (v16): resources are packed NUL-terminated UTF16 strings,
+                    // not a table of offsets into a string pool.
+                    foreach (var resource in Resources)
                     {
-                        var rszType = sourceObject.Type;
-                        var fieldType = rszType.Fields[j];
-                        if (fieldType.Type == RszFieldType.GameObjectRef)
+                        foreach (var ch in resource)
                         {
+                            bw.Write((short)ch);
+                        }
+                        bw.Write((short)0);
+                    }
+                }
+                else
+                {
+                    bw.Align(16);
+                    resourceOffset = ms.Position;
+                    foreach (var resource in Resources)
+                    {
+                        stringPool.WriteStringOffset64(resource);
+                    }
+                }
+
+                // Userdata
+                var userDataOffset = 0L;
+                var userDataCount = 0;
+                if (Version >= 17)
+                {
+                    bw.Align(16);
+                    userDataOffset = ms.Position;
+                    var userDataList = rsz.UserDataInfoList;
+                    var userDataListPaths = rsz.UserDataInfoPaths;
+                    for (var i = 0; i < userDataList.Length; i++)
+                    {
+                        bw.Write(userDataList[i].TypeId);
+                        bw.Write(0);
+                        stringPool.WriteStringOffset64(userDataListPaths[i]);
+                    }
+                    userDataCount = userDataList.Length;
+                }
+
+                // String data
+                if (Version >= 17)
+                {
+                    bw.Align(16);
+                    stringPool.WriteStrings();
+                }
+
+                // Instance data
+                var rszDataOffset = ms.Position;
+                rszBuilder.AlignOffset = rszDataOffset;
+                rsz = rszBuilder.Build();
+                bw.Write(rsz.Data.Span);
+
+                // Header
+                ms.Position = 0;
+                bw.Write(MAGIC);
+                bw.Write(gameObjects.Count);
+                bw.Write(Resources.Count);
+                bw.Write(gameObjectRefCount);
+                if (Version >= 17)
+                {
+                    bw.Write(userDataCount);
+                    bw.Write(0);
+                }
+                bw.Write(gameObjectRefOffset);
+                bw.Write(resourceOffset);
+                if (Version >= 17)
+                {
+                    bw.Write(userDataOffset);
+                }
+                bw.Write(rszDataOffset);
+
+                return new PfbFile(Version, ms.ToArray());
+
+                void WriteGameObjectRefs()
+                {
+                    for (var i = 0; i < objectList.Count; i++)
+                    {
+                        var sourceObject = (RszObjectNode)objectList[i];
+                        for (var j = 0; j < sourceObject.Children.Length; j++)
+                        {
+                            var rszType = sourceObject.Type;
+                            var fieldType = rszType.Fields[j];
+                            if (fieldType.Type != RszFieldType.GameObjectRef)
+                            {
+                                continue;
+                            }
+
                             var fieldValue = sourceObject.Children[j];
                             var fieldArrayValues = new List<Guid>();
                             if (fieldType.IsArray)
@@ -341,7 +630,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                                 {
                                     ObjectId = i,
                                     TargetId = gameObjects[gameObjectIndex].ObjectId,
-                                    PropertyId = fieldType.Id ?? throw new Exception($"Id not set on field: {rszType.Name}.{fieldType.Name}."),
+                                    PropertyIdPacked = fieldType.Id ?? throw new Exception($"Id not set on field: {rszType.Name}.{fieldType.Name}."),
                                     ArrayIndex = arrayIndex
                                 });
                                 arrayIndex++;
@@ -351,62 +640,88 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                 }
 
-                // Resources
-                bw.Align(16);
-                var resourceOffset = ms.Position;
-                foreach (var resource in Resources)
+                int WritePreservedGameObjectRefs()
                 {
-                    stringPool.WriteStringOffset64(resource);
-                }
-
-                // Userdata
-                var userDataOffset = 0L;
-                var userDataCount = 0;
-                if (Version >= 17)
-                {
-                    bw.Align(16);
-                    userDataOffset = ms.Position;
-                    var userDataList = rsz.UserDataInfoList;
-                    var userDataListPaths = rsz.UserDataInfoPaths;
-                    for (var i = 0; i < userDataList.Length; i++)
+                    // RE2 (v16): property ids are engine-assigned and unknown to the RSZ dump, so the
+                    // original ref table is replayed. src/dst object ids are remapped through object
+                    // identity: (type crc, occurrence index among instances of that type).
+                    var oldObjects = OriginalObjectList;
+                    if (oldObjects == null)
                     {
-                        bw.Write(userDataList[i].TypeId);
-                        bw.Write(0);
-                        stringPool.WriteStringOffset64(userDataListPaths[i]);
+                        // Template-free build: no preserved identity to remap against.
+                        return 0;
                     }
-                    userDataCount = userDataList.Length;
+                    var oldList = oldObjects.GetValueOrDefault();
+                    if (oldList.Length != objectList.Count)
+                    {
+                        // Object list changed shape (edited scene); fall back to positional replay where
+                        // possible, skipping refs that no longer resolve.
+                        return WriteRemappedRefs(i => i);
+                    }
+
+                    var oldToNew = BuildIdentityMap(oldList);
+                    return WriteRemappedRefs(i => oldToNew.TryGetValue(i, out var newIndex) ? newIndex : -1);
+
+                    int WriteRemappedRefs(Func<int, int> remapObjectId)
+                    {
+                        var count = 0;
+                        foreach (var raw in PreservedGameObjectRefs)
+                        {
+                            var srcId = remapObjectId(raw.ObjectId);
+                            var dstId = remapObjectId(raw.TargetId);
+                            if (srcId < 0 || dstId < 0)
+                                continue;
+
+                            bw.Write(new GameObjectRefInfo()
+                            {
+                                ObjectId = srcId,
+                                PropertyIdPacked = raw.PropertyIdPacked,
+                                ArrayIndex = raw.ArrayIndex,
+                                TargetId = dstId
+                            });
+                            count++;
+                        }
+                        return count;
+                    }
                 }
 
-                // String data
-                bw.Align(16);
-                stringPool.WriteStrings();
-
-                // Instance data
-                var rszDataOffset = ms.Position;
-                rszBuilder.AlignOffset = rszDataOffset;
-                rsz = rszBuilder.Build();
-                bw.Write(rsz.Data.Span);
-
-                // Header
-                ms.Position = 0;
-                bw.Write(MAGIC);
-                bw.Write(gameObjects.Count);
-                bw.Write(Resources.Count);
-                bw.Write(gameObjectRefCount);
-                if (Version >= 17)
+                Dictionary<int, int> BuildIdentityMap(ImmutableArray<RszObjectNode> from)
                 {
-                    bw.Write(userDataCount);
-                    bw.Write(0);
-                }
-                bw.Write(gameObjectRefOffset);
-                bw.Write(resourceOffset);
-                if (Version >= 17)
-                {
-                    bw.Write(userDataOffset);
-                }
-                bw.Write(rszDataOffset);
+                    // Map old object index -> new object index by (type crc, k-th occurrence of type).
+                    var result = new Dictionary<int, int>();
+                    for (var oldId = 0; oldId < from.Length; oldId++)
+                    {
+                        var node = from[oldId];
+                        var occurrence = CountOccurrences(from, oldId);
+                        result[oldId] = FindOccurrence(node.Type.Crc, occurrence);
+                    }
+                    return result;
 
-                return new PfbFile(Version, ms.ToArray());
+                    int CountOccurrences(ImmutableArray<RszObjectNode> list, int index)
+                    {
+                        var key = list[index].Type.Crc;
+                        var seen = 0;
+                        for (var i = 0; i < index; i++)
+                        {
+                            if (list[i].Type.Crc == key)
+                                seen++;
+                        }
+                        return seen;
+                    }
+
+                    int FindOccurrence(uint key, int occurrence)
+                    {
+                        var seen = 0;
+                        for (var i = 0; i < objectList.Count; i++)
+                        {
+                            if (((RszObjectNode)objectList[i]).Type.Crc != key)
+                                continue;
+                            if (seen++ == occurrence)
+                                return i;
+                        }
+                        return -1;
+                    }
+                }
 
                 int AddObject(RszObjectNode node)
                 {
@@ -460,12 +775,15 @@ namespace IntelOrca.Biohazard.REE.Rsz
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        private struct GameObjectRefInfo
+        internal struct GameObjectRefInfo
         {
             public int ObjectId;
-            public int PropertyId;
+            public int PropertyIdPacked;
             public int ArrayIndex;
             public int TargetId;
+
+            // v17+: PropertyIdPacked holds the field's property id.
+            // v16: packed = (ArrayIndex << 16) | PropertyId, stored split into the two int fields above.
         }
 
         [StructLayout(LayoutKind.Sequential)]

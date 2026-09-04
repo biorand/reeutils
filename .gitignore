@@ -403,3 +403,6 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Cygwin/Git-bash crash dumps
+*.stackdump

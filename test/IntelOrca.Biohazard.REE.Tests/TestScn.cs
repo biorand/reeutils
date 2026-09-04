@@ -20,10 +20,10 @@ namespace IntelOrca.Biohazard.REE.Tests
             _pakHelper.Dispose();
         }
 
-        [Fact(Skip = "Currently fails to produce identical output")]
+        [Fact]
         public void Rebuild_RE2_ST4_701_0_GIMMICK()
         {
-            AssertRebuild(GameNames.RE2, "natives/x64/objectroot/scene/location/rpd/level_100/environments/st4_701_0/gimmick.scn.19", 31432);
+            AssertRebuild(GameNames.RE2, "natives/x64/objectroot/scene/location/rpd/level_100/environments/st4_701_0/gimmick.scn.19");
         }
 
         [Fact(Skip = "Currently fails to produce identical output")]

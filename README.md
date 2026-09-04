@@ -60,6 +60,16 @@ dotnet test
 
 - The library is designed around immutability and builder patterns for thread-safety and efficient cloning. Builders provide explicit, safe mutation paths while core types remain immutable to allow safe sharing across threads and cheap copy-on-write style operations.
 
+### Supported formats (RE Engine)
+
+| Game | Formats |
+| ---- | ------- |
+| RE2/RE3 (non-RT) | `.scn.19`, `.pfb.16`, `.fsmv2.30` — full read+write, byte-identical JSON roundtrip (corpus-verified) |
+| RE8 | `.fsmv2.40` (BHVT), `.user`, `.scn`, `.pfb` (RSZ-based), `.tex`, `.msg`, `.fsm` |
+
+> Note: when invoking the CLI on versioned files, keep the version suffix (`.19`/`.16`/`.30`) — bare extensions default to the RT/newer versions.
+
+
 ## 🙏 Credits
 
 - Thanks to the REasy project for RSZ JSON dumps and type information used in tests and tooling.

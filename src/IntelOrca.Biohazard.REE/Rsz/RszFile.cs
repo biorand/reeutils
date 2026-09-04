@@ -23,11 +23,45 @@ namespace IntelOrca.Biohazard.REE.Rsz
         internal ReadOnlySpan<EmbeddedUserDataInfo> EmbeddedUserDataInfoList => Version >= 16
             ? throw new InvalidOperationException()
             : data.Get<EmbeddedUserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
+        // RE2 (RSZ v8) scn/pfb files store user data as v15-style embedded RSZ blobs even though
+        // the RSZ version itself is 8; the userdata table entry size identifies the layout.
+        private bool IsEmbeddedUserDataTableLayout()
+        {
+            if (Version >= 16 || Header.UserDataOffset == 0)
+                return Version < 16;
+            // Embedded entries are 24 bytes wide and packed between the userdata table and
+            // the instance data section; path-style entries are 16 bytes wide.
+            var tableSize = Header.DataOffset - Header.UserDataOffset;
+            if (tableSize < 0 || tableSize % 24 != 0)
+                return false;
+            if (tableSize / 24 == Header.UserDataCount)
+                return true;
+            if (tableSize % 16 == 0 && tableSize / 16 == Header.UserDataCount)
+                return false;
+            return tableSize / 24 >= Header.UserDataCount;
+        }
         private ReadOnlySpan<byte> InstanceData => data.Slice((int)Header.DataOffset).Span;
 
         internal int Version => (int)Header.Version;
 
+        /// <summary>
+        /// Bytes of leading zero padding between the object-id list and the instance-info table.
+        /// A few vanilla RE2 (RSZ v8) template files 16-align that table; nothing in the format
+        /// predicts which, so a rebuild replays this captured run. 0 for the common case.
+        /// </summary>
+        public int InstanceListPad
+        {
+            get
+            {
+                var natural = Header.Size + (long)Header.ObjectCount * 4;
+                var pad = (long)Header.InstanceOffset - natural;
+                return pad > 0 && pad < 16 ? (int)pad : 0;
+            }
+        }
+
         public int InstanceCount => InstanceInfoList.Length;
+
+        public int UserDataCount => (int)Header.UserDataCount;
 
         internal ImmutableArray<string> UserDataInfoPaths
         {
@@ -51,7 +85,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
             get
             {
                 var result = ImmutableArray.CreateBuilder<RszFile>();
-                foreach (var userData in EmbeddedUserDataInfoList)
+                foreach (var userData in data.Get<EmbeddedUserDataInfo>(Header.UserDataOffset, Header.UserDataCount))
                 {
                     result.Add(new RszFile(Data.Slice((int)userData.Offset, (int)userData.Size)));
                 }
@@ -92,9 +126,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
             var result = ImmutableArray.CreateBuilder<RszInstance>();
             result.Count = instanceInfoList.Length;
 
-            if (Version < 16)
+            if (Version < 16 || (Version == 8 && IsEmbeddedUserDataTableLayout()))
             {
-                var userDataInfoList = EmbeddedUserDataInfoList;
+                var userDataInfoList = data.Get<EmbeddedUserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
                 for (var i = 0; i < userDataInfoList.Length; i++)
                 {
                     var instanceIndex = userDataInfoList[i].InstanceId;
@@ -132,94 +166,149 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var rszType = instanceRszTypes[i];
 
                 if (rszType == null) continue;
-                var rszValue = rszType.Id == 0 ? new RszNullNode() : (IRszNode)rszDataReader.ReadStruct(rszType);
-                if (i < result.Count)
+                try
                 {
-                    result[i] = new RszInstance(new RszInstanceId(i), rszValue);
-                }
-            }
-
-#if DEBUG_RSZ
-                var instanceIds = Enumerable.Range(0, instanceInfoList.Length).ToHashSet();
-#endif
-            // Resolve object/user data references. References must point at the same canonical node
-            // for each instance (memoized) so that sharing is preserved: a prefab object that is
-            // both referenced from a component and listed in the RSZ object list stays a single
-            // instance when serialized again.
-            var resolvedCache = new Dictionary<int, IRszNode>();
-            for (var i = 0; i < instanceInfoList.Length; i++)
-            {
-                result[i] = new RszInstance(result[i].Id, ResolveInstance(i));
-            }
-
-            IRszNode ResolveInstance(int instanceId)
-            {
-                if (resolvedCache.TryGetValue(instanceId, out var cached))
-                {
-                    return cached;
-                }
-
-                var resolved = Resolve(result[instanceId].Value);
-                resolvedCache[instanceId] = resolved;
-                return resolved;
-            }
-
-            IRszNode Resolve(IRszNode node)
-            {
-                if (node is RszValueNode valueNode)
-                {
-                    if (valueNode.Type == RszFieldType.Object)
+                    var rszValue = rszType.Id == 0 ? new RszNullNode() : (IRszNode)rszDataReader.ReadStruct(rszType);
+                    if (i < result.Count)
                     {
-                        var instanceId = valueNode.AsInt32();
-#if DEBUG_RSZ
-                        if (!instanceIds.Remove(instanceId))
-                        {
-                            Console.WriteLine("HMM");
-                        }
-#endif
-                        if (instanceId >= 0 && instanceId < result.Count)
-                        {
-                            return ResolveInstance(instanceId);
-                        }
-                        return new RszNullNode();
-                    }
-                    else if (valueNode.Type == RszFieldType.UserData)
-                    {
-                        var instanceId = valueNode.AsInt32();
-#if DEBUG_RSZ
-                        if (!instanceIds.Remove(instanceId))
-                        {
-                            Console.WriteLine("HMM");
-                        }
-#endif
-                        if (instanceId == 0) return new RszUserDataNode();
-
-                        if (instanceId > 0 && instanceId < result.Count)
-                        {
-                            return ResolveInstance(instanceId);
-                        }
-                        return new RszUserDataNode();
+                        result[i] = new RszInstance(new RszInstanceId(i), rszValue);
                     }
                 }
-                else if (node is IRszNodeContainer container)
+                catch (Exception e)
                 {
-                    var children = container.Children.ToBuilder();
-                    for (var i = 0; i < children.Count; i++)
-                    {
-                        children[i] = Resolve(children[i]);
-                    }
-                    return container.WithChildren(children.ToImmutable());
+                    throw new Exception($"Failed to read instance {i} of type '{rszType.Name}' (id {rszType.Id}) at data offset {rszDataReader.BytesRead}", e);
                 }
-                return node;
             }
-#if DEBUG_RSZ
-            foreach (var o in ObjectInstanceIds)
-            {
-                instanceIds.Remove(o.Index);
-            }
-#endif
 
-            return result.ToImmutable();
+            // Resolve object/user data references so every reference to an instance resolves to the
+            // SAME canonical node (memoized), keeping shared objects a single instance on rebuild.
+            // The two engine eras need different traversal and are gated by RSZ version:
+            //   * v<16 (RE2 non-RT): the de-duplicating builder is sensitive to node identity, so
+            //     resolve through Visit (whose unchanged fast-path keeps identity stable) and mark
+            //     each instance before recursing so cyclic references terminate.
+            //   * v>=16 (RE4/RE9+): rebuild each container's children directly.
+            if (Version < 16)
+            {
+                var resolved = new Dictionary<int, IRszNode>();
+                for (var i = 0; i < instanceInfoList.Length; i++)
+                {
+                    Resolve(i);
+                }
+
+                return result.ToImmutable();
+
+                IRszNode Resolve(int index)
+                {
+                    if (resolved.TryGetValue(index, out var cached))
+                        return cached;
+
+                    var node = result[index].Value;
+                    // Mark before recursing so cyclic references cannot recurse forever. If a
+                    // back-edge resolves to this node while it is still being visited, it gets
+                    // the pre-visit identity; the unchanged fast-path in Visit guarantees that
+                    // identity is kept whenever no descendant of this node actually changed,
+                    // so pre-visit and post-visit identities converge.
+                    resolved[index] = node;
+
+                    if (node is IRszNodeContainer container)
+                    {
+                        node = container.Visit(child =>
+                        {
+                            if (child is RszValueNode valueNode)
+                            {
+                                if (valueNode.Type == RszFieldType.Object)
+                                {
+                                    var instanceId = valueNode.AsInt32();
+                                    if (instanceId >= 0 && instanceId < result.Count)
+                                    {
+                                        return Resolve(instanceId);
+                                    }
+                                    return new RszNullNode();
+                                }
+                                else if (valueNode.Type == RszFieldType.UserData)
+                                {
+                                    var instanceId = valueNode.AsInt32();
+                                    if (instanceId == 0) return new RszUserDataNode();
+
+                                    if (instanceId > 0 && instanceId < result.Count)
+                                    {
+                                        return Resolve(instanceId);
+                                    }
+                                    return new RszUserDataNode();
+                                }
+                            }
+                            return child;
+                        });
+                        resolved[index] = node;
+                        result[index] = new RszInstance(result[index].Id, node);
+                    }
+
+                    return node;
+                }
+            }
+            else
+            {
+                // Resolve object/user data references. References must point at the same canonical
+                // node for each instance (memoized) so that sharing is preserved: a prefab object
+                // that is both referenced from a component and listed in the RSZ object list stays a
+                // single instance when serialized again.
+                var resolvedCache = new Dictionary<int, IRszNode>();
+                for (var i = 0; i < instanceInfoList.Length; i++)
+                {
+                    result[i] = new RszInstance(result[i].Id, ResolveInstance(i));
+                }
+
+                return result.ToImmutable();
+
+                IRszNode ResolveInstance(int instanceId)
+                {
+                    if (resolvedCache.TryGetValue(instanceId, out var cached))
+                    {
+                        return cached;
+                    }
+
+                    var res = Resolve(result[instanceId].Value);
+                    resolvedCache[instanceId] = res;
+                    return res;
+                }
+
+                IRszNode Resolve(IRszNode node)
+                {
+                    if (node is RszValueNode valueNode)
+                    {
+                        if (valueNode.Type == RszFieldType.Object)
+                        {
+                            var instanceId = valueNode.AsInt32();
+                            if (instanceId >= 0 && instanceId < result.Count)
+                            {
+                                return ResolveInstance(instanceId);
+                            }
+                            return new RszNullNode();
+                        }
+                        else if (valueNode.Type == RszFieldType.UserData)
+                        {
+                            var instanceId = valueNode.AsInt32();
+                            if (instanceId == 0) return new RszUserDataNode();
+
+                            if (instanceId > 0 && instanceId < result.Count)
+                            {
+                                return ResolveInstance(instanceId);
+                            }
+                            return new RszUserDataNode();
+                        }
+                    }
+                    else if (node is IRszNodeContainer container)
+                    {
+                        var children = container.Children.ToBuilder();
+                        for (var i = 0; i < children.Count; i++)
+                        {
+                            children[i] = Resolve(children[i]);
+                        }
+                        return container.WithChildren(children.ToImmutable());
+                    }
+                    return node;
+                }
+            }
         }
 
         public ImmutableArray<RszObjectNode> ReadObjectList(RszTypeRepository repository)
@@ -264,6 +353,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public ImmutableArray<RszObjectNode> Objects { get; set; } = [];
             public long AlignOffset { get; set; }
 
+            /// <summary>Leading zero padding to re-emit before the instance-info table, for the
+            /// rare RE2 template files that had it. See <see cref="RszFile.InstanceListPad"/>.</summary>
+            public int PreservedInstanceListPad { get; set; }
+
+            // RE2 (v<16): one instance per distinct object node. Later versions: no de-dup.
+            private bool _dedupeInstances;
+            private readonly Dictionary<IRszNode, RszInstance> _instanceByNode = [];
+
             public Builder(RszTypeRepository repository, int version)
             {
                 Repository = repository;
@@ -284,6 +381,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var dict = new Dictionary<IRszNode, Queue<RszInstanceId>>();
                 foreach (var instance in instanceList)
                 {
+                    if (instance.Value is RszNullNode)
+                        continue;
                     if (!dict.TryGetValue(instance.Value, out var q))
                     {
                         q = new Queue<RszInstanceId>();
@@ -291,14 +390,18 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     q.Enqueue(instance.Id);
                 }
-                // Object references consume a distinct instance per occurrence (value-type
-                // semantics): each reference edge created its own instance, so pairing them 1:1
-                // in creation order keeps every instance referenced. User data is deduped by path,
-                // so all references resolve to the single shared instance via Peek.
+                // v<16 (RE2 non-RT): a shared node owns ONE instance id that every reference reuses,
+                // so never consume it (Peek). v>=16: object references consume a distinct instance
+                // per occurrence (value-type semantics) - each reference edge created its own
+                // instance, so pairing them 1:1 in creation order keeps every instance referenced.
+                // User data is always deduped by path, so all its references resolve to the single
+                // shared instance via Peek.
                 var getInstance = new Func<IRszNode, RszFieldType, RszInstanceId>((node, type) =>
                 {
                     var q = dict[node];
-                    return type == RszFieldType.UserData ? q.Peek() : q.Dequeue();
+                    return (_dedupeInstances || type == RszFieldType.UserData)
+                        ? q.Peek()
+                        : q.Dequeue();
                 });
 
                 var ms = new MemoryStream();
@@ -315,6 +418,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
 
                 // Instance list
+                // A few vanilla RE2 (RSZ v8) template files 16-align the instance-info table; the
+                // rest do not, and there is no layout rule that predicts which, so replay the
+                // original run of leading padding when it was captured.
+                if (Version < 16 && PreservedInstanceListPad > 0)
+                    bw.WriteZeros(PreservedInstanceListPad);
                 var instanceListOffset = ms.Position;
                 foreach (var instance in instanceList)
                 {
@@ -375,6 +483,9 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     else if (instanceList[i].Value is RszEmbeddedUserValueNode embeddedUserValueNode)
                     {
+                        if (Version >= 16)
+                            throw new NotSupportedException();
+
                         bw.Write(i);
                         bw.Write(embeddedUserValueNode.Type.Id);
                         bw.Write(embeddedUserValueNode.Hash);
@@ -434,6 +545,21 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 // There is always a NULL instance at 0 (probably to prevent 0 from being used as a reference ID)
                 instanceList.Add(new RszInstance(new RszInstanceId(0), new RszNullNode()));
 
+                _dedupeInstances = Version < 16;
+
+                if (_dedupeInstances)
+                {
+                    // RE2 non-RT (RSZ v<16): de-duplicate shared instances by node identity so a
+                    // node referenced from several places serializes back to a single instance.
+                    _instanceByNode.Clear();
+                    foreach (var obj in Objects)
+                    {
+                        objectList.Add(CreateInstanceTreeDeduped(obj, instanceList));
+                    }
+                    return (instanceList.ToImmutable(), objectList.ToImmutable());
+                }
+
+                // v>=16 (RE4/RE9+): one instance per Object-reference occurrence.
                 // Nodes that were instantiated while expanding the children of another object (i.e. reached
                 // through an Object reference), and the instance created for each. A root that is already in
                 // this set was reached from the scene graph, so its own entry in the object list reuses that
@@ -559,6 +685,130 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                 }
             }
+
+            private RszInstance CreateInstanceTreeDeduped(IRszNode node, ImmutableArray<RszInstance>.Builder builder)
+            {
+                if (node is RszObjectNode objectNode)
+                {
+                    AddInstances(objectNode);
+                    return AddInstance(objectNode);
+                }
+                else
+                {
+                    throw new NotSupportedException("Non struct node added to object list.");
+                }
+
+                void AddInstances(RszObjectNode node)
+                {
+                    var rszType = node.Type;
+                    for (var i = 0; i < rszType.Fields.Length; i++)
+                    {
+                        var child = node.Children[i];
+                        var rszField = rszType.Fields[i];
+                        if (rszField.IsArray)
+                        {
+                            var childArray = (RszArrayNode)child;
+                            for (var j = 0; j < childArray.Children.Length; j++)
+                            {
+                                // Struct-typed arrays hold inline nested structs which are part of
+                                // the parent's instance data, not standalone instances.
+                                if (rszField.Type != RszFieldType.Object &&
+                                    rszField.Type != RszFieldType.UserData)
+                                {
+                                    continue;
+                                }
+
+                                if (childArray.Children[j] is RszObjectNode childobjectNode)
+                                {
+                                    AddInstances(childobjectNode);
+                                    AddInstance(childobjectNode);
+                                }
+                                else if (childArray.Children[j] is RszUserDataNode userDataNode)
+                                {
+                                    AddInstance(userDataNode);
+                                }
+                                else if (childArray.Children[j] is RszEmbeddedUserValueNode embeddedUserValueNode)
+                                {
+                                    AddInstance(embeddedUserValueNode);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (child is RszObjectNode childobjectNode)
+                            {
+                                AddInstances(childobjectNode);
+                                if (rszField.Type == RszFieldType.Object ||
+                                    rszField.Type == RszFieldType.UserData)
+                                {
+                                    AddInstance(child);
+                                }
+                            }
+                            else if (child is RszUserDataNode userDataNode)
+                            {
+                                AddInstance(userDataNode);
+                            }
+                            else if (child is RszEmbeddedUserValueNode embeddedUserValueNode)
+                            {
+                                AddInstance(embeddedUserValueNode);
+                            }
+                        }
+                    }
+                }
+
+                RszInstance AddInstance(IRszNode node)
+                {
+                    if (node is RszNullNode)
+                    {
+                        return builder[0];
+                    }
+
+                    // RE2 scn/pfb (RSZ v8) files share one instance for every reference to the
+                    // same object (e.g. post-effect params shared across filter settings), so
+                    // de-duplicate by node identity. Later engine versions re-emit each
+                    // reference as a separate instance; changing that behaviour would alter
+                    // existing RE4/RE9 output.
+                    if (_dedupeInstances && !(node is RszUserDataNode))
+                    {
+                        if (_instanceByNode.TryGetValue(node, out var shared))
+                        {
+                            return shared;
+                        }
+                    }
+
+                    if (node is RszUserDataNode userDataNode)
+                    {
+                        if (userDataNode.IsEmpty)
+                        {
+                            return builder[0];
+                        }
+                        else
+                        {
+                            // Avoid duplicate user data entries
+                            var path = userDataNode.Path;
+                            foreach (var b in builder)
+                            {
+                                if (b.Value is RszUserDataNode otherUserValueNode && otherUserValueNode.Path == userDataNode.Path)
+                                {
+                                    if (otherUserValueNode.Type != userDataNode.Type)
+                                    {
+                                        throw new Exception($"Mismatch of RSZ type for user data: {path}");
+                                    }
+                                    return b;
+                                }
+                            }
+                        }
+                    }
+
+                    var instance = new RszInstance(new RszInstanceId(builder.Count), node);
+                    if (_dedupeInstances && !(node is RszUserDataNode))
+                    {
+                        _instanceByNode.Add(node, instance);
+                    }
+                    builder.Add(instance);
+                    return instance;
+                }
+            }
         }
 
         [DebuggerDisplay("TypeId = {TypeId,h} Crc = {Crc,h}")]
@@ -578,6 +828,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         }
 
 #pragma warning disable 649
+        [StructLayout(LayoutKind.Sequential)]
         internal struct EmbeddedUserDataInfo
         {
             public int InstanceId;

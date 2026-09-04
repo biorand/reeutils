@@ -114,6 +114,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 _bw.Write(bytes);
                 _bw.Write((byte)0);
             }
+            else if (field.Type == RszFieldType.Struct)
+            {
+                Write(node);
+            }
             else
             {
                 var oldPosition = _bw.BaseStream.Position;

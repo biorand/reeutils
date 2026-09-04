@@ -62,7 +62,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
 
             File.WriteAllText(pakListPath, string.Join('\n', new[] { textPath, msgPath, scenePath }) + "\n");
 
-            await using var client = await CreateClientAsync(cancellationToken);
+            await using var client = await McpServerTestHost.CreateClientAsync(cancellationToken);
 
             var toolNames = (await client.ListToolsAsync(cancellationToken: cancellationToken)).Select(x => x.Name).ToArray();
             Assert.Contains("open_pak", toolNames);
@@ -75,10 +75,10 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             Assert.Contains("get_type", toolNames);
             Assert.Contains("generate_class", toolNames);
 
-            var listGamesText = await CallToolTextAsync(client, "list_games", cancellationToken: cancellationToken);
+            var listGamesText = await McpServerTestHost.CallToolTextAsync(client, "list_games", cancellationToken: cancellationToken);
             Assert.Contains("\"re9\"", listGamesText);
 
-            var openPakText = await CallToolTextAsync(client, "open_pak", new Dictionary<string, object?>
+            var openPakText = await McpServerTestHost.CallToolTextAsync(client, "open_pak", new Dictionary<string, object?>
             {
                 ["path"] = pakPath
             }, cancellationToken);
@@ -89,21 +89,21 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
                 ["patterns"] = new[] { "*.txt" }
             }, cancellationToken: cancellationToken);
             Assert.True(findError.IsError is true);
-            Assert.Contains("No pak list is loaded", GetText(findError));
+            Assert.Contains("No pak list is loaded", McpServerTestHost.GetText(findError));
 
-            await CallToolTextAsync(client, "open_pak_list", new Dictionary<string, object?>
+            await McpServerTestHost.CallToolTextAsync(client, "open_pak_list", new Dictionary<string, object?>
             {
                 ["path"] = pakListPath
             }, cancellationToken);
 
-            var listFilesText = await CallToolTextAsync(client, "list_files", new Dictionary<string, object?>
+            var listFilesText = await McpServerTestHost.CallToolTextAsync(client, "list_files", new Dictionary<string, object?>
             {
                 ["path"] = "natives/stm"
             }, cancellationToken);
             Assert.Contains("\"name\": \"leveldesign\"", listFilesText);
             Assert.Contains("\"name\": \"message\"", listFilesText);
 
-            var searchText = await CallToolTextAsync(client, "search", new Dictionary<string, object?>
+            var searchText = await McpServerTestHost.CallToolTextAsync(client, "search", new Dictionary<string, object?>
             {
                 ["regex"] = "LevelFlow",
                 ["paths"] = new[] { "natives/stm/leveldesign" },
@@ -112,25 +112,25 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             Assert.Contains(textPath, searchText);
             Assert.Contains("LevelFlow", searchText);
 
-            var readText = await CallToolTextAsync(client, "read", new Dictionary<string, object?>
+            var readText = await McpServerTestHost.CallToolTextAsync(client, "read", new Dictionary<string, object?>
             {
                 ["path"] = msgPath
             }, cancellationToken);
             Assert.Contains("\"name\": \"Greeting\"", readText);
             Assert.Contains("Hello MCP", readText);
 
-            await CallToolTextAsync(client, "set_game", new Dictionary<string, object?>
+            await McpServerTestHost.CallToolTextAsync(client, "set_game", new Dictionary<string, object?>
             {
                 ["game"] = "re9"
             }, cancellationToken);
 
-            var collapsedSceneText = await CallToolTextAsync(client, "read", new Dictionary<string, object?>
+            var collapsedSceneText = await McpServerTestHost.CallToolTextAsync(client, "read", new Dictionary<string, object?>
             {
                 ["path"] = scenePath
             }, cancellationToken);
             Assert.Contains("\"@type\": \"via.Transform\"", collapsedSceneText);
 
-            var expandedSceneText = await CallToolTextAsync(client, "read", new Dictionary<string, object?>
+            var expandedSceneText = await McpServerTestHost.CallToolTextAsync(client, "read", new Dictionary<string, object?>
             {
                 ["path"] = scenePath,
                 ["expand_nodes"] = new[] { "Root" }
@@ -149,14 +149,14 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             Assert.True(expandedRootComponent.EnumerateObject().Count() > 1);
             Assert.True(expandedChildComponent.EnumerateObject().Count() > 1);
 
-            var getTypeText = await CallToolTextAsync(client, "get_type", new Dictionary<string, object?>
+            var getTypeText = await McpServerTestHost.CallToolTextAsync(client, "get_type", new Dictionary<string, object?>
             {
                 ["typeName"] = "app.InventorySlotCapacitySetting"
             }, cancellationToken);
             Assert.Contains("InventorySlotCapacitySetting", getTypeText);
             Assert.Contains("\"fields\"", getTypeText);
 
-            var generateClassText = await CallToolTextAsync(client, "generate_class", new Dictionary<string, object?>
+            var generateClassText = await McpServerTestHost.CallToolTextAsync(client, "generate_class", new Dictionary<string, object?>
             {
                 ["typeNames"] = new[] { "app.InventorySlotCapacitySetting" },
                 ["includeEnums"] = false
@@ -184,17 +184,17 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
 
             File.WriteAllText(pakListPath, string.Join('\n', new[] { textPath, msgPath, scenePath }) + "\n");
 
-            await using var client = await CreateClientAsync(cancellationToken);
-            await CallToolTextAsync(client, "open_pak", new Dictionary<string, object?>
+            await using var client = await McpServerTestHost.CreateClientAsync(cancellationToken);
+            await McpServerTestHost.CallToolTextAsync(client, "open_pak", new Dictionary<string, object?>
             {
                 ["path"] = pakPath
             }, cancellationToken);
-            await CallToolTextAsync(client, "open_pak_list", new Dictionary<string, object?>
+            await McpServerTestHost.CallToolTextAsync(client, "open_pak_list", new Dictionary<string, object?>
             {
                 ["path"] = pakListPath
             }, cancellationToken);
 
-            var findText = await CallToolTextAsync(client, "find", new Dictionary<string, object?>
+            var findText = await McpServerTestHost.CallToolTextAsync(client, "find", new Dictionary<string, object?>
             {
                 ["patterns"] = new[] { "test.scn", "*.txt" }
             }, cancellationToken);
@@ -203,46 +203,13 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             var paths = findJson.RootElement.GetProperty("paths").EnumerateArray().Select(x => x.GetString()).ToArray();
             Assert.Equal(new[] { textPath, scenePath }, paths);
 
-            var noMatchText = await CallToolTextAsync(client, "find", new Dictionary<string, object?>
+            var noMatchText = await McpServerTestHost.CallToolTextAsync(client, "find", new Dictionary<string, object?>
             {
                 ["patterns"] = new[] { "does-not-exist" }
             }, cancellationToken);
 
             using var noMatchJson = JsonDocument.Parse(noMatchText);
             Assert.Empty(noMatchJson.RootElement.GetProperty("paths").EnumerateArray());
-        }
-
-        private static async Task<McpClient> CreateClientAsync(CancellationToken cancellationToken)
-        {
-            var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
-            var configuration = new DirectoryInfo(AppContext.BaseDirectory).Parent!.Name;
-            var reeutilsDll = Path.Combine(repoRoot, "src", "reeutils", "bin", configuration, "net10.0", "reeutils.dll");
-
-            var transport = new StdioClientTransport(new StdioClientTransportOptions
-            {
-                Name = "reeutils",
-                Command = "dotnet",
-                Arguments = [reeutilsDll, "mcp"],
-                WorkingDirectory = repoRoot,
-            });
-
-            return await McpClient.CreateAsync(transport, cancellationToken: cancellationToken);
-        }
-
-        private static async Task<string> CallToolTextAsync(
-            McpClient client,
-            string toolName,
-            IReadOnlyDictionary<string, object?>? arguments = null,
-            CancellationToken cancellationToken = default)
-        {
-            var result = await client.CallToolAsync(toolName, arguments ?? new Dictionary<string, object?>(), cancellationToken: cancellationToken);
-            Assert.False(result.IsError is true, GetText(result));
-            return GetText(result);
-        }
-
-        private static string GetText(CallToolResult result)
-        {
-            return string.Join("\n", result.Content.OfType<TextContentBlock>().Select(x => x.Text));
         }
 
         private static byte[] BuildMsg(string name, string text)

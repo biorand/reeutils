@@ -77,14 +77,20 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
                     else if (field.Type == RszFieldType.Object)
                     {
+                        // Polymorphic references may declare no concrete type; the
+                        // natural default for a reference field is a null node.
+                        if (field.ObjectType == null)
+                            children.Add(new RszNullNode());
+                        else
+                            children.Add(field.ObjectType.Create());
+                    }
+                    else if (field.Type == RszFieldType.Struct)
+                    {
                         if (field.ObjectType == null)
                         {
-                            throw new NotImplementedException();
+                            throw new NotImplementedException($"Field '{Name}.{field.Name}' has no struct type.");
                         }
-                        else
-                        {
-                            children.Add(field.ObjectType.Create());
-                        }
+                        children.Add(field.ObjectType.Create());
                     }
                     else if (field.Type == RszFieldType.UserData)
                     {
