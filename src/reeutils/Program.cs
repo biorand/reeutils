@@ -51,11 +51,13 @@ namespace IntelOrca.Biohazard.REEUtils
                     .WithExample("ls", "--pak", "test.pak", "natives/stm");
                 config.AddCommand<FindCommand>("find")
                     .WithDescription("Finds files in a PAK file matching the given patterns.")
-                    .WithExample("find", "--pak", "test.pak", "-g", "re9", "natives/stm/leveldesign");
-                config.AddCommand<TreeCommand>("tree")
-                     .WithDescription("Shows the tree or JSON view of a supported REE file.")
-                     .WithExample("tree", "chap3_01_level.scn.21", "LightSwitch/Gm99_108", "-g", "re9")
-                     .WithExample("tree", "--pak", "input.pak", "-g", "re9", "--json", "natives/stm/leveldesign/chapter/chap3_01/chap3_01_level.scn.21");
+                                    .WithExample("find", "--pak", "test.pak", "-g", "re9", "natives/stm/leveldesign")
+                                    .WithExample("find", "--pak", "test.pak", "-g", "oniws", "natives/stm/**/*.scn.21");
+                                config.AddCommand<TreeCommand>("tree")
+                                     .WithDescription("Shows the tree or JSON view of a supported REE file.")
+                                     .WithExample("tree", "chap3_01_level.scn.21", "LightSwitch/Gm99_108", "-g", "re9")
+                                     .WithExample("tree", "--pak", "input.pak", "-g", "re9", "--json", "natives/stm/leveldesign/chapter/chap3_01/chap3_01_level.scn.21")
+                                     .WithExample("tree", "--pak", "input.pak", "-g", "oniws", "--json", "natives/stm/gamedesign/system/area/area.scn.21");
                 config.AddCommand<McpCommand>("mcp")
                     .WithDescription("Runs reeutils as an MCP stdio server.");
             });

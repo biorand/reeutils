@@ -50,7 +50,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tools
 
         [McpServerTool(Name = "set_game", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false), Description("REQUIRED AFTER open_pak. Loads the embedded pak file listing (path map) and RSZ type data for the given game. Must complete before find, read, search, or list_files can work. Call this after open_pak, then wait for the result before calling any other tool.")]
         public static string SetGame(
-            [Description("Game identifier, such as re2, re4, re7, re8, or re9.")] string game,
+            [Description("Game identifier, such as re2, re4, re7, re8, re9, or oniws.")] string game,
             McpSession session)
         {
             session.SetGame(game);

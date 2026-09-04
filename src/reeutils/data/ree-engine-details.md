@@ -9,6 +9,7 @@
 - `re7`
 - `re8`
 - `re9`
+- `oniws` (Onimusha: Way of the Sword) — uses `.scn.21`, `.user.3`, `.pfb.18`, `.fsmv2.42`, and `.msg.23` containers. `rszoniws.json.gz` derives from the retail game RSZ dump; `paklist.oniws.txt.gz` lists the retail pak contents. Both are pinned upstream data (SHA-256 in the vendoring commit).
 
 ## Core concepts
 

@@ -8,5 +8,6 @@ namespace IntelOrca.Biohazard.REE.Tests
         public const string RE7 = "re7";
         public const string RE8 = "re8";
         public const string RE9 = "re9";
+        public const string ONIWS = "oniws";
     }
 }
