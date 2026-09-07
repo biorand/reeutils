@@ -84,11 +84,10 @@ namespace RszViewer
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            if (_config.RszRepoPath != null && File.Exists(_config.RszRepoPath))
-            {
-                try { _repo = RszRepositorySerializer.Default.FromJsonFile(_config.RszRepoPath); } catch { }
-            }
-            
+            TryLoadGameRepo(showErrors: false);
+            UpdateGameMenu();
+            UpdateRszStatus();
+
             // Load Recent Folders
             RecentFolders.Clear();
             foreach (var f in _config.RecentFolders) RecentFolders.Add(f);
@@ -211,6 +210,98 @@ namespace RszViewer
                 item.Click += (s, e) => OpenFolder(folder);
                 MenuRecentFolders.Items.Add(item);
             }
+        }
+
+        private bool _repoLoaded;
+
+        private static string NormalizeGameId(string? gameId)
+        {
+            if (string.IsNullOrWhiteSpace(gameId))
+                return "re4";
+            gameId = gameId.Trim().ToLowerInvariant();
+            if (gameId == GameCatalog.CustomId)
+                return gameId;
+            return GameCatalog.IsKnownGame(gameId) ? gameId : "re4";
+        }
+
+        private bool TryLoadGameRepo(bool showErrors)
+        {
+            try
+            {
+                if (string.Equals(_config.GameId, GameCatalog.CustomId, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (_config.RszRepoPath != null && File.Exists(_config.RszRepoPath))
+                    {
+                        _repo = RszRepositorySerializer.Default.FromJsonFile(_config.RszRepoPath);
+                        _repoLoaded = true;
+                    }
+                    else
+                    {
+                        _repoLoaded = false;
+                    }
+                }
+                else
+                {
+                    var gameId = NormalizeGameId(_config.GameId);
+                    _config.GameId = gameId;
+                    _repo = GameCatalog.LoadEmbedded(gameId);
+                    _repoLoaded = true;
+                }
+                return _repoLoaded;
+            }
+            catch (Exception ex)
+            {
+                _repoLoaded = false;
+                if (showErrors)
+                    MessageBox.Show("Error loading RSZ definitions: " + ex.Message);
+                return false;
+            }
+        }
+
+        private void UpdateGameMenu()
+        {
+            if (MenuGame == null) return;
+            MenuGame.Items.Clear();
+            var currentGameId = string.Equals(_config.GameId, GameCatalog.CustomId, StringComparison.OrdinalIgnoreCase)
+                ? GameCatalog.CustomId
+                : NormalizeGameId(_config.GameId);
+            foreach (var game in GameCatalog.Games)
+            {
+                var item = new MenuItem
+                {
+                    Header = game.DisplayName,
+                    IsCheckable = true,
+                    IsChecked = string.Equals(game.Id, currentGameId, StringComparison.OrdinalIgnoreCase)
+                };
+                item.Click += (s, e) => SelectGame(game.Id);
+                MenuGame.Items.Add(item);
+            }
+        }
+
+        private void SelectGame(string gameId)
+        {
+            if (string.Equals(_config.GameId, gameId, StringComparison.OrdinalIgnoreCase))
+                return;
+            _config.GameId = gameId;
+            if (TryLoadGameRepo(showErrors: true))
+            {
+                _config.Save();
+            }
+            UpdateGameMenu();
+            UpdateRszStatus();
+        }
+
+        private void UpdateRszStatus()
+        {
+            if (TxtStatusMessage == null) return;
+            if (!_repoLoaded)
+            {
+                TxtStatusMessage.Text = "No RSZ definitions loaded — use File > Game";
+                return;
+            }
+            TxtStatusMessage.Text = string.Equals(_config.GameId, GameCatalog.CustomId, StringComparison.OrdinalIgnoreCase)
+                ? $"Custom RSZ | {Path.GetFileName(_config.RszRepoPath)}"
+                : $"{GameCatalog.DisplayNameFor(_config.GameId)} | embedded RSZ";
         }
 
         private void UpdateBreadcrumbs(string path)
@@ -1024,15 +1115,22 @@ namespace RszViewer
 
         private void LoadRsz_Click(object sender, RoutedEventArgs e)
         {
-            var dlg = new OpenFileDialog { Filter = "RSZ JSON|*.json" };
+            var dlg = new OpenFileDialog { Filter = "RSZ JSON|*.json;*.json.gz|All files|*.*" };
             if (dlg.ShowDialog() == true)
             {
                 try
                 {
-                    _repo = RszRepositorySerializer.Default.FromJsonFile(dlg.FileName);
-                    _config.RszRepoPath = dlg.FileName;
+                    var path = dlg.FileName;
+                    _repo = path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)
+                        ? RszRepositorySerializer.Default.FromJsonGz(File.ReadAllBytes(path))
+                        : RszRepositorySerializer.Default.FromJsonFile(path);
+                    _repoLoaded = true;
+                    _config.GameId = GameCatalog.CustomId;
+                    _config.RszRepoPath = path;
                     _config.Save();
-                    MessageBox.Show("RSZ Definitions loaded successfully.");
+                    UpdateGameMenu();
+                    UpdateRszStatus();
+                    MessageBox.Show("Custom RSZ Definitions loaded.");
                 }
                 catch (Exception ex)
                 {
@@ -1071,12 +1169,18 @@ namespace RszViewer
 
         private bool EnsureRszLoaded()
         {
-            if (_repo == null)
+            if (!_repoLoaded)
             {
-                if (MessageBox.Show("RSZ Definitions not loaded. Do you want to load them now?", "Missing RSZ", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+                // Auto-retry the selected game once (e.g. first run before Loaded finished).
+                TryLoadGameRepo(showErrors: false);
+                UpdateRszStatus();
+            }
+            if (!_repoLoaded)
+            {
+                if (MessageBox.Show("RSZ Definitions not loaded. Pick a game under File > Game, or load a custom JSON now?", "Missing RSZ", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
                 {
                     LoadRsz_Click(this, new RoutedEventArgs());
-                    return _repo != null;
+                    return _repoLoaded;
                 }
                 return false;
             }
@@ -1732,10 +1836,10 @@ namespace RszViewer
         {
             if (_config.SpreadsheetPath != null && SheetVM != null)
             {
-                _ = Dispatcher.InvokeAsync(() => 
+                _ = Dispatcher.InvokeAsync(async () =>
                 {
-                     if (!string.IsNullOrEmpty(_config.SpreadsheetPath)) 
-                        SheetVM.LoadSheet(_config.SpreadsheetPath);
+                     if (!string.IsNullOrEmpty(_config.SpreadsheetPath))
+                        await SheetVM.LoadSheet(_config.SpreadsheetPath);
                 });
             }
         }

@@ -10,6 +10,8 @@ namespace RszViewer
         public string? LeftFilePath { get; set; }
         public string? RightFilePath { get; set; }
         public string? RszRepoPath { get; set; }
+        /// <summary>Selected game id (re2/re3/re4/re7/re8/re9/oniws/custom). Embedded RSZ is used unless "custom".</summary>
+        public string GameId { get; set; } = "re4";
         public List<string> SearchHistory { get; set; } = new List<string>();
         public List<SavedSearch> SavedSearches { get; set; } = new List<SavedSearch>();
         public List<FileHistoryItem> RecentFiles { get; set; } = new List<FileHistoryItem>();
@@ -36,7 +38,15 @@ namespace RszViewer
                 if (File.Exists(ConfigPath))
                 {
                     string json = File.ReadAllText(ConfigPath);
-                    return JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
+                    var config = JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
+                    // One-time migration: settings written before GameId existed only had
+                    // a manual RszRepoPath. Keep using that file instead of dropping it.
+                    if (!json.Contains("GameId", StringComparison.OrdinalIgnoreCase) &&
+                        config.RszRepoPath != null && File.Exists(config.RszRepoPath))
+                    {
+                        config.GameId = "custom";
+                    }
+                    return config;
                 }
             }
             catch { }

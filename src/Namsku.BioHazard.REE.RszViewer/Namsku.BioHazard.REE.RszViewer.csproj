@@ -23,6 +23,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- RSZ type dumps linked from reeutils (no duplication on disk, embedded in GUI assembly).
+         Logical names end with rsz{game}.json.gz so GameCatalog can find them. -->
+    <EmbeddedResource Include="..\reeutils\data\rszre2.json.gz" Link="data\rszre2.json.gz" />
+    <EmbeddedResource Include="..\reeutils\data\rszre3.json.gz" Link="data\rszre3.json.gz" />
+    <EmbeddedResource Include="..\reeutils\data\rszre4.json.gz" Link="data\rszre4.json.gz" />
+    <EmbeddedResource Include="..\reeutils\data\rszre7.json.gz" Link="data\rszre7.json.gz" />
+    <EmbeddedResource Include="..\reeutils\data\rszre8.json.gz" Link="data\rszre8.json.gz" />
+    <EmbeddedResource Include="..\reeutils\data\rszre9.json.gz" Link="data\rszre9.json.gz" />
+    <EmbeddedResource Include="..\reeutils\data\rszoniws.json.gz" Link="data\rszoniws.json.gz" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\IntelOrca.Biohazard.REE\IntelOrca.Biohazard.REE.csproj" />
   </ItemGroup>
 
@@ -31,6 +43,9 @@
     <PackageReference Include="ExcelDataReader.DataSet" Version="3.8.0" />
     <PackageReference Include="Ookii.Dialogs.Wpf" Version="5.0.1" />
     <PackageReference Include="System.Text.Encoding.CodePages" Version="10.0.2" />
+    <PackageReference Include="BCnEncoder.Net" Version="2.2.1" />
+    <PackageReference Include="BCnEncoder.Net.ImageSharp" Version="1.1.2" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
 
 </Project>

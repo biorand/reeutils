@@ -269,7 +269,8 @@
                     <MenuItem Header="Save As..." InputGestureText="Ctrl+Shift+S" Click="BtnSaveAs_Click"/>
                     <Separator/>
                     <MenuItem Header="Reload" InputGestureText="Ctrl+R" Click="BtnReload_Click"/>
-                    <MenuItem Header="Reload RSZ Repo" Click="LoadRsz_Click"/>
+                    <MenuItem Header="Game" x:Name="MenuGame"/>
+                    <MenuItem Header="Load Custom RSZ Repo..." Click="LoadRsz_Click"/>
                     <Separator/>
                     <MenuItem Header="Close Tab" InputGestureText="Ctrl+W" Click="BtnCloseTab_Click"/>
                     <Separator/>
