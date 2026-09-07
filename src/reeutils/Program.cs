@@ -43,6 +43,10 @@ namespace IntelOrca.Biohazard.REEUtils
                     .WithDescription("Displays metadata for supported REE file types.")
                     .WithExample("inspect", "input.tex.143221013")
                     .WithExample("inspect", "--pak", "input.pak", "natives/stm/leveldesign/chapter/chap3_01/chap3_01_level.scn.21");
+                config.AddCommand<TextureCommand>("texture")
+                    .WithDescription("Convert between RE Engine Texture (.tex) and DDS.")
+                    .WithExample("texture", "-o", "output.dds", "input.tex.28")
+                    .WithExample("texture", "-g", "re4", "-o", "output.tex.36", "input.dds");
                 config.AddCommand<GrepCommand>("grep")
                     .WithDescription("Search files in a pak for properties/values matching a regex.")
                     .WithExample("grep", "--pak", "input.pak", "--regex", "pattern", "natives/stm/**/enemy.user.2");
