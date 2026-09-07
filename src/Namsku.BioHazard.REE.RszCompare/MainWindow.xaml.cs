@@ -18,6 +18,7 @@ namespace ReeCompare
         private RszTypeRepository? _repo;
         private SearchManager _searchManager = new SearchManager();
         private AppConfig _config = AppConfig.Load();
+        private bool _suppressGameChange;
 
         public string SearchQuery { get; set; } = "";
         private int _matchIndex = -1;
@@ -32,23 +33,148 @@ namespace ReeCompare
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            if (_config.RszRepoPath != null && File.Exists(_config.RszRepoPath))
-            {
-                try
-                {
-                    _repo = RszRepositorySerializer.Default.FromJsonFile(_config.RszRepoPath);
-                }
-                catch { }
-            }
+            InitGamePicker();
+            TryLoadGameRepo(showErrors: false);
+            UpdateStatus();
 
             if (_config.LeftFilePath != null && File.Exists(_config.LeftFilePath))
                 LoadFile(true, _config.LeftFilePath);
-            
+
             if (_config.RightFilePath != null && File.Exists(_config.RightFilePath))
                 LoadFile(false, _config.RightFilePath);
 
             ListHistory.ItemsSource = _config.SearchHistory;
             ListRecent.ItemsSource = _config.RecentFiles;
+        }
+
+        private void InitGamePicker()
+        {
+            _suppressGameChange = true;
+            try
+            {
+                var items = GameCatalog.Games
+                    .Select(g => new GameEntry(g.Id, g.DisplayName))
+                    .ToList();
+                items.Add(new GameEntry(GameCatalog.CustomId, "Custom..."));
+                CmbGame.ItemsSource = items;
+                CmbGame.DisplayMemberPath = "DisplayName";
+                CmbGame.SelectedValuePath = "Id";
+
+                var gameId = NormalizeGameId(_config.GameId);
+                CmbGame.SelectedValue = gameId;
+                // If the id was legacy/unknown, fall back to re4 visually but keep custom file if set.
+                if (CmbGame.SelectedItem == null)
+                {
+                    CmbGame.SelectedValue = string.Equals(_config.GameId, GameCatalog.CustomId, StringComparison.OrdinalIgnoreCase)
+                        ? GameCatalog.CustomId
+                        : "re4";
+                }
+            }
+            finally
+            {
+                _suppressGameChange = false;
+            }
+        }
+
+        private static string NormalizeGameId(string? gameId)
+        {
+            if (string.IsNullOrWhiteSpace(gameId))
+                return "re4";
+            gameId = gameId.Trim().ToLowerInvariant();
+            if (gameId == GameCatalog.CustomId)
+                return gameId;
+            return GameCatalog.IsKnownGame(gameId) ? gameId : "re4";
+        }
+
+        private void CmbGame_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressGameChange || !IsLoaded)
+                return;
+            if (CmbGame.SelectedItem is not GameEntry entry)
+                return;
+
+            if (string.Equals(entry.Id, GameCatalog.CustomId, StringComparison.OrdinalIgnoreCase))
+            {
+                // Picking Custom prompts for a file; on cancel revert to current game.
+                var previous = NormalizeGameId(_config.GameId == GameCatalog.CustomId ? "re4" : _config.GameId);
+                LoadRsz_Click(this, new RoutedEventArgs());
+                _suppressGameChange = true;
+                try
+                {
+                    CmbGame.SelectedValue = _config.GameId == GameCatalog.CustomId
+                        ? GameCatalog.CustomId
+                        : previous;
+                }
+                finally
+                {
+                    _suppressGameChange = false;
+                }
+                return;
+            }
+
+            _config.GameId = entry.Id;
+            if (TryLoadGameRepo(showErrors: true))
+            {
+                _config.Save();
+                UpdateStatus();
+                ReparseLoadedFiles();
+            }
+            else
+            {
+                UpdateStatus();
+            }
+        }
+
+        private bool TryLoadGameRepo(bool showErrors)
+        {
+            try
+            {
+                if (string.Equals(_config.GameId, GameCatalog.CustomId, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (_config.RszRepoPath != null && File.Exists(_config.RszRepoPath))
+                        _repo = RszRepositorySerializer.Default.FromJsonFile(_config.RszRepoPath);
+                    else
+                        _repo = null;
+                }
+                else
+                {
+                    var gameId = NormalizeGameId(_config.GameId);
+                    _config.GameId = gameId;
+                    _repo = GameCatalog.LoadEmbedded(gameId);
+                }
+                return _repo != null;
+            }
+            catch (Exception ex)
+            {
+                _repo = null;
+                if (showErrors)
+                    MessageBox.Show("Error loading RSZ definitions: " + ex.Message);
+                return false;
+            }
+        }
+
+        private void UpdateStatus()
+        {
+            if (TxtStatus == null)
+                return;
+            if (_repo == null)
+            {
+                TxtStatus.Text = "No RSZ — pick a game above";
+                return;
+            }
+            if (string.Equals(_config.GameId, GameCatalog.CustomId, StringComparison.OrdinalIgnoreCase))
+                TxtStatus.Text = $"Custom RSZ | {Path.GetFileName(_config.RszRepoPath)}";
+            else
+                TxtStatus.Text = $"{GameCatalog.DisplayNameFor(_config.GameId)} | embedded RSZ";
+        }
+
+        private void ReparseLoadedFiles()
+        {
+            // LoadFile only overwrites the tree on success, so a failed re-parse keeps the old view.
+            if (_config.LeftFilePath != null && File.Exists(_config.LeftFilePath))
+                LoadFile(true, _config.LeftFilePath);
+            if (_config.RightFilePath != null && File.Exists(_config.RightFilePath))
+                LoadFile(false, _config.RightFilePath);
         }
 
         private void Exit_Click(object sender, RoutedEventArgs e)
@@ -242,15 +368,24 @@ namespace ReeCompare
 
         private void LoadRsz_Click(object sender, RoutedEventArgs e)
         {
-            var dlg = new OpenFileDialog { Filter = "RSZ JSON|*.json" };
+            var dlg = new OpenFileDialog { Filter = "RSZ JSON|*.json;*.json.gz|All files|*.*" };
             if (dlg.ShowDialog() == true)
             {
                 try
                 {
-                    _repo = RszRepositorySerializer.Default.FromJsonFile(dlg.FileName);
-                    _config.RszRepoPath = dlg.FileName;
+                    var path = dlg.FileName;
+                    _repo = path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)
+                        ? RszRepositorySerializer.Default.FromJsonGz(File.ReadAllBytes(path))
+                        : RszRepositorySerializer.Default.FromJsonFile(path);
+                    _config.GameId = GameCatalog.CustomId;
+                    _config.RszRepoPath = path;
                     _config.Save();
-                    MessageBox.Show("RSZ Definitions loaded.");
+                    _suppressGameChange = true;
+                    try { CmbGame.SelectedValue = GameCatalog.CustomId; }
+                    finally { _suppressGameChange = false; }
+                    UpdateStatus();
+                    MessageBox.Show("Custom RSZ Definitions loaded.");
+                    ReparseLoadedFiles();
                 }
                 catch (Exception ex)
                 {
@@ -297,7 +432,7 @@ namespace ReeCompare
         {
             if (!EnsureRszLoaded()) return;
 
-            var dlg = new OpenFileDialog { Filter = "User Files|*.user.2;*.scn.20|All files|*.*" };
+            var dlg = new OpenFileDialog { Filter = "RE Engine files|*.user.*;*.scn.*;*.pfb.*|User files|*.user.*|Scene files|*.scn.*|Prefab files|*.pfb.*|All files|*.*" };
             if (dlg.ShowDialog() == true)
             {
                 LoadFile(isA, dlg.FileName);
@@ -308,7 +443,13 @@ namespace ReeCompare
         {
             if (_repo == null)
             {
-                 var mbRes = MessageBox.Show("RSZ Definitions not loaded. Do you want to load them now?", "Missing RSZ", MessageBoxButton.YesNo);
+                // Auto-retry the selected game once (e.g. first run before Loaded finished).
+                TryLoadGameRepo(showErrors: false);
+                UpdateStatus();
+            }
+            if (_repo == null)
+            {
+                 var mbRes = MessageBox.Show("RSZ Definitions not loaded. Pick a game in the toolbar (uses embedded RSZ), or load a custom JSON now?", "Missing RSZ", MessageBoxButton.YesNo);
                 if (mbRes == MessageBoxResult.Yes)
                 {
                     LoadRsz_Click(this, new RoutedEventArgs());
@@ -319,6 +460,18 @@ namespace ReeCompare
             return true;
         }
 
+        private static bool TryGetScnOrPfbVersion(string filePath, out int version)
+        {
+            // Matches ".scn.20", ".scn.21", ".pfb.18", etc. (trailing number after last dot).
+            version = 0;
+            var name = Path.GetFileName(filePath);
+            var lastDot = name.LastIndexOf('.');
+            if (lastDot < 0 || !int.TryParse(name.Substring(lastDot + 1), out version))
+                return false;
+            var lower = name.ToLowerInvariant();
+            return lower.Contains(".scn.") || lower.Contains(".pfb.");
+        }
+
         private void LoadFile(bool isA, string filePath)
         {
             if (!EnsureRszLoaded()) return;
@@ -326,20 +479,33 @@ namespace ReeCompare
             try
             {
                 IList<RszNodeViewModel> viewModels;
+                var lower = filePath.ToLowerInvariant();
 
-                if (filePath.EndsWith(".scn.20"))
+                if (lower.Contains(".scn."))
                 {
+                    if (!TryGetScnOrPfbVersion(filePath, out var version))
+                        throw new InvalidDataException($"Could not parse scn version from '{Path.GetFileName(filePath)}'.");
                     var data = File.ReadAllBytes(filePath);
-                    var scnFile = new ScnFile(20, data);
+                    var scnFile = new ScnFile(version, data);
                     var scene = scnFile.ReadScene(_repo!);
-                    
+
+                    viewModels = scene.Children.Select(n => new RszNodeViewModel(n)).ToList();
+                }
+                else if (lower.Contains(".pfb."))
+                {
+                    if (!TryGetScnOrPfbVersion(filePath, out var version))
+                        throw new InvalidDataException($"Could not parse pfb version from '{Path.GetFileName(filePath)}'.");
+                    var data = File.ReadAllBytes(filePath);
+                    var pfbFile = new PfbFile(version, data);
+                    var scene = pfbFile.ReadScene(_repo!);
+
                     viewModels = scene.Children.Select(n => new RszNodeViewModel(n)).ToList();
                 }
                 else
                 {
                     var data = File.ReadAllBytes(filePath);
                     var userFile = new UserFile(data);
-                    
+
                     var builder = userFile.ToBuilder(_repo!);
                     var rootNodes = builder.Objects;
 

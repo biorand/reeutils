@@ -24,6 +24,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- RSZ type dumps linked from reeutils (no duplication on disk, embedded in GUI assembly).
+         Logical names end with rsz{game}.json.gz so GameCatalog can find them. -->
+    <EmbeddedResource Include="..\reeutils\data\rszre2.json.gz" Link="data\rszre2.json.gz" />
+    <EmbeddedResource Include="..\reeutils\data\rszre3.json.gz" Link="data\rszre3.json.gz" />
+    <EmbeddedResource Include="..\reeutils\data\rszre4.json.gz" Link="data\rszre4.json.gz" />
+    <EmbeddedResource Include="..\reeutils\data\rszre7.json.gz" Link="data\rszre7.json.gz" />
+    <EmbeddedResource Include="..\reeutils\data\rszre8.json.gz" Link="data\rszre8.json.gz" />
+    <EmbeddedResource Include="..\reeutils\data\rszre9.json.gz" Link="data\rszre9.json.gz" />
+    <EmbeddedResource Include="..\reeutils\data\rszoniws.json.gz" Link="data\rszoniws.json.gz" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\IntelOrca.Biohazard.REE\IntelOrca.Biohazard.REE.csproj" />
   </ItemGroup>
 

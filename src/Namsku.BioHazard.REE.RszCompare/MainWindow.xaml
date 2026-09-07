@@ -203,6 +203,12 @@
 
                 <!-- Navigation & Actions -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal">
+                    <TextBlock Text="Game:" VerticalAlignment="Center" Foreground="#888888" Margin="0,0,5,0" FontSize="11"/>
+                    <ComboBox Name="CmbGame" Width="210" Height="28" VerticalContentAlignment="Center"
+                              ToolTip="Select game (uses embedded RSZ, no files to place)"
+                              SelectionChanged="CmbGame_SelectionChanged"/>
+                    <Button Content="Custom RSZ" Click="LoadRsz_Click" Background="Transparent" Foreground="#007ACC" Margin="5,0,0,0" ToolTip="Load RSZ JSON from file (advanced)"/>
+                    <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="10,5"/>
                     <Button Name="BtnPrev" Content="◀" ToolTip="Previous Match" Click="BtnPrev_Click" Style="{x:Null}" Background="Transparent" Foreground="#888888" Margin="0,0,5,0" Padding="5"/>
                     <TextBlock Name="TxtMatchStatus" Text="0/0" VerticalAlignment="Center" Margin="5,0" Foreground="#888888" Width="40" TextAlignment="Center"/>
                     <Button Name="BtnNext" Content="▶" ToolTip="Next Match" Click="BtnNext_Click" Style="{x:Null}" Background="Transparent" Foreground="#888888" Margin="5,0,0,0" Padding="5"/>
@@ -266,7 +272,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="EXPLORER: FILE A" Foreground="#BBBBBB" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
-                    <Button Grid.Column="1" Content="Load RSZ" Click="LoadRsz_Click" Background="Transparent" Foreground="#007ACC" Padding="5,0" FontSize="11" ToolTip="Load RSZ JSON Definitions"/>
+                    <Button Grid.Column="1" Content="Custom RSZ" Click="LoadRsz_Click" Background="Transparent" Foreground="#007ACC" Padding="5,0" FontSize="11" ToolTip="Load RSZ JSON from file (advanced)"/>
                 </Grid>
                 
                 <StackPanel Grid.Row="1" Margin="10,0,10,10">
@@ -502,7 +508,7 @@
         <Border Grid.Row="2" Background="{StaticResource StatusBarBackground}">
             <DockPanel LastChildFill="False">
                 <TextBlock Text="&#xE70B;" FontFamily="Segoe MDL2 Assets" Foreground="White" VerticalAlignment="Center" Margin="10,0,5,0" FontSize="12"/>
-                <TextBlock Text="Ready" Foreground="White" VerticalAlignment="Center" FontSize="11"/>
+                <TextBlock Name="TxtStatus" Text="Ready" Foreground="White" VerticalAlignment="Center" FontSize="11"/>
                 
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Margin="0,0,10,0">
                      <TextBlock Text="UTF-8" Foreground="White" VerticalAlignment="Center" Margin="10,0" FontSize="11"/>
