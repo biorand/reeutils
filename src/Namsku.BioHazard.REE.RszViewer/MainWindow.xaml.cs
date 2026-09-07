@@ -21,6 +21,7 @@ using IntelOrca.Biohazard.REE.Package;
 using Microsoft.Win32;
 using System.Threading;
 using System.Collections.Immutable;
+using System.Windows.Threading;
 
 namespace RszViewer
 {
@@ -253,7 +254,7 @@ namespace RszViewer
             {
                 _repoLoaded = false;
                 if (showErrors)
-                    MessageBox.Show("Error loading RSZ definitions: " + ex.Message);
+                    ShowStatus("Error loading RSZ definitions: " + ex.Message, StatusLevel.Error);
                 return false;
             }
         }
@@ -304,6 +305,42 @@ namespace RszViewer
                 : $"{GameCatalog.DisplayNameFor(_config.GameId)} | embedded RSZ";
         }
 
+        private enum StatusLevel { Info, Success, Warning, Error }
+
+        private DispatcherTimer? _statusTimer;
+
+        /// <summary>
+        /// Transient, non-blocking feedback in the status bar (right-hand slot) instead of a
+        /// modal MessageBox — routine confirmations/errors shouldn't stop a user mid-workflow.
+        /// </summary>
+        private void ShowStatus(string message, StatusLevel level = StatusLevel.Info)
+        {
+            if (TxtStatusStats == null) return;
+
+            var brush = level switch
+            {
+                StatusLevel.Error => (Brush)FindResource("ErrorRed"),
+                StatusLevel.Warning => (Brush)FindResource("AccentOrange"),
+                StatusLevel.Success => (Brush)FindResource("SuccessGreen"),
+                _ => (Brush)FindResource("TextSecondary")
+            };
+
+            TxtStatusStats.Text = message;
+            TxtStatusStats.Foreground = brush;
+            if (StatusDot != null) StatusDot.Fill = brush;
+
+            _statusTimer?.Stop();
+            _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(level == StatusLevel.Error ? 6 : 3.5) };
+            _statusTimer.Tick += (s, e) =>
+            {
+                _statusTimer!.Stop();
+                TxtStatusStats.Text = "";
+                TxtStatusStats.Foreground = (Brush)FindResource("TextSecondary");
+                if (StatusDot != null) StatusDot.Fill = (Brush)FindResource("SuccessGreen");
+            };
+            _statusTimer.Start();
+        }
+
         private void UpdateBreadcrumbs(string path)
         {
             if (string.IsNullOrEmpty(path))
@@ -343,7 +380,7 @@ namespace RszViewer
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error listing files: " + ex.Message);
+                ShowStatus("Error listing files: " + ex.Message, StatusLevel.Error);
             }
         }
 
@@ -497,7 +534,7 @@ namespace RszViewer
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading file:\n{ex.Message}");
+                ShowStatus($"Error loading file: {ex.Message}", StatusLevel.Error);
             }
         }
 
@@ -523,7 +560,7 @@ namespace RszViewer
                  {
                      UpdateRszSheet();
                  }
-                 MessageBox.Show("Settings saved.");
+                 ShowStatus("Settings saved.", StatusLevel.Success);
              }
         }
 
@@ -859,7 +896,7 @@ namespace RszViewer
                         }
                         catch 
                         { 
-                            Application.Current.Dispatcher.Invoke(() => MessageBox.Show("Invalid regex pattern.")); 
+                            Application.Current.Dispatcher.Invoke(() => ShowStatus("Invalid regex pattern.", StatusLevel.Error));
                             return; 
                         }
                     }
@@ -970,7 +1007,7 @@ namespace RszViewer
         {
             if (string.IsNullOrEmpty(_config.NativesPath) || !Directory.Exists(_config.NativesPath))
             {
-                MessageBox.Show("Set Natives path in settings first for Deep Scan.");
+                ShowStatus("Set Natives path in settings first for Deep Scan.", StatusLevel.Warning);
                 return;
             }
 
@@ -1050,7 +1087,7 @@ namespace RszViewer
                     catch { /* Skip files that fail to load */ }
                 }
             }
-            catch (Exception ex) { MessageBox.Show($"Deep scan error: {ex.Message}"); }
+            catch (Exception ex) { ShowStatus($"Deep scan error: {ex.Message}", StatusLevel.Error); }
         }
 
 
@@ -1130,11 +1167,11 @@ namespace RszViewer
                     _config.Save();
                     UpdateGameMenu();
                     UpdateRszStatus();
-                    MessageBox.Show("Custom RSZ Definitions loaded.");
+                    ShowStatus("Custom RSZ definitions loaded.", StatusLevel.Success);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Error loading RSZ JSON: " + ex.Message);
+                    ShowStatus("Error loading RSZ JSON: " + ex.Message, StatusLevel.Error);
                 }
             }
         }
@@ -1310,7 +1347,7 @@ namespace RszViewer
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading file: {ex.Message}");
+                ShowStatus($"Error loading file: {ex.Message}", StatusLevel.Error);
             }
         }
 
@@ -1448,7 +1485,7 @@ namespace RszViewer
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error comparing objects: " + ex.ToString());
+                ShowStatus("Error comparing objects: " + ex.Message, StatusLevel.Error);
             }
         }
 
@@ -1571,7 +1608,7 @@ namespace RszViewer
                     TracerUI.Initialize(_repo, selected.GameObject);
                     MainTabControl.SelectedIndex = 2; // RSZ LINK tab
                 }
-                else MessageBox.Show("Please select a GameObject to trace.");
+                else ShowStatus("Please select a GameObject to trace.", StatusLevel.Warning);
             }
         }
 
@@ -1589,7 +1626,7 @@ namespace RszViewer
             {
                 foreach(TabItem tab in MainTabControl.Items) if (tab.Header.ToString() == "RSZ LINK") { MainTabControl.SelectedItem = tab; break; }
                 if (_repo != null) TracerUI.Initialize(_repo, vm.GameObject);
-                else MessageBox.Show("RSZ Repository not loaded.");
+                else ShowStatus("RSZ Repository not loaded.", StatusLevel.Warning);
             }
         }
 
@@ -1758,7 +1795,7 @@ namespace RszViewer
                     {
                         for(int i=0; i<parts.Length; i++) vm.VectorValues[i].ComponentValue = parts[i];
                     }
-                    else MessageBox.Show($"Clipboard data format mismatch. Expected {vm.VectorValues.Count} values.");
+                    else ShowStatus($"Clipboard data format mismatch. Expected {vm.VectorValues.Count} values.", StatusLevel.Warning);
                 }
             }
         }

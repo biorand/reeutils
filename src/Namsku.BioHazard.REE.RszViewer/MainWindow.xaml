@@ -701,7 +701,7 @@
         <Border Grid.Row="4" Background="{StaticResource BgSecondary}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0">
             <DockPanel Margin="14,0">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Ellipse Width="6" Height="6" Fill="{StaticResource SuccessGreen}" Margin="0,0,10,0"/>
+                    <Ellipse x:Name="StatusDot" Width="6" Height="6" Fill="{StaticResource SuccessGreen}" Margin="0,0,10,0"/>
                     <TextBlock x:Name="TxtStatusMessage" Text="Ready" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,0,20,0"/>
                     <TextBlock x:Name="TxtStatusStats" Text="" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
                 </StackPanel>
