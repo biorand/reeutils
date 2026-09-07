@@ -3,19 +3,26 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 
-namespace ReeCompare
+namespace RszViewer
 {
     public class AppConfig
     {
         public string? LeftFilePath { get; set; }
         public string? RightFilePath { get; set; }
         public string? RszRepoPath { get; set; }
-        /// <summary>Selected game id (re2/re3/re4/re7/re8/re9/oniws/custom). Embedded RSZ is used unless "custom".</summary>
-        public string GameId { get; set; } = "re4";
         public List<string> SearchHistory { get; set; } = new List<string>();
         public List<SavedSearch> SavedSearches { get; set; } = new List<SavedSearch>();
         public List<FileHistoryItem> RecentFiles { get; set; } = new List<FileHistoryItem>();
         public ComparisonSession? LastSession { get; set; }
+        public string? LastViewFolder { get; set; }
+        public string? LastOpenFile { get; set; }
+        public string? LastLinkerFolder { get; set; }
+        public string? SpreadsheetPath { get; set; }
+        public List<string> RecentFolders { get; set; } = new List<string>();
+        public bool IsExplorerVisible { get; set; } = true;
+        public List<string> OpenedTabPaths { get; set; } = new List<string>();
+        public int SelectedTabIndex { get; set; } = 0;
+        public string? NativesPath { get; set; }
 
         private static readonly string ConfigPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -29,15 +36,7 @@ namespace ReeCompare
                 if (File.Exists(ConfigPath))
                 {
                     string json = File.ReadAllText(ConfigPath);
-                    var config = JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
-                    // One-time migration: settings written before GameId existed only had
-                    // a manual RszRepoPath. Keep using that file instead of dropping it.
-                    if (!json.Contains("GameId", StringComparison.OrdinalIgnoreCase) &&
-                        config.RszRepoPath != null && File.Exists(config.RszRepoPath))
-                    {
-                        config.GameId = "custom";
-                    }
-                    return config;
+                    return JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
                 }
             }
             catch { }
