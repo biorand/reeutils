@@ -5,6 +5,9 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
+    <!-- Allow `dotnet restore`/build of this WPF app on non-Windows CI (Linux) where the
+         solution is restored as a whole; it is only ever run on Windows. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>RszViewer</AssemblyName>
     <RootNamespace>RszViewer</RootNamespace>
