@@ -109,17 +109,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
             return string.Empty;
         }
 
-        internal ImmutableArray<RszInstance> ReadInstanceList(RszTypeRepository repository)
+        public ImmutableArray<RszInstance> ReadInstanceList(RszTypeRepository repository)
         {
             var instanceInfoList = InstanceInfoList;
             var instanceRszTypes = new RszType[instanceInfoList.Length];
             for (var i = 0; i < instanceRszTypes.Length; i++)
             {
                 var rszTypeId = instanceInfoList[i].TypeId;
-                var rszType = repository.FromId(rszTypeId);
-
-                if (rszType != null)
-                    instanceRszTypes[i] = repository.FromId(rszTypeId) ?? throw new Exception($"Type ID {rszTypeId} not found");
+                instanceRszTypes[i] = repository.FromId(rszTypeId) ?? throw new Exception($"Type ID {rszTypeId} not found");
             }
 
 
@@ -165,7 +162,6 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                 var rszType = instanceRszTypes[i];
 
-                if (rszType == null) continue;
                 try
                 {
                     var rszValue = rszType.Id == 0 ? new RszNullNode() : (IRszNode)rszDataReader.ReadStruct(rszType);

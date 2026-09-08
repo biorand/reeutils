@@ -1,0 +1,80 @@
+<Window x:Class="RszViewer.AdvancedSearchDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Advanced Search" Height="300" Width="450"
+        Background="{StaticResource BgPrimary}"
+        Foreground="{StaticResource TextPrimary}"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner">
+    
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="SEARCH OPTIONS" Style="{StaticResource ProSectionTitleOrange}" Margin="0,0,0,10"/>
+
+        <TabControl x:Name="Tabs" Grid.Row="1" Style="{StaticResource ProTabControl}" Background="Transparent">
+            <TabItem Header="Text" Style="{StaticResource ProTabItem}">
+                <StackPanel Margin="10">
+                    <TextBlock Text="Search Query:" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
+                    <TextBox x:Name="TxtQuery" Style="{StaticResource ProTextBox}" Margin="0,0,0,10"/>
+                    <CheckBox x:Name="ChkMatchCase" Content="Match Case" Margin="0,5" Foreground="{StaticResource TextPrimary}"/>
+                    <CheckBox x:Name="ChkRegex" Content="Use Regex" Margin="0,5" Foreground="{StaticResource TextPrimary}"/>
+                    
+                    <TextBlock Text="Target:" Foreground="{StaticResource TextSecondary}" Margin="0,10,0,5"/>
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="RadPropName" Content="Property Name" GroupName="Target" Margin="0,0,15,0" Foreground="{StaticResource TextPrimary}"/>
+                        <RadioButton x:Name="RadPropValue" Content="Property Value" GroupName="Target" Margin="0,0,15,0" Foreground="{StaticResource TextPrimary}"/>
+                        <RadioButton x:Name="RadBoth" Content="Both" GroupName="Target" IsChecked="True" Foreground="{StaticResource TextPrimary}"/>
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
+            
+            <TabItem Header="Number" Style="{StaticResource ProTabItem}">
+                 <StackPanel Margin="10">
+                    <TextBlock Text="Type:" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <RadioButton x:Name="RadInt" Content="Integer" IsChecked="True" GroupName="NumType" Margin="0,0,15,0" Foreground="{StaticResource TextPrimary}"/>
+                        <RadioButton x:Name="RadFloat" Content="Float/Double" GroupName="NumType" Foreground="{StaticResource TextPrimary}"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Range (Leave empty for no limit):" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
+                    <Grid Margin="0,0,0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="TxtMin" Style="{StaticResource ProTextBox}" ToolTip="Min Value"/>
+                        <TextBlock Text="-" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}"/>
+                        <TextBox x:Name="TxtMax" Grid.Column="2" Style="{StaticResource ProTextBox}" ToolTip="Max Value"/>
+                    </Grid>
+                 </StackPanel>
+            </TabItem>
+
+            <TabItem Header="Hex" Style="{StaticResource ProTabItem}">
+                <StackPanel Margin="10">
+                    <TextBlock Text="Hex Pattern (e.g. AA BB CC):" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
+                    <TextBox x:Name="TxtHex" Style="{StaticResource ProTextBox}" Margin="0,0,0,5"/>
+                    <TextBlock Text="Matches exact byte sequence." Foreground="{StaticResource TextSecondary}" FontSize="10" FontStyle="Italic"/>
+                </StackPanel>
+            </TabItem>
+
+            <TabItem Header="GUID" Style="{StaticResource ProTabItem}">
+                 <StackPanel Margin="10">
+                    <TextBlock Text="GUID:" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,5"/>
+                    <TextBox x:Name="TxtGuid" Style="{StaticResource ProTextBox}" Margin="0,0,0,5"/>
+                    <Button Content="Paste from Clipboard" HorizontalAlignment="Left" Style="{StaticResource ProButtonSecondary}" Padding="8,4" Click="BtnPasteGuid_Click" Margin="0,5,0,0"/>
+                 </StackPanel>
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Content="Find All" Click="BtnSearch_Click" Style="{StaticResource ProButtonPrimary}" Width="100" Margin="5,0"/>
+            <Button Content="Cancel" Click="BtnCancel_Click" Style="{StaticResource ProButtonSecondary}" Width="80"/>
+        </StackPanel>
+    </Grid>
+</Window>
