@@ -122,6 +122,68 @@ namespace IntelOrca.Biohazard.REE.Rsz
             MemoryMarshal.AsBytes(span).CopyTo(destination);
         }
 
+        /// <summary>
+        /// The engine-assigned property id for each <see cref="RszFieldType.GameObjectRef"/> field
+        /// that the file's ref table links, keyed by (owning type crc, field index). RSZ dumps do
+        /// not carry these ids; <see cref="ReadScene"/> back-fills the ones it can reach, but the
+        /// JSON export/import path has no original file to source them from. Callers persist this
+        /// map alongside the exported JSON and feed it back through
+        /// <see cref="ApplyGameObjectRefPropertyIds"/> before rebuilding.
+        /// </summary>
+        public IReadOnlyList<(uint TypeCrc, int FieldIndex, int PropertyId)> GetGameObjectRefPropertyIds(RszTypeRepository repository)
+        {
+            var result = new List<(uint, int, int)>();
+            if (Version < 17 || Header.GameObjectRefCount == 0)
+                return result;
+
+            var objectList = Rsz.ReadObjectList(repository);
+            var seen = new HashSet<(uint, int)>();
+            // Multiple entries can share a source object; they appear in GameObjectRef-field
+            // order, matching the writer in Build. Advance a per-object cursor so the n-th entry
+            // maps to the n-th GameObjectRef field.
+            var cursor = new Dictionary<int, int>();
+            foreach (var r in GameObjectRefInfoList)
+            {
+                if (r.ObjectId < 0 || r.ObjectId >= objectList.Length)
+                    continue;
+                if (objectList[r.ObjectId] is not RszObjectNode source)
+                    continue;
+
+                var fields = source.Type.Fields;
+                var start = cursor.GetValueOrDefault(r.ObjectId, 0);
+                for (var fi = start; fi < fields.Length; fi++)
+                {
+                    if (fields[fi].Type != RszFieldType.GameObjectRef)
+                        continue;
+                    cursor[r.ObjectId] = fi + 1;
+                    if (seen.Add((source.Type.Id, fi)))
+                        result.Add((source.Type.Id, fi, r.PropertyIdPacked));
+                    break;
+                }
+            }
+            // Stable order (independent of ref-table order) so the serialized map round-trips
+            // identically after a rebuild reorders the ref entries.
+            result.Sort((a, b) => a.Item1 != b.Item1 ? a.Item1.CompareTo(b.Item1) : a.Item2.CompareTo(b.Item2));
+            return result;
+        }
+
+        /// <summary>
+        /// Re-applies a map produced by <see cref="GetGameObjectRefPropertyIds"/> to the shared
+        /// repository field metadata so <see cref="Builder.Build"/> can regenerate the ref table
+        /// on the template-based JSON import path.
+        /// </summary>
+        public static void ApplyGameObjectRefPropertyIds(
+            RszTypeRepository repository,
+            IEnumerable<(uint TypeCrc, int FieldIndex, int PropertyId)> ids)
+        {
+            foreach (var (crc, fieldIndex, propertyId) in ids)
+            {
+                var type = repository.FromId(crc);
+                if (type != null && fieldIndex >= 0 && fieldIndex < type.Fields.Length)
+                    type.Fields[fieldIndex].Id = propertyId;
+            }
+        }
+
         public RszScene ReadScene(RszTypeRepository repository)
         {
             return ReadScene(repository, Rsz.ReadObjectList(repository));
@@ -445,7 +507,14 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 }
                 else
                 {
-                    foreach (var orphan in OrphanObjects)
+                    // Binary ToBuilder populates OrphanObjects; the template-based JSON import
+                    // path carries the same set in as LooseObjects (from the "@loose" document
+                    // section) with OrphanObjects left empty. Fall back to it so those objects
+                    // are not dropped on rebuild.
+                    var extras = OrphanObjects.Count > 0 || LooseObjects.Count == 0
+                        ? (IReadOnlyList<RszObjectNode>)OrphanObjects
+                        : LooseObjects;
+                    foreach (var orphan in extras)
                     {
                         objectList.Add(orphan);
                     }

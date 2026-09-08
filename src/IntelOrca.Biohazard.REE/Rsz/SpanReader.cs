@@ -43,7 +43,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public string? ReadString()
         {
             var length = ReadInt32();
-            if (length == 0)
+                    if (length <= 0)
                 return null;
 
             // Assume null terminator

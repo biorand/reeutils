@@ -99,7 +99,8 @@ namespace IntelOrca.Biohazard.REE.Tests
                 GameNames.RE7 => "RESIDENT EVIL 7 biohazard",
                 GameNames.RE8 => "Resident Evil Village BIOHAZARD VILLAGE",
                 GameNames.RE9 => "RESIDENT EVIL requiem BIOHAZARD requiem",
-                _ => throw new NotSupportedException()
+                                GameNames.ONIWS => "OnimushaWotS",
+                                _ => throw new NotSupportedException()
             };
             return Path.Combine(streamDir, gameDirName);
         }
@@ -121,7 +122,8 @@ namespace IntelOrca.Biohazard.REE.Tests
                     GameNames.RE7 => "rszre7",
                     GameNames.RE8 => "rszre8",
                     GameNames.RE9 => "rszre9",
-                    _ => throw new NotImplementedException()
+                                        GameNames.ONIWS => "rszoniws",
+                                        _ => throw new NotImplementedException()
                 };
                 var externalDir = GetEnvironmentVariable("REEUTILS_RSZ_DIR",
                     RuntimeInformation.IsOSPlatform(OSPlatform.Windows)

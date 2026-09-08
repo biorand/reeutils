@@ -66,6 +66,9 @@ dotnet test
 | ---- | ------- |
 | RE2/RE3 (non-RT) | `.scn.19`, `.pfb.16`, `.fsmv2.30` — full read+write, byte-identical JSON roundtrip (corpus-verified) |
 | RE8 | `.fsmv2.40` (BHVT), `.user`, `.scn`, `.pfb` (RSZ-based), `.tex`, `.msg`, `.fsm` |
+| Onimusha WotS | `.scn.21`, `.user.3`, `.pfb.18` (RSZ-based), `.msg.23` (MSG) — full read+write, corpus-verified |
+
+> Note: Onimusha `.fsmv2.42` files can be read but `.fsmv2` import is not supported for this version — see `ree-engine-details.md`.
 
 > Note: when invoking the CLI on versioned files, keep the version suffix (`.19`/`.16`/`.30`) — bare extensions default to the RT/newer versions.
 

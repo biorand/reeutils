@@ -46,6 +46,30 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
                 metadata["@gorefs"] = refs;
             }
 
+            // v17+ GameObjectRef property ids live in the RSZ dump, but the import path rebuilds
+            // from a template and never reads the original file, so ReadScene's back-fill is lost.
+            // Carry the (type crc, field index -> property id) map so Import can restore it before
+            // the ref table is regenerated.
+            if (file.Version >= 17 && file.GameObjectRefCount > 0)
+            {
+                var ids = file.GetGameObjectRefPropertyIds(Repository);
+                if (ids.Count > 0)
+                {
+                    using var stream = new MemoryStream();
+                    using (var writer = new BinaryWriter(stream))
+                    {
+                        writer.Write(ids.Count);
+                        foreach (var (typeCrc, fieldIndex, propertyId) in ids)
+                        {
+                            writer.Write(typeCrc);
+                            writer.Write(fieldIndex);
+                            writer.Write(propertyId);
+                        }
+                    }
+                    metadata["@gorefprops"] = stream.ToArray();
+                }
+            }
+
             // A few vanilla v16 template prefabs carry stray zero padding before the RSZ block and
             // before the RSZ instance table that no layout rule predicts; carry the original
             // offsets so Import can replay the exact gaps. Harmless for the common (no-padding) case.
@@ -109,6 +133,16 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
             if (metadata.TryGetValue("gorefs", out var gorefs))
             {
                 builder.PreservedGameObjectRefData = gorefs;
+            }
+            if (metadata.TryGetValue("gorefprops", out var gorefprops) && gorefprops.Length >= 4)
+            {
+                var ids = new List<(uint, int, int)>();
+                using var stream = new MemoryStream(gorefprops);
+                using var reader = new BinaryReader(stream);
+                var count = reader.ReadInt32();
+                for (var i = 0; i < count; i++)
+                    ids.Add((reader.ReadUInt32(), reader.ReadInt32(), reader.ReadInt32()));
+                PfbFile.ApplyGameObjectRefPropertyIds(Repository, ids);
             }
             if (metadata.TryGetValue("dataoffset", out var dataOffset) && dataOffset.Length == 8)
             {

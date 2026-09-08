@@ -43,6 +43,10 @@ namespace IntelOrca.Biohazard.REEUtils
                     .WithDescription("Displays metadata for supported REE file types.")
                     .WithExample("inspect", "input.tex.143221013")
                     .WithExample("inspect", "--pak", "input.pak", "natives/stm/leveldesign/chapter/chap3_01/chap3_01_level.scn.21");
+                config.AddCommand<TextureCommand>("texture")
+                    .WithDescription("Convert between RE Engine Texture (.tex) and DDS.")
+                    .WithExample("texture", "-o", "output.dds", "input.tex.28")
+                    .WithExample("texture", "-g", "re4", "-o", "output.tex.36", "input.dds");
                 config.AddCommand<GrepCommand>("grep")
                     .WithDescription("Search files in a pak for properties/values matching a regex.")
                     .WithExample("grep", "--pak", "input.pak", "--regex", "pattern", "natives/stm/**/enemy.user.2");
@@ -51,11 +55,13 @@ namespace IntelOrca.Biohazard.REEUtils
                     .WithExample("ls", "--pak", "test.pak", "natives/stm");
                 config.AddCommand<FindCommand>("find")
                     .WithDescription("Finds files in a PAK file matching the given patterns.")
-                    .WithExample("find", "--pak", "test.pak", "-g", "re9", "natives/stm/leveldesign");
-                config.AddCommand<TreeCommand>("tree")
-                     .WithDescription("Shows the tree or JSON view of a supported REE file.")
-                     .WithExample("tree", "chap3_01_level.scn.21", "LightSwitch/Gm99_108", "-g", "re9")
-                     .WithExample("tree", "--pak", "input.pak", "-g", "re9", "--json", "natives/stm/leveldesign/chapter/chap3_01/chap3_01_level.scn.21");
+                                    .WithExample("find", "--pak", "test.pak", "-g", "re9", "natives/stm/leveldesign")
+                                    .WithExample("find", "--pak", "test.pak", "-g", "oniws", "natives/stm/**/*.scn.21");
+                                config.AddCommand<TreeCommand>("tree")
+                                     .WithDescription("Shows the tree or JSON view of a supported REE file.")
+                                     .WithExample("tree", "chap3_01_level.scn.21", "LightSwitch/Gm99_108", "-g", "re9")
+                                     .WithExample("tree", "--pak", "input.pak", "-g", "re9", "--json", "natives/stm/leveldesign/chapter/chap3_01/chap3_01_level.scn.21")
+                                     .WithExample("tree", "--pak", "input.pak", "-g", "oniws", "--json", "natives/stm/gamedesign/system/area/area.scn.21");
                 config.AddCommand<McpCommand>("mcp")
                     .WithDescription("Runs reeutils as an MCP stdio server.");
             });

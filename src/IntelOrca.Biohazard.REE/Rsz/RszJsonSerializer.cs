@@ -788,7 +788,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
             RszFieldType.Sfix2, RszFieldType.Sfix3, RszFieldType.Sfix4,
             RszFieldType.Position, RszFieldType.Mat3, RszFieldType.Float3x3,
             RszFieldType.Float3x4, RszFieldType.Float4x3, RszFieldType.Float4x4,
-            RszFieldType.Half2, RszFieldType.Half4, RszFieldType.VecU4
+            RszFieldType.Half2, RszFieldType.Half4, RszFieldType.VecU4,
+            // c8/c16 char-buffer fields (e.g. oniws Terrain.scn.21) have no STJ value
+            // shape; round-trip them as their raw little-endian bytes, base64-encoded.
+            RszFieldType.C8, RszFieldType.C16,
+            // Raw byte-blob fields (e.g. via.Folder/value data on MTR/Onimusha) round-trip as base64.
+            RszFieldType.Data
         };
 
         private RszType ResolveObjectType(JsonElement element, RszType? expectedType)
@@ -928,6 +933,10 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 RszFieldType.Position => typeof(global::via.Position),
                 // Unknown dump types round-trip as their raw little-endian bytes (base64 in JSON).
                 RszFieldType.ukn_error => typeof(byte[]),
+                                // Raw byte-blob fields (e.g. via.Folder/value data on MTR/Onimusha) round-trip as base64.
+                                RszFieldType.Data => typeof(byte[]),
+                // c8/c16 char buffers round-trip as raw bytes (see s_rawValueTypes).
+                RszFieldType.C8 or RszFieldType.C16 => typeof(byte[]),
                 _ => throw new NotSupportedException($"Unsupported RSZ value type '{type}'.")
             };
         }
