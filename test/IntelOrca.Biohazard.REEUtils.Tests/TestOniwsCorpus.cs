@@ -67,6 +67,20 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             "natives/STM/Sound/UserData/32_GimmickTrigger/Gm009/gm009_001_00_GimmickGeneratorData.user.3",
         ];
 
+        /// <summary>
+        /// .user.3 files whose wrapper carries a resource table before the RSZ stream (bank lists,
+        /// montage parts, trigger-info lists, effect params). Rebuilding must preserve the resource
+        /// table verbatim or the file is corrupted and the game refuses to load it.
+        /// </summary>
+        private static readonly string[] UserResourceCorpus =
+        [
+            "natives/STM/Sound/UserData/12_Bank/Resident/FSM/MainMission/Ms000055_BankListData.user.3",
+            "natives/STM/Sound/UserData/12_Bank/Resident/FSM/MainMission/Ms000055_Voice_BankListData.user.3",
+            "natives/STM/Art/Model/Character/Montage/PartsModelData/npc301_00/ch200_01_08_montageParts.user.3",
+            "natives/STM/Art/Model/Character/Montage/ColorVariation/npc301_40-50/npc301_40-50_MmiPresetData_09.user.3",
+            "natives/STM/Sound/UserData/11_TriggerInfoList/Human/Player/pl000_Actvoice_TriggerInfoListData.user.3",
+        ];
+
         private static readonly string[] MsgCorpus =
         [
             "natives/STM/Ace/Data/GUI/ACE_SAVE_MSG.msg.23",
@@ -159,6 +173,12 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
         public async Task User_AllCorpus_RoundTrips()
         {
             await CheckCorpus(".user.3", UserCorpus);
+        }
+
+        [Fact]
+        public async Task User_ResourceCorpus_RoundTrips_ByteIdentical()
+        {
+            await CheckByteIdentical(".user.3", UserResourceCorpus);
         }
 
         [Fact]

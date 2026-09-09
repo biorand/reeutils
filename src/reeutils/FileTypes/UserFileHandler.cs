@@ -23,9 +23,36 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
 
         public override JsonDocument GetJson(TreeOptions options)
         {
-            var objects = new UserFile(Data).GetObjects(Repository);
+            var file = new UserFile(Data);
+            var objects = file.GetObjects(Repository);
             using var raw = CreateDocument(objects);
-            return JsonSupport.ApplyTreeOptions(raw, options);
+            var json = JsonSupport.ApplyTreeOptions(raw, options);
+
+            // Resource-bearing .user files (wrapper resource table / userdata before the RSZ stream)
+            // can't be reconstructed from the object list alone; carry the wrapper prefix verbatim so
+            // import doesn't drop it. Plain files (RSZ directly after the header) keep the flat shape.
+            if (file.RszDataOffset > 48)
+            {
+                using var ms = new MemoryStream();
+                using (var writer = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true }))
+                {
+                    writer.WriteStartObject();
+                    writer.WritePropertyName("@meta-user");
+                    writer.WriteStartObject();
+                    writer.WritePropertyName("prefix");
+                    writer.WriteBase64StringValue(file.Prefix);
+                    writer.WriteEndObject();
+                    foreach (var property in json.RootElement.EnumerateObject())
+                    {
+                        property.WriteTo(writer);
+                    }
+                    writer.WriteEndObject();
+                }
+                ms.Position = 0;
+                json.Dispose();
+                return JsonDocument.Parse(ms);
+            }
+            return json;
         }
 
         public override IEnumerable<string> Search(Regex pattern)
@@ -43,9 +70,25 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
         {
             var template = EmbeddedData.GetFile($"empty.user.{Version}") ?? throw new NotSupportedException($"No embedded template exists for .user.{Version}.");
             var builder = new UserFile(template).ToBuilder(Repository);
-            builder.Objects = json.RootElement.ValueKind == JsonValueKind.Array
-                ? [.. json.RootElement.EnumerateArray().Select(x => (RszObjectNode)RszJsonSerializer.Deserialize(JsonDocument.Parse(x.GetRawText()), Repository))]
-                : [(RszObjectNode)RszJsonSerializer.Deserialize(json, Repository)];
+
+            // Resource-bearing exports carry the wrapper prefix; restore it so the resource table /
+            // wrapper userdata survives the JSON hop. Flat exports (plain header) use the template.
+            if (json.RootElement.TryGetProperty("@meta-user", out var meta) &&
+                meta.ValueKind == JsonValueKind.Object &&
+                meta.TryGetProperty("prefix", out var prefixEl) && prefixEl.ValueKind == JsonValueKind.String)
+            {
+                builder.PreservedPrefix = Convert.FromBase64String(prefixEl.GetString()!);
+                var objectsElement = json.RootElement.TryGetProperty("objects", out var objEl) ? objEl : json.RootElement;
+                builder.Objects = objectsElement.ValueKind == JsonValueKind.Array
+                    ? [.. objectsElement.EnumerateArray().Select(x => (RszObjectNode)RszJsonSerializer.Deserialize(JsonDocument.Parse(x.GetRawText()), Repository))]
+                    : [(RszObjectNode)RszJsonSerializer.Deserialize(JsonDocument.Parse(objectsElement.GetRawText()), Repository)];
+            }
+            else
+            {
+                builder.Objects = json.RootElement.ValueKind == JsonValueKind.Array
+                    ? [.. json.RootElement.EnumerateArray().Select(x => (RszObjectNode)RszJsonSerializer.Deserialize(JsonDocument.Parse(x.GetRawText()), Repository))]
+                    : [(RszObjectNode)RszJsonSerializer.Deserialize(json, Repository)];
+            }
             return builder.Build().Data.ToArray();
         }
 

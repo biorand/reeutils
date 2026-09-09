@@ -15,6 +15,16 @@ namespace IntelOrca.Biohazard.REE.Rsz
         private UserHeader Header => MemoryMarshal.Read<UserHeader>(data.Span);
         private RszFile Rsz => new RszFile(data.Slice((int)Header.DataOffset));
 
+        /// <summary>Absolute offset of the embedded RSZ stream (the wrapper's DataOffset field).</summary>
+        public int RszDataOffset => (int)Header.DataOffset;
+
+        /// <summary>Number of resource-table entries in the wrapper (paths before the RSZ stream).</summary>
+        public int ResourceCount => (int)Header.ResourceCount;
+
+        /// <summary>Wrapper bytes before the RSZ stream (header + resource table + resource strings +
+        /// userdata table). Preserved verbatim on rebuild so resource-bearing files round-trip.</summary>
+        public byte[] Prefix => data.Slice(0, RszDataOffset).ToArray();
+
         public int RszVersion => Rsz.Version;
 
         public int InstanceCount => Rsz.InstanceCount;
@@ -32,65 +42,32 @@ namespace IntelOrca.Biohazard.REE.Rsz
             public int RszVersion { get; }
             public ImmutableArray<RszObjectNode> Objects { get; set; }
 
+            /// <summary>Wrapper bytes before the RSZ stream, preserved from the source file (the header,
+            /// resource table, resource strings and userdata table). The RSZ stream is re-emitted below
+            /// it, so resource-bearing .user files (e.g. oniws BankList/TriggerInfoList/EffectParam)
+            /// round-trip without dropping their resource table.</summary>
+            public byte[] PreservedPrefix { get; set; }
+
             public Builder(RszTypeRepository repository, UserFile instance)
             {
                 Repository = repository;
                 RszVersion = instance.Rsz.Version;
                 Objects = instance.Rsz.ReadObjectList(repository);
+                PreservedPrefix = instance.Prefix;
             }
 
             public UserFile Build()
             {
                 var rszBuilder = new RszFile.Builder(Repository, RszVersion);
                 rszBuilder.Objects = Objects;
+                // Alignment inside the RSZ stream is computed against its absolute position in the
+                // wrapper, which is the preserved prefix length (== the source DataOffset).
+                rszBuilder.AlignOffset = PreservedPrefix.Length;
                 var rsz = rszBuilder.Build();
 
                 var ms = new MemoryStream();
-                var bw = new BinaryWriter(ms);
-                var stringPool = new StringPoolBuilder(ms);
-
-                // Reserve space for header
-                bw.WriteZeros(48);
-
-                // Resources
-                bw.Align(16);
-                var resourceOffset = ms.Position;
-
-                // Userdata
-                bw.Align(16);
-                var userDataOffset = 0L;
-                var userDataCount = 0;
-                userDataOffset = ms.Position;
-                var userDataList = rsz.UserDataInfoList;
-                var userDataListPaths = rsz.UserDataInfoPaths;
-                for (var i = 0; i < userDataList.Length; i++)
-                {
-                    bw.Write(userDataList[i].TypeId);
-                    bw.Write(0);
-                    stringPool.WriteStringOffset64(userDataListPaths[i]);
-                }
-                userDataCount = userDataList.Length;
-
-                // Strings
-                bw.Align(16);
-                stringPool.WriteStrings();
-
-                // Instance data
-                var rszDataOffset = ms.Position;
-                rszBuilder.AlignOffset = rszDataOffset;
-                rsz = rszBuilder.Build();
-                bw.Write(rsz.Data.Span);
-
-                // Header
-                ms.Position = 0;
-                bw.Write(MAGIC);
-                bw.Write(0); // Resource count
-                bw.Write(userDataCount); // User data count
-                bw.Write(0); // Info count
-                bw.Write(resourceOffset); // Resource offset
-                bw.Write(userDataOffset); // User data offset
-                bw.Write(rszDataOffset); // Data offset
-                bw.Write(0UL); // Reserved
+                ms.Write(PreservedPrefix, 0, PreservedPrefix.Length);
+                ms.Write(rsz.Data.Span);
 
                 return new UserFile(ms.ToArray());
             }

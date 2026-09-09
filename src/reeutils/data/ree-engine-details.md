@@ -23,6 +23,10 @@ Onimusha ships placement and zone data in three RSZ-backed containers that reeut
 
 `.fsmv2` (BHVT) **import is now supported for versions 30, 40, and 42**. Version 42 (RE9 / Onimusha-era) differs from 40 in the header (a 4-byte pad after the hash) and in the trailing pools: v42 files place the empty userdata-path pool directly after the resource pool with no 16-byte alignment, and write it as just the count (no char-length field). Onimusha `.fsmv2.42` export→import is byte-identical.
 
+## .user wrapper resources
+
+`.user` files wrap their RSZ stream in a `USR` header plus an optional resource table (8-byte offsets into a UTF-16 string pool) and a userdata table. Onimusha ships many `.user.3` files with a resource table before the RSZ (bank lists, montage parts, trigger-info lists, effect params). The wrapper prefix is preserved verbatim on rebuild (and carried as `@meta-user.prefix` in exports that need it), so editing those files doesn't drop the resource table — dropping it corrupts the file and the game refuses to load it.
+
 ## Core concepts
 
 - **PAK files** store hashed file entries. A pak list is needed to map hashes back to human-readable paths.

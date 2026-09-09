@@ -39,6 +39,20 @@ namespace IntelOrca.Biohazard.REE.Tests
         }
 
         [Fact]
+        public void Rebuild_Oniws_User_With_Resources_Is_ByteIdentical()
+        {
+            // Resource-bearing .user files carry a wrapper resource table before the RSZ stream;
+            // rebuilding must preserve it or the file is corrupted (game fails to load).
+            var repo = _pakHelper.GetTypeRepository(GameNames.ONIWS);
+            var path = "natives/STM/Sound/UserData/12_Bank/Resident/FSM/MainMission/Ms000055_BankListData.user.3";
+            var input = new UserFile(_pakHelper.GetFileData(GameNames.ONIWS, path));
+            Assert.Equal(1, input.ResourceCount);
+            var output = input.ToBuilder(repo).Build();
+            Assert.True(output.Data.Span.SequenceEqual(input.Data.Span),
+                "Resource-bearing .user rebuild must be byte-identical.");
+        }
+
+        [Fact]
         public void Rebuild_Oniws_Scene()
         {
             AssertRebuildScene("natives/STM/GameDesign/System/Environment/Stage/Stage100/Area/Area.scn.21");
