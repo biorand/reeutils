@@ -40,6 +40,10 @@ namespace RszViewer
             if (lower.Contains(".uvar")) return "🔧";
             if (lower.Contains(".pak")) return "📦";
             if (lower.Contains(".aimap")) return "📍";
+            if (lower.Contains(".pog.")) return "📍";
+            if (lower.Contains(".poglst.")) return "📇";
+            if (lower.Contains(".cset.")) return "🟥";
+            if (lower.Contains(".fsmv2.")) return "🌳";
             return "📄";
         }
 
@@ -54,6 +58,10 @@ namespace RszViewer
             if (lower.Contains(".uvar")) return "#26A69A"; // Teal
             if (lower.Contains(".pak")) return "#8D6E63"; // Brown
             if (lower.Contains(".aimap")) return "#EF5350"; // Red
+            if (lower.Contains(".pog.")) return "#EF5350"; // Red
+            if (lower.Contains(".poglst.")) return "#AB47BC"; // Purple
+            if (lower.Contains(".cset.")) return "#FF7043"; // Deep orange
+            if (lower.Contains(".fsmv2.")) return "#66BB6A"; // Green
             return "#90A4AE"; // Grey
         }
 
@@ -165,7 +173,8 @@ namespace RszViewer
 
         public static bool IsTargetFileStatic(string filename)
         {
-            return filename.Contains(".user.") || filename.Contains(".scn.") || filename.Contains(".pfb.") || filename.Contains(".tex") || filename.Contains(".msg") || filename.Contains(".uvar") || filename.Contains(".pak") || filename.Contains(".aimap");
+            return filename.Contains(".user.") || filename.Contains(".scn.") || filename.Contains(".pfb.") || filename.Contains(".tex") || filename.Contains(".msg") || filename.Contains(".uvar") || filename.Contains(".pak") || filename.Contains(".aimap")
+                || filename.Contains(".pog.") || filename.Contains(".poglst.") || filename.Contains(".cset.") || filename.Contains(".fsmv2.");
         }
     }
 }

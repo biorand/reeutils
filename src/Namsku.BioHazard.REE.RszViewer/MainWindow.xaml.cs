@@ -139,7 +139,7 @@ namespace RszViewer
                 {
                     string filePath = files[0];
                     string lower = filePath.ToLower();
-                    if (lower.Contains(".scn.") || lower.Contains(".pfb.") || lower.Contains(".user.") || lower.Contains(".aimap") || lower.Contains(".tex") || lower.Contains(".msg") || lower.Contains(".uvar") || lower.Contains(".pak"))
+                    if (lower.Contains(".scn.") || lower.Contains(".pfb.") || lower.Contains(".user.") || lower.Contains(".aimap") || lower.Contains(".tex") || lower.Contains(".msg") || lower.Contains(".uvar") || lower.Contains(".pak") || lower.Contains(".pog.") || lower.Contains(".poglst.") || lower.Contains(".cset.") || lower.Contains(".fsmv2."))
                     {
                         LoadFileForView(filePath);
                     }
@@ -521,6 +521,22 @@ namespace RszViewer
                     }
                     viewModels.Add(rszNode);
                 }
+                else if (lower.Contains(".fsmv2."))
+                {
+                    viewModels = CategorizeFsmv2Nodes(data, filePath);
+                }
+                else if (lower.Contains(".pog."))
+                {
+                    viewModels = CategorizePogNodes(data, filePath);
+                }
+                else if (lower.Contains(".poglst."))
+                {
+                    viewModels = CategorizePoglstNodes(data, filePath);
+                }
+                else if (lower.Contains(".cset."))
+                {
+                    viewModels = CategorizeCsetNodes(data, filePath);
+                }
                 else
                 {
                     var userFile = new UserFile(data);
@@ -647,6 +663,104 @@ namespace RszViewer
             }
 
             return rootNodes.Any() ? rootNodes : gameObjects.Concat(folders).ToList();
+        }
+
+        /// <summary>Renders an Onimusha .fsmv2 behaviour tree (version 42) as a navigable node tree.</summary>
+        private IList<RszNodeViewModel> CategorizeFsmv2Nodes(byte[] data, string filePath)
+        {
+            var version = GetVersion(filePath.ToLower(), ".fsmv2.");
+            var bhvt = new BhvtFile(version, data);
+            var root = bhvt.ReadTree(_repo);
+            var rootNode = new RszNodeViewModel($"FSM: {root.Name}", root.Id.ToString(), "BhvtNode") { Icon = "\uE8B7" };
+            AddBhvtChildren(rootNode, root);
+            return new List<RszNodeViewModel> { rootNode };
+        }
+
+        private static void AddBhvtChildren(RszNodeViewModel parent, BhvtNode node)
+        {
+            parent.Children.Add(new RszNodeViewModel("Id", node.Id.ToString(), "BhvtNodeId"));
+            parent.Children.Add(new RszNodeViewModel("Priority", node.Priority.ToString(), "Int32"));
+            parent.Children.Add(new RszNodeViewModel("Attributes", node.Attributes.ToString(), "Enum"));
+
+            foreach (var action in node.Actions)
+            {
+                if (action.Instance != null)
+                    parent.Children.Add(new RszNodeViewModel(action.Instance, $"Action (ex {action.ActionEx})"));
+            }
+            foreach (var state in node.States)
+            {
+                var stateNode = new RszNodeViewModel($"State -> {state.Target}", $"map {state.TransitionMapId} ex {state.StateEx}", "State");
+                if (state.Condition != null) stateNode.Children.Add(new RszNodeViewModel(state.Condition, "Condition"));
+                foreach (var ev in state.Events) stateNode.Children.Add(new RszNodeViewModel(ev, "Event"));
+                parent.Children.Add(stateNode);
+            }
+            foreach (var transition in node.Transitions)
+            {
+                var tNode = new RszNodeViewModel($"Transition -> {transition.Start}", "", "Transition");
+                if (transition.Condition != null) tNode.Children.Add(new RszNodeViewModel(transition.Condition, "Condition"));
+                parent.Children.Add(tNode);
+            }
+            foreach (var child in node.Children)
+            {
+                var childNode = new RszNodeViewModel(child.Node.Name, child.Node.Id.ToString(), "BhvtNode");
+                AddBhvtChildren(childNode, child.Node);
+                parent.Children.Add(childNode);
+            }
+        }
+
+        /// <summary>Renders an Onimusha .pog point graph: the graph container, node table, and the
+        /// placed-context RSZ objects (each node's type id + transform).</summary>
+        private IList<RszNodeViewModel> CategorizePogNodes(byte[] data, string filePath)
+        {
+            var version = GetVersion(filePath.ToLower(), ".pog.");
+            var pog = new PogFile(version, data);
+            var list = new List<RszNodeViewModel>();
+
+            var graphNode = new RszNodeViewModel("Graph", $"hash 0x{pog.GraphHash:X8} · {pog.NodeCount} nodes", "PointGraph") { Icon = "\uE8F1" };
+            foreach (var obj in pog.ReadGraphObjects(_repo))
+                graphNode.Children.Add(new RszNodeViewModel(obj, obj.Type.Name));
+            list.Add(graphNode);
+
+            if (pog.NodeEntries.Length > 0)
+            {
+                var tableNode = new RszNodeViewModel("Node Table", $"{pog.NodeEntries.Length} entries", "List") { Icon = "\uE8FD" };
+                for (var i = 0; i < pog.NodeEntries.Length; i++)
+                {
+                    tableNode.Children.Add(new RszNodeViewModel($"Node {i}", $"object {pog.NodeEntries[i].ObjectIndex}", "NodeEntry"));
+                }
+                list.Add(tableNode);
+            }
+
+            var nodesNode = new RszNodeViewModel("Placed Objects", $"{pog.ReadObjects(_repo).Length} objects", "List") { Icon = "\uE8B7" };
+            var objects = pog.ReadObjects(_repo);
+            for (var i = 0; i < objects.Length; i++)
+            {
+                nodesNode.Children.Add(new RszNodeViewModel(objects[i], $"Node {i} · {objects[i].Type.Name}"));
+            }
+            list.Add(nodesNode);
+            return list;
+        }
+
+        /// <summary>Renders an Onimusha .poglst point-graph list (the .pog paths a layouter loads).</summary>
+        private IList<RszNodeViewModel> CategorizePoglstNodes(byte[] data, string filePath)
+        {
+            var version = GetVersion(filePath.ToLower(), ".poglst.");
+            var poglst = new PogListFile(version, data);
+            var root = new RszNodeViewModel("Point Graph List", $"{poglst.PogFiles.Length} graphs", "Poglst") { Icon = "\uE8FD" };
+            foreach (var p in poglst.PogFiles)
+                root.Children.Add(new RszNodeViewModel(Path.GetFileName(p), p, "Resource"));
+            return new List<RszNodeViewModel> { root };
+        }
+
+        /// <summary>Renders an Onimusha .cset collider set: header summary + the zone-parameter RSZ objects.</summary>
+        private IList<RszNodeViewModel> CategorizeCsetNodes(byte[] data, string filePath)
+        {
+            var version = GetVersion(filePath.ToLower(), ".cset.");
+            var cset = new CsetFile(version, data, _repo);
+            var root = new RszNodeViewModel("Collider Set", $"RSZ @0x{cset.MainRszOffset:X} · {cset.ShapeListCount}/{cset.ShapeCount} shapes", "Cset") { Icon = "\uE8F1" };
+            foreach (var obj in cset.ReadObjects(_repo))
+                root.Children.Add(new RszNodeViewModel(obj, obj.Type.Name));
+            return new List<RszNodeViewModel> { root };
         }
 
         private int GetVersion(string fileName, string ext)
@@ -1060,6 +1174,22 @@ namespace RszViewer
                                 var scene = pfbFile.ReadScene(_repo);
                                 viewModels = CategorizeSceneNodes(scene);
                             }
+                            else if (lower.Contains(".aimap"))
+                            {
+                                var aimap = new AimapFile(data);
+                                viewModels = new List<RszNodeViewModel>();
+                                var instanceList = aimap.Rsz.ReadInstanceList(_repo);
+                                var rszNode = new RszNodeViewModel($"RSZ Objects [{instanceList.Length}]", $"{instanceList.Length} instances", "RszFile");
+                                foreach (var inst in instanceList)
+                                {
+                                    if (inst.Value != null) rszNode.Children.Add(new RszNodeViewModel(inst.Value, $"Instance {inst.Id.Index}"));
+                                }
+                                viewModels.Add(rszNode);
+                            }
+                            else if (lower.Contains(".fsmv2.")) viewModels = CategorizeFsmv2Nodes(data, filePath);
+                            else if (lower.Contains(".pog.")) viewModels = CategorizePogNodes(data, filePath);
+                            else if (lower.Contains(".poglst.")) viewModels = CategorizePoglstNodes(data, filePath);
+                            else if (lower.Contains(".cset.")) viewModels = CategorizeCsetNodes(data, filePath);
                             else if (lower.Contains(".user."))
                             {
                                 var userFile = new UserFile(data);
@@ -1330,6 +1460,22 @@ namespace RszViewer
                         }
                     }
                     viewModels.Add(rszNode);
+                }
+                else if (lower.Contains(".fsmv2."))
+                {
+                    viewModels = CategorizeFsmv2Nodes(data, filePath);
+                }
+                else if (lower.Contains(".pog."))
+                {
+                    viewModels = CategorizePogNodes(data, filePath);
+                }
+                else if (lower.Contains(".poglst."))
+                {
+                    viewModels = CategorizePoglstNodes(data, filePath);
+                }
+                else if (lower.Contains(".cset."))
+                {
+                    viewModels = CategorizeCsetNodes(data, filePath);
                 }
                 else
                 {
