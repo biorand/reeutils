@@ -96,7 +96,9 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
             if (settings.Json)
             {
                 using var json = handler.GetJson(treeOptions);
-                Console.WriteLine(JsonSupport.ToJsonString(json));
+                // Raw UTF-8 bytes, like `export` writes. Console.WriteLine would re-encode through the
+                // console codepage and best-fit-mangle non-ASCII text (e.g. U+201C -> '"'), breaking JSON.
+                JsonSupport.WriteJsonToOutput(json, JsonOutputOverride ?? Console.OpenStandardOutput());
             }
             else
             {
@@ -105,6 +107,9 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
 
             return 0;
         }
+
+        /// <summary>Test seam: where <c>--json</c> output is written. Defaults to the process stdout.</summary>
+        internal System.IO.Stream? JsonOutputOverride { get; set; }
 
         private static string? GetFilePath(Settings settings)
         {

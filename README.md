@@ -9,7 +9,7 @@ A .NET library for working with RE Engine resource formats and PAK files. Primar
 Add the package to your project by referencing the NuGet package in your `.csproj`:
 
 ```xml
-<PackageReference Include="IntelOrca.Biohazard.REE" Version="1.5.1" />
+<PackageReference Include="IntelOrca.Biohazard.REE" Version="1.5.2" />
 ```
 
 Basic example showing how to open a file from the game's patched pak files, modify it and write a new patch pak:
@@ -66,9 +66,9 @@ dotnet test
 | ---- | ------- |
 | RE2/RE3 (non-RT) | `.scn.19`, `.pfb.16`, `.fsmv2.30` — full read+write, byte-identical JSON roundtrip (corpus-verified) |
 | RE8 | `.fsmv2.40` (BHVT), `.user`, `.scn`, `.pfb` (RSZ-based), `.tex`, `.msg`, `.fsm` |
-| Onimusha WotS | `.scn.21`, `.user.3`, `.pfb.18` (RSZ-based), `.msg.23` (MSG) — full read+write, corpus-verified |
+| Onimusha WotS | `.scn.21`, `.user.3`, `.pfb.18`, `.msg.23`, `.pog.12`, `.poglst.0`, `.cset.6`, `.fsmv2.42` — full read+write, corpus-verified (byte-identical for the point-graph/collider-set/fsmv2 containers) |
 
-> Note: Onimusha `.fsmv2.42` files can be read but `.fsmv2` import is not supported for this version — see `ree-engine-details.md`.
+> Note: Onimusha `.pog.12` point graphs (placed enemy/item/gimmick nodes, `.poglst.0` lists, and `.cset.6` collider sets) are fully read+write. `.fsmv2.42` behaviour trees now support import for **versions 30, 40, and 42** (RE2/RE3, RE8, and RE9/Onimusha-era).
 
 > Note: when invoking the CLI on versioned files, keep the version suffix (`.19`/`.16`/`.30`) — bare extensions default to the RT/newer versions.
 

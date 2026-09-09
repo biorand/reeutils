@@ -26,6 +26,9 @@ namespace IntelOrca.Biohazard.REEUtils
                 ".scn" => new SceneFileHandler(path, data, GetVersionOrDefault(info, 20), repository),
                 ".pfb" => new PrefabFileHandler(path, data, GetVersionOrDefault(info, 17), repository),
                 ".tex" => new TextureFileHandler(path, data),
+                ".pog" => new PointGraphFileHandler(path, data, GetVersionOrDefault(info, 12), repository),
+                ".poglst" => new PointGraphListFileHandler(path, data, GetVersionOrDefault(info, 0)),
+                ".cset" => new ColliderSetFileHandler(path, data, GetVersionOrDefault(info, 6), repository),
                 _ => throw new NotSupportedException($"Unsupported file format '{info.Extension}'.")
             };
         }

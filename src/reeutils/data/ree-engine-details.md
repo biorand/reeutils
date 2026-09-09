@@ -9,7 +9,19 @@
 - `re7`
 - `re8`
 - `re9`
-- `oniws` (Onimusha: Way of the Sword) — uses `.scn.21`, `.user.3`, `.pfb.18`, `.fsmv2.42`, and `.msg.23` containers. `rszoniws.json.gz` derives from the retail game RSZ dump; `paklist.oniws.txt.gz` lists the retail pak contents. Both are pinned upstream data (SHA-256 in the vendoring commit).
+- `oniws` (Onimusha: Way of the Sword) — uses `.scn.21`, `.user.3`, `.pfb.18`, `.fsmv2.42`, `.msg.23`, `.pog.12`, `.poglst.0`, and `.cset.6` containers. `rszoniws.json.gz` derives from the retail game RSZ dump; `paklist.oniws.txt.gz` lists the retail pak contents. Both are pinned upstream data (SHA-256 in the vendoring commit).
+
+## Onimusha point-graph / collider-set containers
+
+Onimusha ships placement and zone data in three RSZ-backed containers that reeutils reads **and** writes (byte-identical roundtrip, corpus-verified):
+
+- `.pog.12` — **point graphs**. A `POG` container (magic `POG\0`, version 12) with a node table and two embedded RSZ streams. The main stream holds the placed-context objects (`app.ContextPointGraphEnemy` / `app.ContextPointGraphGimmick` / `app.ContextPointGraphItem`, etc.) — the per-node type id (e.g. `_Data._EmID`) and world transform (`v2` position, `_Rotation`) — and the secondary stream holds the graph-level container (`app.ContextPointGraph*.cContextLayoutGraph*`). The node table maps each graph node to a position in the main object list, so adding/removing a node edits both `objects` and `nodeTable` in the exported JSON. Two node-section layouts exist: the standard table (header field `0x10` = 0) and the spawner/point-pool name table (`SpnSet_*`, `RandomSetPoint_*`, `0x10` != 0, preserved verbatim). Empty graphs (no nodes) omit the main RSZ stream.
+- `.poglst.0` — **point-graph lists**. A `PGL` container (magic `PGL\0`, version 0) that indexes the `.pog` paths a `ContextLayouter` / `RandomSetPointFinder` loads. Editing the `files` array changes a `RandomSet_*_Set{NNN}` variant list's membership. Note the stored paths omit the `.12` version suffix.
+- `.cset.6` — **collider sets**. A `CSET` container (magic `CSET`, version 0–8) with a native header + collider geometry (preserved verbatim) and one parameter RSZ stream holding the per-zone objects (`app.col_user_data.*ZoneCollider`). The header/geometry bytes are carried base64 in `@meta-cset`; the `objects` array is the editable zone parameter list.
+
+## fsmv2 import versions
+
+`.fsmv2` (BHVT) **import is now supported for versions 30, 40, and 42**. Version 42 (RE9 / Onimusha-era) differs from 40 in the header (a 4-byte pad after the hash) and in the trailing pools: v42 files place the empty userdata-path pool directly after the resource pool with no 16-byte alignment, and write it as just the count (no char-length field). Onimusha `.fsmv2.42` export→import is byte-identical.
 
 ## Core concepts
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Spectre.Console;
@@ -28,6 +29,21 @@ namespace IntelOrca.Biohazard.REEUtils
         public static string ToJsonString(JsonDocument document)
         {
             return JsonSerializer.Serialize(document.RootElement, CreateOptions());
+        }
+
+        /// <summary>
+        /// Writes a JSON document to a stream as raw UTF-8 bytes (plus trailing newline). This is the
+        /// same byte output <see cref="FileTypes.FileHandlerBase.Export"/> produces. Do NOT round-trip
+        /// through <c>Console.WriteLine</c>: its writer re-encodes text through the console codepage,
+        /// whose best-fit mapping corrupts non-ASCII characters (e.g. U+201C RIGHT DOUBLE QUOTATION MARK
+        /// becomes a bare ASCII <c>"</c>) and can emit invalid JSON.
+        /// </summary>
+        public static void WriteJsonToOutput(JsonDocument document, Stream output)
+        {
+            var bytes = new UTF8Encoding(false).GetBytes(ToJsonString(document));
+            output.Write(bytes, 0, bytes.Length);
+            output.WriteByte((byte)'\n');
+            output.Flush();
         }
 
         public static JsonDocument ApplyTreeOptions(JsonDocument document, TreeOptions options)
@@ -170,7 +186,7 @@ namespace IntelOrca.Biohazard.REEUtils
                     {
                         if (IsLeaf(childElement))
                         {
-                            parent.AddNode($"[white][{index}][/] = [green]{Escape(Format(childElement))}[/]");
+                            parent.AddNode($"[white]{Escape($"[{index}]")}[/] = [green]{Escape(Format(childElement))}[/]");
                         }
                         else
                         {

@@ -83,6 +83,54 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             "natives/STM/GameDesign/Text/Manual/Mission/Ms000120.msg.23",
         ];
 
+        private static readonly string[] PogCorpus =
+        [
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_000/Layout/EmSet_Area100_000_00.pog.12",
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_000/Layout/RandomEmSet_Area100_000_Set001.pog.12",
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_000/Layout/RandomEmSet_Area100_000_Set014.pog.12",
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_000/Layout/GmSet_Area100_000_00.pog.12",
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_000/Layout/ItSet_Area100_000_00.pog.12",
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_202/Layout/EmSet_Area100_202_00.pog.12",
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_204/Layout/RandomEmSet_Area100_204_Set004.pog.12",
+            "natives/STM/GameDesign/Environment/Stage/Stage201/Area/Area201_002/Layout/EmSet_Area201_002_MS100200.pog.12",
+            "natives/STM/GameDesign/Environment/Stage/Stage201/Area/Area201_002/Layout/SetWave/Area201_002_MS100201_3.pog.12",
+            "natives/STM/GameDesign/Environment/Stage/Stage213/Area/Area213_000/Layout/SpnSet_Area213_000_00.pog.12",
+            "natives/STM/GameDesign/Environment/Stage/Stage213/Area/Area213_004/Layout/EmSet_Area213_004_00.pog.12",
+            "natives/STM/Sound/UserData/41_Env/Pos/Stage201/Stage201_Ochiba_EnvFoliage_PointGraph.pog.12",
+        ];
+
+        private static readonly string[] PoglstCorpus =
+        [
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_000/Layout/ContextLayoutList_Area100_000.poglst.0",
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_000/Layout/RandomSet_Area100_000_Set001.poglst.0",
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_001/Layout/RandomSet_Area100_001_Set005.poglst.0",
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_102/Layout/RandomSet_Area100_102_Set000.poglst.0",
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_204/Layout/SetWave/SpnSetList014.poglst.0",
+            "natives/STM/GameDesign/Environment/Stage/Stage209/Area/Area209_011/Layout/SetWave/OgSetList010.poglst.0",
+            "natives/STM/GameDesign/Event/Cutscene/evc/evc1103/Fsm/evc1103_PointGraphList_End.poglst.0",
+            "natives/STM/GameDesign/Event/Cutscene/evc/evc1608/Fsm/evc1608_PointGraphList_Start.poglst.0",
+        ];
+
+        private static readonly string[] CsetCorpus =
+        [
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_000/Layout/RestrictZone_Area100_000.cset.6",
+            "natives/STM/GameDesign/Environment/Stage/Stage209/Area/Area209_003/Layout/UniqueActingZone_Area209_003.cset.6",
+            "natives/STM/GameDesign/Environment/Stage/Stage100/Area/Area100_103/Layout/RespawnZone_Area100_103.cset.6",
+            "natives/STM/GameDesign/Environment/Stage/Stage214/Area/Area214_009/Layout/GeographyZone_Area214_009.cset.6",
+            "natives/STM/GameDesign/Story/MainMission/Ms000010/Ob25/_Zone/Ms000010_Ob25_Col.cset.6",
+            "natives/STM/GameDesign/System/Environment/Stage/Stage209/Area/Area209_007/Layout/Gimmick/ColliderSet/GimmickZone_Area209_007_INVALID_Gimmick.cset.6",
+        ];
+
+        private static readonly string[] Fsmv2Corpus =
+        [
+            "natives/STM/GameDesign/Story/MainMission/Ms000100/Ob11/_Fsm/Ms000100_Ob11_Fsm01.fsmv2.42",
+            "natives/STM/GameDesign/Story/MainMission/Ms032010/Ob00/_Fsm/Ms032010_Ob00_RestoreFsm.fsmv2.42",
+            "natives/STM/GameDesign/Story/SideMissionStory/Ms100202/Ob06/_Fsm/Ms100202_Ob06_RestoreFsm.fsmv2.42",
+            "natives/STM/GameDesign/Story/SideMissionStory/Ms100401/Ob05/_Fsm/Ms100401_Ob05_Fsm00.fsmv2.42",
+            "natives/STM/GameDesign/Story/SideMissionStory/Ms105003/Ob00/_Fsm/Ms105003_Ob00_RestoreFsm.fsmv2.42",
+            "natives/STM/GameDesign/Story/SideMissionStory/Ms105005/Ob01/_Fsm/Ms105005_Ob01_Fsm01.fsmv2.42",
+        ];
+
         private readonly RePakCollection _pak;
 
         public TestOniwsCorpus()
@@ -117,6 +165,58 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
         public async Task Msg_AllCorpus_RoundTrips()
         {
             await CheckCorpus(".msg.23", MsgCorpus);
+        }
+
+        [Fact]
+        public async Task Pog_AllCorpus_RoundTrips()
+        {
+            await CheckByteIdentical(".pog.12", PogCorpus);
+        }
+
+        [Fact]
+        public async Task Poglst_AllCorpus_RoundTrips()
+        {
+            await CheckByteIdentical(".poglst.0", PoglstCorpus);
+        }
+
+        [Fact]
+        public async Task Cset_AllCorpus_RoundTrips()
+        {
+            await CheckByteIdentical(".cset.6", CsetCorpus);
+        }
+
+        [Fact]
+        public async Task Fsmv2_AllCorpus_RoundTrips()
+        {
+            await CheckByteIdentical(".fsmv2.42", Fsmv2Corpus);
+        }
+
+        /// <summary>
+        /// export -> import must reproduce the original bytes exactly (stronger than the JSON
+        /// idempotency check used for the older formats). Used for the point-graph / collider-set /
+        /// fsmv2 formats where the container is fully re-emitted.
+        /// </summary>
+        private async Task CheckByteIdentical(string extension, IReadOnlyList<string> corpus)
+        {
+            var failures = new List<string>();
+            foreach (var path in corpus)
+            {
+                try
+                {
+                    var (_, _, importedBytes, originalBytes) = await RoundTripAsync(path, extension);
+                    if (!importedBytes.AsSpan().SequenceEqual(originalBytes))
+                    {
+                        failures.Add($"{path}: import changed {importedBytes.Length} bytes -> {originalBytes.Length}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failures.Add($"{path}: {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+
+            Assert.True(failures.Count == 0,
+                $"{failures.Count}/{corpus.Count} {extension} files failed byte-identical roundtrip:\n{string.Join("\n", failures)}");
         }
 
         private async Task CheckCorpus(string extension, IReadOnlyList<string> corpus)

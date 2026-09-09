@@ -743,23 +743,24 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 {
                     // Userdata-path pool: always empty for now (no real .fsmv2 file has been seen using
                     // it), but wired so it fails loudly rather than silently corrupting if that changes.
-                    bw.Align(16);
-                    header["userdataPaths"] = ms.Position;
+                    // An empty pool is just the count (4 bytes), with no char-length field, on every
+                    // observed version including Onimusha v42. v42+ files (RE9/Onimusha-era) place it
+                    // directly after the resource pool with no 16-alignment; earlier versions align.
+                    if (Version >= 42)
+                    {
+                        header["userdataPaths"] = ms.Position;
+                    }
+                    else
+                    {
+                        bw.Align(16);
+                        header["userdataPaths"] = ms.Position;
+                    }
                     foreach (var rsz in new[] { actionRsz, staticActionRsz, selectorRsz, selectorCallerRsz, staticSelectorCallerRsz, conditionsRsz, staticConditionsRsz, transitionEventRsz, staticTransitionEventRsz, expressionTreeConditionsRsz, staticExpressionTreeConditionsRsz })
                     {
                         if (rsz.Version >= 16 && rsz.UserDataInfoPaths.Length > 0)
                             throw new NotSupportedException("This BHVT file references userdata, which isn't supported by the write path yet.");
                     }
-                    if (Version < 42)
-                    {
-                        // Pre-42 files write an empty pool as just the count -- no char-length field.
-                        bw.Write(0);
-                    }
-                    else
-                    {
-                        bw.Write(0);
-                        bw.WriteZeros(4);
-                    }
+                    bw.Write(0);
                 }
 
                 if (UvarBlob != null)
