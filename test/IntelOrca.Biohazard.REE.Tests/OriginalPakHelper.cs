@@ -182,7 +182,7 @@ namespace IntelOrca.Biohazard.REE.Tests
             return string.IsNullOrEmpty(value) ? defaultValue : value;
         }
 
-        private static string GetRepoDataPath()
+        public static string GetRepoDataPath()
         {
             return Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../../../../../src/reeutils/data"));
         }

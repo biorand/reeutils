@@ -112,69 +112,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
         public ImmutableArray<RszInstance> ReadInstanceList(RszTypeRepository repository)
         {
             var instanceInfoList = InstanceInfoList;
-            var instanceRszTypes = new RszType[instanceInfoList.Length];
-            for (var i = 0; i < instanceRszTypes.Length; i++)
-            {
-                var rszTypeId = instanceInfoList[i].TypeId;
-                instanceRszTypes[i] = repository.FromId(rszTypeId) ?? throw new Exception($"Type ID {rszTypeId} not found");
-            }
-
-
-            var result = ImmutableArray.CreateBuilder<RszInstance>();
-            result.Count = instanceInfoList.Length;
-
-            if (Version < 16 || (Version == 8 && IsEmbeddedUserDataTableLayout()))
-            {
-                var userDataInfoList = data.Get<EmbeddedUserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
-                for (var i = 0; i < userDataInfoList.Length; i++)
-                {
-                    var instanceIndex = userDataInfoList[i].InstanceId;
-                    if (instanceIndex >= 0 && instanceIndex < result.Count)
-                    {
-                        var rszType = instanceRszTypes[instanceIndex];
-                        var rszFile = new RszFile(Data.Slice((int)userDataInfoList[i].Offset, (int)userDataInfoList[i].Size));
-                        result[instanceIndex] = new RszInstance(
-                            new RszInstanceId(instanceIndex),
-                            new RszEmbeddedUserValueNode(rszType, (int)userDataInfoList[i].JsonPathHash, rszFile));
-                    }
-                }
-            }
-            else
-            {
-                var userDataInfoList = UserDataInfoList;
-                for (var i = 0; i < userDataInfoList.Length; i++)
-                {
-                    var instanceIndex = userDataInfoList[i].InstanceId;
-                    if (instanceIndex >= 0 && instanceIndex < result.Count)
-                    {
-                        var rszType = instanceRszTypes[instanceIndex];
-                        var path = GetString(userDataInfoList[i].PathOffset);
-                        result[instanceIndex] = new RszInstance(new RszInstanceId(instanceIndex), new RszUserDataNode(rszType, path));
-                    }
-                }
-            }
-
-            var rszDataReader = new RszDataReader(repository, new SpanReader(InstanceData));
-            for (var i = 0; i < instanceInfoList.Length; i++)
-            {
-                if (i < result.Count && result[i].Id.Index != 0)
-                    continue;
-
-                var rszType = instanceRszTypes[i];
-
-                try
-                {
-                    var rszValue = rszType.Id == 0 ? new RszNullNode() : (IRszNode)rszDataReader.ReadStruct(rszType);
-                    if (i < result.Count)
-                    {
-                        result[i] = new RszInstance(new RszInstanceId(i), rszValue);
-                    }
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"Failed to read instance {i} of type '{rszType.Name}' (id {rszType.Id}) at data offset {rszDataReader.BytesRead}", e);
-                }
-            }
+            var result = ReadUnresolvedInstanceList(repository);
 
             // Resolve object/user data references so every reference to an instance resolves to the
             // SAME canonical node (memoized), keeping shared objects a single instance on rebuild.
@@ -307,6 +245,76 @@ namespace IntelOrca.Biohazard.REE.Rsz
             }
         }
 
+        private ImmutableArray<RszInstance>.Builder ReadUnresolvedInstanceList(RszTypeRepository repository)
+        {
+            var instanceInfoList = InstanceInfoList;
+            var instanceRszTypes = new RszType[instanceInfoList.Length];
+            for (var i = 0; i < instanceRszTypes.Length; i++)
+            {
+                var rszTypeId = instanceInfoList[i].TypeId;
+                instanceRszTypes[i] = repository.FromId(rszTypeId) ?? throw new Exception($"Type ID {rszTypeId} not found");
+            }
+
+
+            var result = ImmutableArray.CreateBuilder<RszInstance>();
+            result.Count = instanceInfoList.Length;
+
+            if (Version < 16 || (Version == 8 && IsEmbeddedUserDataTableLayout()))
+            {
+                var userDataInfoList = data.Get<EmbeddedUserDataInfo>(Header.UserDataOffset, Header.UserDataCount);
+                for (var i = 0; i < userDataInfoList.Length; i++)
+                {
+                    var instanceIndex = userDataInfoList[i].InstanceId;
+                    if (instanceIndex >= 0 && instanceIndex < result.Count)
+                    {
+                        var rszType = instanceRszTypes[instanceIndex];
+                        var rszFile = new RszFile(Data.Slice((int)userDataInfoList[i].Offset, (int)userDataInfoList[i].Size));
+                        result[instanceIndex] = new RszInstance(
+                            new RszInstanceId(instanceIndex),
+                            new RszEmbeddedUserValueNode(rszType, (int)userDataInfoList[i].JsonPathHash, rszFile));
+                    }
+                }
+            }
+            else
+            {
+                var userDataInfoList = UserDataInfoList;
+                for (var i = 0; i < userDataInfoList.Length; i++)
+                {
+                    var instanceIndex = userDataInfoList[i].InstanceId;
+                    if (instanceIndex >= 0 && instanceIndex < result.Count)
+                    {
+                        var rszType = instanceRszTypes[instanceIndex];
+                        var path = GetString(userDataInfoList[i].PathOffset);
+                        result[instanceIndex] = new RszInstance(new RszInstanceId(instanceIndex), new RszUserDataNode(rszType, path));
+                    }
+                }
+            }
+
+            var rszDataReader = new RszDataReader(repository, new SpanReader(InstanceData));
+            for (var i = 0; i < instanceInfoList.Length; i++)
+            {
+                if (i < result.Count && result[i].Id.Index != 0)
+                    continue;
+
+                var rszType = instanceRszTypes[i];
+
+                try
+                {
+                    var rszValue = rszType.Id == 0 ? new RszNullNode() : (IRszNode)rszDataReader.ReadStruct(rszType);
+                    if (i < result.Count)
+                    {
+                        result[i] = new RszInstance(new RszInstanceId(i), rszValue);
+                    }
+                }
+                catch (Exception e)
+                {
+                    throw new Exception($"Failed to read instance {i} of type '{rszType.Name}' (id {rszType.Id}) at data offset {rszDataReader.BytesRead}", e);
+                }
+            }
+
+            return result;
+        }
+
         public ImmutableArray<RszObjectNode> ReadObjectList(RszTypeRepository repository)
         {
             var instanceList = ReadInstanceList(repository);
@@ -335,6 +343,51 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     result.Add(ids[i].Index);
             }
             return result.ToArray();
+        }
+
+        /// <summary>
+        /// Diagnostic: ids of instances (index &gt; 0) that are neither in the RSZ object list nor
+        /// referenced by any Object/UserData field of another instance. A type dump that mistypes a
+        /// pointer field as plain data leaves its children unreferenced, which corrupts rebuilt files.
+        /// </summary>
+        public ImmutableArray<RszInstanceId> FindUnreferencedInstances(RszTypeRepository repository)
+        {
+            var instances = ReadUnresolvedInstanceList(repository);
+            var referenced = new HashSet<int>(ReadObjectInstanceIndices());
+            for (var i = 0; i < instances.Count; i++)
+            {
+                MarkReferences(i, instances[i].Value);
+            }
+
+            var result = ImmutableArray.CreateBuilder<RszInstanceId>();
+            for (var i = 1; i < instances.Count; i++)
+            {
+                if (!referenced.Contains(i))
+                {
+                    result.Add(new RszInstanceId(i));
+                }
+            }
+            return result.ToImmutable();
+
+            void MarkReferences(int owner, IRszNode node)
+            {
+                if (node is RszValueNode valueNode)
+                {
+                    if (valueNode.Type == RszFieldType.Object || valueNode.Type == RszFieldType.UserData)
+                    {
+                        var instanceId = valueNode.AsInt32();
+                        if (instanceId != owner)
+                            referenced.Add(instanceId);
+                    }
+                }
+                else if (node is IRszNodeContainer container)
+                {
+                    foreach (var child in container.Children)
+                    {
+                        MarkReferences(owner, child);
+                    }
+                }
+            }
         }
 
         public Builder ToBuilder(RszTypeRepository repository)
