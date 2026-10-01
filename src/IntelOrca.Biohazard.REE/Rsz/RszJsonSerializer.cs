@@ -499,7 +499,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 var id = refElement.GetInt32();
                 if (_nodesById != null && _nodesById.TryGetValue(id, out var shared))
+                {
+                    // The document shares this node on purpose; keep it a single instance.
+                    RszSharedNodes.Mark(shared);
                     return shared;
+                }
                 throw new InvalidOperationException($"Reference @ref {id} could not be resolved; the referenced node must appear earlier in the document.");
             }
 

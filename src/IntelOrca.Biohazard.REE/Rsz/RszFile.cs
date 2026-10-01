@@ -124,9 +124,25 @@ namespace IntelOrca.Biohazard.REE.Rsz
             if (Version < 16)
             {
                 var resolved = new Dictionary<int, IRszNode>();
+
+                // Count how often each instance is referenced (object list entries plus Object /
+                // UserData fields) so genuinely shared ones can be marked for the builder.
+                var referenceCounts = new int[result.Count];
+                foreach (var objectId in ObjectInstanceIds)
+                {
+                    if (objectId.Index >= 0 && objectId.Index < referenceCounts.Length)
+                        referenceCounts[objectId.Index]++;
+                }
+
                 for (var i = 0; i < instanceInfoList.Length; i++)
                 {
                     Resolve(i);
+                }
+
+                for (var i = 0; i < referenceCounts.Length; i++)
+                {
+                    if (referenceCounts[i] > 1)
+                        RszSharedNodes.Mark(result[i].Value);
                 }
 
                 return result.ToImmutable();
@@ -155,6 +171,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                                     var instanceId = valueNode.AsInt32();
                                     if (instanceId >= 0 && instanceId < result.Count)
                                     {
+                                        referenceCounts[instanceId]++;
                                         return Resolve(instanceId);
                                     }
                                     return new RszNullNode();
@@ -166,6 +183,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                                     if (instanceId > 0 && instanceId < result.Count)
                                     {
+                                        referenceCounts[instanceId]++;
                                         return Resolve(instanceId);
                                     }
                                     return new RszUserDataNode();
@@ -448,9 +466,17 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 var getInstance = new Func<IRszNode, RszFieldType, RszInstanceId>((node, type) =>
                 {
                     var q = dict[node];
-                    return (_dedupeInstances || type == RszFieldType.UserData)
-                        ? q.Peek()
-                        : q.Dequeue();
+                    if (type == RszFieldType.UserData)
+                        return q.Peek();
+                    if (_dedupeInstances)
+                    {
+                        // Genuinely shared nodes own one instance. Any other repeat (a clone that
+                        // reuses its source's nodes) was given one instance per occurrence.
+                        return RszSharedNodes.IsShared(node) || q.Count == 1
+                            ? q.Peek()
+                            : q.Dequeue();
+                    }
+                    return q.Dequeue();
                 });
 
                 var ms = new MemoryStream();
@@ -739,13 +765,19 @@ namespace IntelOrca.Biohazard.REE.Rsz
             {
                 if (node is RszObjectNode objectNode)
                 {
-                    AddInstances(objectNode);
+                    if (!AlreadyInstanced(objectNode))
+                        AddInstances(objectNode);
                     return AddInstance(objectNode);
                 }
                 else
                 {
                     throw new NotSupportedException("Non struct node added to object list.");
                 }
+
+                // A shared node that already has an instance also already has instances for its
+                // whole subtree. Walking it again would create duplicates of the descendants that
+                // are not themselves shared, leaving orphan instances behind.
+                bool AlreadyInstanced(IRszNode n) => RszSharedNodes.IsShared(n) && _instanceByNode.ContainsKey(n);
 
                 void AddInstances(RszObjectNode node)
                 {
@@ -769,7 +801,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                                 if (childArray.Children[j] is RszObjectNode childobjectNode)
                                 {
-                                    AddInstances(childobjectNode);
+                                    if (!AlreadyInstanced(childobjectNode))
+                                        AddInstances(childobjectNode);
                                     AddInstance(childobjectNode);
                                 }
                                 else if (childArray.Children[j] is RszUserDataNode userDataNode)
@@ -786,7 +819,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
                         {
                             if (child is RszObjectNode childobjectNode)
                             {
-                                AddInstances(childobjectNode);
+                                if (!AlreadyInstanced(childobjectNode))
+                                    AddInstances(childobjectNode);
                                 if (rszField.Type == RszFieldType.Object ||
                                     rszField.Type == RszFieldType.UserData)
                                 {
@@ -814,10 +848,12 @@ namespace IntelOrca.Biohazard.REE.Rsz
 
                     // RE2 scn/pfb (RSZ v8) files share one instance for every reference to the
                     // same object (e.g. post-effect params shared across filter settings), so
-                    // de-duplicate by node identity. Later engine versions re-emit each
-                    // reference as a separate instance; changing that behaviour would alter
-                    // existing RE4/RE9 output.
-                    if (_dedupeInstances && !(node is RszUserDataNode))
+                    // de-duplicate by node identity, but only the nodes the source actually shared
+                    // (see RszSharedNodes). Nodes are immutable, so a cloned game object reuses its
+                    // source's component nodes; those must still get instances of their own.
+                    // Later engine versions re-emit each reference as a separate instance.
+                    var dedupe = _dedupeInstances && !(node is RszUserDataNode) && RszSharedNodes.IsShared(node);
+                    if (dedupe)
                     {
                         if (_instanceByNode.TryGetValue(node, out var shared))
                         {
@@ -850,7 +886,7 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     }
 
                     var instance = new RszInstance(new RszInstanceId(builder.Count), node);
-                    if (_dedupeInstances && !(node is RszUserDataNode))
+                    if (dedupe)
                     {
                         _instanceByNode.Add(node, instance);
                     }

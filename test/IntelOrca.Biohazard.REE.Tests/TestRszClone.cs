@@ -79,6 +79,87 @@ namespace IntelOrca.Biohazard.REE.Tests
             Assert.Equal(originalGoGuids, originalAfter);
         }
 
+        /// <summary>
+        /// A cloned game object must serialize to its own instances. RE2 (non-RT) scenes share
+        /// instances by node identity on rebuild, and Clone only replaces nodes it changes, so a
+        /// clone used to end up pointing at the same component instances as its source, which
+        /// crashes the game.
+        /// </summary>
+        [Fact]
+        public void Clone_RE2_RebuildDoesNotShareInstancesWithOriginal()
+        {
+            var repo = _pakHelper.GetTypeRepository(GameNames.RE2);
+            var path = "natives/x64/objectroot/scene/scenario/scenariono/rpd/enemy/s02_0100.scn.19";
+            var input = new ScnFile(FileVersion.FromPath(path), _pakHelper.GetFileData(GameNames.RE2, path));
+            var builder = input.ToBuilder(repo);
+
+            // Baseline: the vanilla scene has no shared nodes.
+            Assert.Empty(FindSharedObjectNodes(builder.Scene));
+
+            RszGameObject? source = null;
+            builder.Scene.VisitGameObjects(go =>
+            {
+                if (source == null && go.Components.Length >= 3)
+                    source = go;
+            });
+            Assert.NotNull(source);
+
+            var clone = source.Clone();
+            builder.Scene = builder.Scene.VisitGameObjects(go =>
+                go.Guid == source.Guid ? go.WithChildren(go.Children.Add(clone)) : go);
+
+            var output = builder.Build();
+            var reread = output.ToBuilder(repo).Scene;
+
+            Assert.Empty(FindSharedObjectNodes(reread));
+        }
+
+        private static List<string> FindSharedObjectNodes(RszScene scene)
+        {
+            var seen = new HashSet<IRszNode>(ReferenceEqualityComparer.Instance);
+            var shared = new List<string>();
+            foreach (var child in scene.Children)
+                Walk(child);
+            return shared;
+
+            // Own traversal: RszExtensions.Visit walks a game object's children twice and never
+            // reaches its settings node.
+            void Walk(IRszNode node)
+            {
+                switch (node)
+                {
+                    case RszFolder folder:
+                        foreach (var child in folder.Children)
+                            Walk(child);
+                        break;
+                    case RszGameObject gameObject:
+                        WalkObject(gameObject.Settings);
+                        foreach (var component in gameObject.Components)
+                            WalkObject(component);
+                        foreach (var child in gameObject.Children)
+                            Walk(child);
+                        break;
+                }
+            }
+
+            void WalkObject(IRszNode node)
+            {
+                if (node is RszObjectNode objectNode)
+                {
+                    if (!seen.Add(objectNode))
+                    {
+                        shared.Add(objectNode.Type.Name);
+                        return;
+                    }
+                }
+                if (node is IRszNodeContainer container)
+                {
+                    foreach (var child in container.Children)
+                        WalkObject(child);
+                }
+            }
+        }
+
         private static List<Guid> CollectGameObjectRefs(RszScene scene)
         {
             var refs = new List<Guid>();

@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using IntelOrca.Biohazard.REE.Package;
+using IntelOrca.Biohazard.REE.Rsz;
 using IntelOrca.Biohazard.REEUtils;
 using IntelOrca.Biohazard.REEUtils.Commands;
 
@@ -58,30 +62,7 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
         [Fact]
         public async Task Fsmv2File30_AllCorpus()
         {
-            var pakList = EmbeddedData.GetPakList(Game)
-                ?? throw new Exception("Embedded pak list for re2 not found.");
-            var paths = new List<string>();
-            foreach (var h in _pak.FileHashes)
-            {
-                var pth = pakList.GetPath(h);
-                if (pth != null && pth.EndsWith(".fsmv2.30")) paths.Add(pth);
-            }
-            Assert.True(paths.Count > 0, "No fsmv2.30 files found in the vanilla pak.");
-
-            var failures = new List<string>();
-            foreach (var path in paths)
-            {
-                try
-                {
-                    await CheckFileAsync(path, ".fsmv2.30");
-                }
-                catch (Exception ex)
-                {
-                    failures.Add($"{path}: {ex.Message}");
-                }
-            }
-            Assert.True(failures.Count == 0,
-                $"{failures.Count}/{paths.Count} fsmv2.30 files failed roundtrip:\n{string.Join("\n", failures)}");
+            await CheckCorpus(".fsmv2.30");
         }
 
         /// <summary>
@@ -116,59 +97,58 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             }
             Assert.True(paths.Count > 0, $"No {extension} files found in the vanilla pak.");
 
-            var failures = new List<string>();
-            foreach (var path in paths)
-            {
-                try
+            // Files are independent, so check them on every core. Pak reads are lock-protected.
+            var failures = new ConcurrentBag<string>();
+            await Parallel.ForEachAsync(
+                paths,
+                new ParallelOptions
                 {
-                    await CheckFileAsync(path, extension);
-                }
-                catch (Exception ex)
+                    MaxDegreeOfParallelism = Environment.ProcessorCount,
+                    CancellationToken = TestContext.Current.CancellationToken
+                },
+                async (path, _) =>
                 {
-                    failures.Add($"{path}: {ex.Message}");
-                }
-            }
+                    try
+                    {
+                        await CheckFileAsync(path, extension);
+                    }
+                    catch (Exception ex)
+                    {
+                        failures.Add($"{path}: {ex.Message}");
+                    }
+                });
+            var sortedFailures = failures.OrderBy(x => x, StringComparer.Ordinal).ToList();
             Assert.True(failures.Count == 0,
                 $"{failures.Count}/{paths.Count} {extension} files failed roundtrip:\n{string.Join("\n", failures)}");
         }
 
-        private async Task CheckFileAsync(string path, string extension)
+        // The RSZ type database is large and expensive to parse, so load it once for every file
+        // and thread instead of once per export/import call.
+        private static readonly Lazy<RszTypeRepository> _repository =
+            new(() => McpEmbeddedData.GetRszTypeRepository(Game));
+
+        private Task CheckFileAsync(string path, string extension)
         {
-            using var tempFolder = new TempFolder();
+            CheckFile(path, extension);
+            return Task.CompletedTask;
+        }
+
+        // Export -> import -> export entirely in memory (the same handler calls the CLI commands
+        // make, minus the temp files and per-call repository load).
+        private void CheckFile(string path, string extension)
+        {
+            var repository = _repository.Value;
+            var virtualPath = $"test{extension}";
             var entryData = _pak.GetEntryData(path) ?? throw new Exception($"'{path}' not found in vanilla pak.");
-            var filePath = tempFolder.GetSubPath($"test{extension}");
-            var jsonPath = tempFolder.GetSubPath("test.json");
-            File.WriteAllBytes(filePath, entryData);
 
-            var exportCommand = new ExportCommand();
-            await exportCommand.ExecuteAsync(null!, new ExportCommand.Settings()
-            {
-                InputPath = filePath,
-                Game = Game,
-                OutputPath = jsonPath
-            });
+            var jsonA = FileHandlerFactory.Default.Create(virtualPath, entryData, repository).Export();
 
-            var jsonA = File.ReadAllText(jsonPath);
-
-            var importCommand = new ImportCommand();
-            await importCommand.ExecuteAsync(null!, new ImportCommand.Settings()
-            {
-                InputPath = jsonPath,
-                Game = Game,
-                OutputPath = filePath
-            });
-
-            var importedBytes = await File.ReadAllBytesAsync(filePath, TestContext.Current.CancellationToken);
+            using var jsonDocument = JsonDocument.Parse(jsonA);
+            var importedBytes = FileHandlerFactory.Default.Create(virtualPath, Array.Empty<byte>(), repository).Import(jsonDocument);
             Assert.Equal(entryData, importedBytes);
 
-            await exportCommand.ExecuteAsync(null!, new ExportCommand.Settings()
-            {
-                InputPath = filePath,
-                Game = Game,
-                OutputPath = jsonPath
-            });
-            var jsonB = File.ReadAllText(jsonPath);
-            Assert.Equal(jsonA, jsonB);
+            var jsonB = FileHandlerFactory.Default.Create(virtualPath, importedBytes, repository).Export();
+            Assert.Equal(Encoding.UTF8.GetString(jsonA), Encoding.UTF8.GetString(jsonB));
         }
 
         private RePakCollection GetVanillaPak()
