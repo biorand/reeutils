@@ -23,7 +23,8 @@ namespace IntelOrca.Biohazard.REE.Rsz
         {
             if (node.GetType().IsValueType)
                 return;
-            _sharedNodes.TryAdd(node, _marker);
+            // GetValue adds the marker when missing; TryAdd is not available on netstandard2.1.
+            _sharedNodes.GetValue(node, static _ => _marker);
         }
 
         public static bool IsShared(IRszNode node)
