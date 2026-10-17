@@ -9,7 +9,7 @@ A .NET library for working with RE Engine resource formats and PAK files. Primar
 Add the package to your project by referencing the NuGet package in your `.csproj`:
 
 ```xml
-<PackageReference Include="IntelOrca.Biohazard.REE" Version="1.5.3" />
+<PackageReference Include="IntelOrca.Biohazard.REE" Version="1.6.0" />
 ```
 
 Basic example showing how to open a file from the game's patched pak files, modify it and write a new patch pak:
@@ -58,7 +58,7 @@ Put this in your client's MCP configuration file, for example:
 - Claude Desktop: `claude_desktop_config.json`, also using `mcpServers`.
 - VS Code: `.vscode/mcp.json`, which uses a top level `servers` key with `"type": "stdio"` alongside the same `command` and `args`.
 
-By default the latest release is used. A version can be pinned the same way as with `npx`, either exactly (`"args": ["reeutils@1.5.6", "mcp"]`) or as a range (`"args": ["reeutils@1.*", "mcp"]`).
+By default the latest release is used. A version can be pinned the same way as with `npx`, either exactly (`"args": ["reeutils@1.6.0", "mcp"]`) or as a range (`"args": ["reeutils@1.*", "mcp"]`).
 
 If you prefer a permanent install, run `dotnet tool install --global reeutils` and then use `"command": "reeutils"` with `"args": ["mcp"]` instead.
 
