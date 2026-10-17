@@ -6,6 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write # request the GitHub OIDC token used for NuGet trusted publishing
     steps:
     - name: Setup .NET 10.0
       uses: actions/setup-dotnet@v4
@@ -52,6 +53,12 @@ jobs:
         files: |
           *.nupkg
           reeutils.tar.gz
+    - name: NuGet login
+      if: startsWith(github.ref, 'refs/tags/v')
+      id: nuget-login
+      uses: NuGet/login@v1
+      with:
+        user: IntelOrca
     - name: Publish to nuget.org
       if: startsWith(github.ref, 'refs/tags/v')
-      run: dotnet nuget push *.nupkg --api-key "${{ secrets.NUGET_APIKEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+      run: dotnet nuget push *.nupkg --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
