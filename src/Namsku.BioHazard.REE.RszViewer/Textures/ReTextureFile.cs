@@ -8,10 +8,7 @@ using System.Runtime.InteropServices;
 using BCnEncoder.Shared;
 using BCnEncoder.Decoder;
 using BCnEncoder.Encoder;
-using BCnEncoder.ImageSharp;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using StbImageSharp;
 
 namespace IntelOrca.Biohazard.REE.Textures;
 
@@ -255,8 +252,10 @@ public class ReTextureFile
 
     public void ImportFromImage(string inputPath, uint? targetFormatId = null, int version = 36)
     {
-        // Load using ImageSharp
-        using var image = Image.Load<Rgba32>(inputPath);
+        // Load using StbImageSharp, which always decodes to tight RGBA32 data
+        using var inputStream = File.OpenRead(inputPath);
+        var image = ImageResult.FromStream(inputStream, ColorComponents.RedGreenBlueAlpha)
+            ?? throw new InvalidDataException($"Unable to decode image '{inputPath}'. Supported formats: PNG, JPEG, TGA, BMP, PSD, GIF, HDR, PIC, PNM.");
         
         // Determine target format
         CompressionFormat targetFormat = CompressionFormat.Bc7; // Default to BC7
@@ -275,9 +274,8 @@ public class ReTextureFile
         encoder.OutputOptions.Quality = CompressionQuality.Balanced;
         encoder.OutputOptions.Format = targetFormat;
         
-        // Manual conversion (Retry with 4 args)
-        var pixels = new byte[image.Width * image.Height * 4];
-        image.CopyPixelDataTo(pixels);
+        // Already tight RGBA32 pixel data
+        var pixels = image.Data;
         
         // Encode with correct overload: (byte[], width, height, PixelFormat)
         // Ensure OutputOptions.Format is set (it is above)
