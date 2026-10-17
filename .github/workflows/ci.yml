@@ -17,8 +17,10 @@ jobs:
         submodules: true
     - name: Restore
       run: dotnet restore
-    - name: Build nupkg
-      run: dotnet pack src/IntelOrca.Biohazard.REE -c Release -o .
+    - name: Pack NuGet packages
+      run: |
+        dotnet pack src/IntelOrca.Biohazard.REE -c Release -o .
+        dotnet pack src/reeutils -c Release -o .
     - name: Build reeutils
       run: |
         dotnet publish src/reeutils -c Release -o out/reeutils --os linux

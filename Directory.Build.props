@@ -1,5 +1,7 @@
 <Project>
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Shared by the IntelOrca.Biohazard.REE library package and the reeutils CLI / MCP tool package. -->
+    <Version>1.5.6</Version>
   </PropertyGroup>
 </Project>

@@ -5,7 +5,16 @@
     <Nullable>enable</Nullable>
     <RootNamespace>IntelOrca.Biohazard.REEUtils</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Packed as a .NET tool so it can be run without a permanent install: `dnx reeutils mcp` -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>reeutils</ToolCommandName>
+    <PackageId>reeutils</PackageId>
+    <Description>RE Engine pak and resource tooling, including an MCP server for AI coding assistants (`dnx reeutils mcp`).</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.7" />
     <PackageReference Include="ModelContextProtocol" Version="1.3.0" />

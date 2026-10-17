@@ -35,6 +35,48 @@ pakBuilder.AddEntry(guiParamPath, newUserFile.Data);
 pakBuilder.Save("re_chunk_000.pak.patch_006.pak");
 ```
 
+## 🤖 MCP server
+
+`reeutils` also runs as a [Model Context Protocol](https://modelcontextprotocol.io) server, so AI coding assistants can browse, search and inspect game files for you. It exposes the CLI functionality as tools: `open_pak`, `set_game`, `find`, `list_files`, `read`, `search`, `get_type`, `generate_class` and `get_engine_details`, backed by embedded pak listings and RSZ type data for `oniws`, `re2`, `re3`, `re4`, `re7`, `re8` and `re9`.
+
+The server speaks stdio and requires the [.NET 10 SDK](https://dotnet.microsoft.com), which provides `dnx` — the .NET equivalent of `npx`. No install step is needed, the client runs the published tool directly:
+
+```json
+{
+  "mcpServers": {
+    "reeutils": {
+      "command": "dnx",
+      "args": ["reeutils", "mcp"]
+    }
+  }
+}
+```
+
+Put this in your client's MCP configuration file, for example:
+
+- Claude Code / Cursor: `.mcp.json` or `.cursor/mcp.json`, using the `mcpServers` key shown above.
+- Claude Desktop: `claude_desktop_config.json`, also using `mcpServers`.
+- VS Code: `.vscode/mcp.json`, which uses a top level `servers` key with `"type": "stdio"` alongside the same `command` and `args`.
+
+By default the latest release is used. A version can be pinned the same way as with `npx`, either exactly (`"args": ["reeutils@1.5.6", "mcp"]`) or as a range (`"args": ["reeutils@1.*", "mcp"]`).
+
+If you prefer a permanent install, run `dotnet tool install --global reeutils` and then use `"command": "reeutils"` with `"args": ["mcp"]` instead.
+
+When developing `reeutils` itself, point the client at the local build:
+
+```json
+{
+  "mcpServers": {
+    "reeutils": {
+      "command": "dotnet",
+      "args": ["run", "--project", "src/reeutils", "--", "mcp"]
+    }
+  }
+}
+```
+
+A typical session starts with the assistant calling `open_pak` on a game install directory or `.pak` file, followed by `set_game` (e.g. `re4`), after which it can locate and read files without further setup.
+
 ## 📦 Build
 
 - Requirements: [.NET SDK 10.0](https://dotnet.microsoft.com).
