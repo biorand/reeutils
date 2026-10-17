@@ -29,8 +29,8 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
 
             // Decode the static tables ONCE and share the instances between ReadTree and the
             // table index: objects referenced from the tree that live in a static table are then
-            // emitted as {"$tbl": "...", "i": n} refs, so import can reuse the exact seeded
-            // instances (table membership is identity-based).
+            // emitted as {"$tbl": "...", "i": n, "value": {...}} refs, so import can reuse the
+            // exact seeded instances when unchanged (table membership is identity-based).
             var staticActions = TryReadTable(file.StaticActionRsz, Repository, out var sa) ? sa!.Value : [];
             var staticSelectorCallers = TryReadTable(file.StaticSelectorCallerRsz, Repository, out var ssc) ? ssc!.Value : [];
             var staticConditions = TryReadTable(file.StaticConditionsRsz, Repository, out var sc) ? sc!.Value : [];
@@ -238,10 +238,10 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
         }
 
         /// <summary>
-        /// Lets the JSON exporter emit <c>{"$tbl": "...", "i": n}</c> references for objects that
-        /// live in a static table instead of inlining them. Import resolves these back to the very
-        /// same decoded instances that seeded the builder, which keeps the rebuild byte-identical
-        /// (table membership is by object identity).
+        /// Lets the JSON exporter emit <c>{"$tbl": "...", "i": n, "value": {...}}</c> references for
+        /// objects that live in a static table. Import resolves an unchanged value back to the very
+        /// same decoded instance that seeded the builder, which keeps the rebuild byte-identical
+        /// (table membership is by object identity); an edited value is deserialized instead.
         /// </summary>
         private sealed class StaticTableIndex
         {
@@ -358,20 +358,29 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
         private static JsonObject NodeIdRef(BhvtNodeId id) => new()
         {
             ["id"] = id.Id,
-            ["exId"] = id.ExId,
+            ["exId"] = id.ExId
+,
         };
 
         private JsonNode? ToJsonNode(RszObjectNode? instance, StaticTableIndex staticIndex)
         {
             if (instance == null) return null;
-            if (staticIndex.TryGetRef(instance, out var table, out var index))
-            {
-                return new JsonObject { ["$tbl"] = table, ["i"] = index };
-            }
             // Repository-aware serialization: embedded userdata needs the type repository to
             // emit its nested JSON; without it the serializer throws.
-            var text = RszJsonSerializer.Serialize(instance, Repository!, JsonSupport.CreateOptions());
-            return JsonNode.Parse(text);
+            var value = SerializeInstance(instance, Repository!);
+            if (staticIndex.TryGetRef(instance, out var table, out var index))
+            {
+                // Keep the ref (for a byte-identical rebuild) but inline the value so the export
+                // is readable and editable. Import reuses the seeded instance unless it changed.
+                return new JsonObject { ["$tbl"] = table, ["i"] = index, ["value"] = value };
+            }
+            return value;
+        }
+
+        private static JsonNode SerializeInstance(RszObjectNode instance, RszTypeRepository repository)
+        {
+            var text = RszJsonSerializer.Serialize(instance, repository, JsonSupport.CreateOptions());
+            return JsonNode.Parse(text)!;
         }
 
         private BhvtNode DeserializeNode(JsonElement element, RszTypeRepository repository, BhvtFile.Builder? builder)
@@ -389,10 +398,16 @@ namespace IntelOrca.Biohazard.REEUtils.FileTypes
                 if (e.ValueKind == JsonValueKind.Object &&
                     e.TryGetProperty("$tbl", out var tblEl))
                 {
+                    var hasValue = e.TryGetProperty("value", out var valueEl) && valueEl.ValueKind != JsonValueKind.Null;
                     var resolved = builder?.ResolveStaticRef(
                         tblEl.GetString()!, e.GetProperty("i").GetInt32());
-                    if (resolved != null)
+                    // Reuse the seeded instance when the inlined value is absent (old exports) or
+                    // unchanged; an edited value becomes a fresh object.
+                    if (resolved != null &&
+                        (!hasValue || JsonNode.DeepEquals(SerializeInstance(resolved, repository), JsonNode.Parse(valueEl.GetRawText()))))
                         return resolved;
+                    if (hasValue)
+                        e = valueEl;
                 }
                 using var document = JsonDocument.Parse(e.GetRawText());
                 return (RszObjectNode)RszJsonSerializer.Deserialize(document, repository);

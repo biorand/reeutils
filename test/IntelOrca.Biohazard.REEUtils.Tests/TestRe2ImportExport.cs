@@ -153,11 +153,14 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
 
         private RePakCollection GetVanillaPak()
         {
-            var availablePaths = new string[]
-            {
-                @"E:\Steam\steamapps\common\RESIDENT EVIL 2  BIOHAZARD RE2",
-                @"D:\SteamLibrary\steamapps\common\RESIDENT EVIL 2  BIOHAZARD RE2"
-            };
+            const string gameDirName = "RESIDENT EVIL 2  BIOHAZARD RE2";
+            var steamDir = Environment.GetEnvironmentVariable("STEAM_DIR");
+            var availablePaths = new List<string>();
+            if (!string.IsNullOrEmpty(steamDir))
+                availablePaths.Add(Path.Combine(steamDir, gameDirName));
+            availablePaths.Add(Path.Combine(@"F:\games\steamapps\common", gameDirName));
+            availablePaths.Add(Path.Combine(@"E:\Steam\steamapps\common", gameDirName));
+            availablePaths.Add(Path.Combine(@"D:\SteamLibrary\steamapps\common", gameDirName));
             var basePath = availablePaths.FirstOrDefault(Directory.Exists);
             if (basePath == null)
             {

@@ -49,6 +49,28 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
             Assert.Contains("\"@type\": \"app.ActivateCommonObject\"", text);
         }
 
+        [Fact]
+        public void Fsmv2FileHandler_Import_Applies_Edited_Table_Value()
+        {
+            var repo = GetRepository();
+            var file = BuildSyntheticFile(repo, out _);
+            var handler = FileHandlerFactory.Default.Create("test.fsmv2.40", file, repo);
+
+            using var json = handler.GetJson(TreeOptions.Root);
+            var original = json.RootElement.GetRawText();
+            Assert.Contains("12345", original);
+            using var editedJson = JsonDocument.Parse(original.Replace("12345", "54321"));
+
+            var imported = handler.Import(editedJson);
+
+            var importedHandler = FileHandlerFactory.Default.Create("test.fsmv2.40", imported, repo);
+            using var reexported = importedHandler.GetJson(TreeOptions.Root);
+            var text = JsonSupport.ToJsonString(reexported);
+
+            Assert.Contains("54321", text);
+            Assert.DoesNotContain("12345", text);
+        }
+
         private static RszTypeRepository GetRepository() => McpEmbeddedData.GetRszTypeRepository("re8");
 
         private static byte[] BuildSyntheticFile(RszTypeRepository repo, out BhvtNode child)

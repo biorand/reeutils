@@ -28,7 +28,8 @@ namespace IntelOrca.Biohazard.REEUtils.Commands
                 .WithStdioServerTransport()
                 .WithTools<SessionTools>()
                 .WithTools<PakTools>()
-                .WithTools<RszTools>();
+                .WithTools<RszTools>()
+                .WithTools<FixModifier>();
 
             using var host = builder.Build();
             await host.RunAsync();

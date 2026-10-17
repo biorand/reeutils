@@ -63,6 +63,42 @@ namespace IntelOrca.Biohazard.REEUtils.Tests
         }
 
         [Fact]
+        public void RszJsonSerializer_Writes_Position_As_Readable_Doubles()
+        {
+            var repo = GetRepository();
+            var position = new via.Position { x = 47.145157, y = 10.084173, z = -15.264416 };
+            var original = repo.Create("app.TimelineEventParameter.TransformSetting").Set("_Position", position);
+
+            var json = RszJsonSerializer.Serialize(original, JsonSupport.CreateOptions());
+            using var document = JsonDocument.Parse(json);
+            var element = document.RootElement.GetProperty("_Position");
+            Assert.Equal(47.145157, element.GetProperty("X").GetDouble());
+            Assert.Equal(10.084173, element.GetProperty("Y").GetDouble());
+            Assert.Equal(-15.264416, element.GetProperty("Z").GetDouble());
+
+            var roundTripped = Assert.IsType<RszObjectNode>(RszJsonSerializer.Deserialize(document, repo));
+            Assert.Equal(position, roundTripped.Get<via.Position>("_Position"));
+        }
+
+        [Fact]
+        public void RszJsonSerializer_Reads_Legacy_Base64_Position()
+        {
+            var repo = GetRepository();
+            var json = """
+                {
+                  "@type": "app.TimelineEventParameter.TransformSetting",
+                  "_Position": "iuQrgZSSR0CUaTS5GCskQAoUsYhhhy7A"
+                }
+                """;
+
+            using var document = JsonDocument.Parse(json);
+            var node = Assert.IsType<RszObjectNode>(RszJsonSerializer.Deserialize(document, repo));
+            Assert.Equal(
+                new via.Position { x = 47.145157, y = 10.084173, z = -15.264416 },
+                node.Get<via.Position>("_Position"));
+        }
+
+        [Fact]
         public void UserFileHandler_RoundTrips_Json()
         {
             var repo = GetRepository();

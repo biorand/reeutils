@@ -453,6 +453,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     WriteMatrix4x4(writer, matrix);
                     return;
                 }
+                if (value is global::via.Position position)
+                {
+                    WritePosition(writer, position);
+                    return;
+                }
                 if (s_rawValueTypes.Contains(valueNode.Type))
                 {
                     // via.* native structs are written as raw little-endian bytes so every
@@ -709,6 +714,11 @@ namespace IntelOrca.Biohazard.REE.Rsz
                     return new Quaternion(Num(element, "X"), Num(element, "Y"), Num(element, "Z"), Num(element, "W"));
                 case RszFieldType.Mat4:
                     return ReadMatrix4x4(element);
+                case RszFieldType.Position:
+                    // Older exports wrote positions as base64 raw bytes.
+                    if (element.ValueKind == JsonValueKind.String)
+                        break;
+                    return ReadPosition(element);
             }
 
             if (s_rawValueTypes.Contains(fieldType))
@@ -767,6 +777,34 @@ namespace IntelOrca.Biohazard.REE.Rsz
                 Num(element, "M21"), Num(element, "M22"), Num(element, "M23"), Num(element, "M24"),
                 Num(element, "M31"), Num(element, "M32"), Num(element, "M33"), Num(element, "M34"),
                 Num(element, "M41"), Num(element, "M42"), Num(element, "M43"), Num(element, "M44"));
+        }
+
+        // via.Position is double precision world space; write it readably (and diffably)
+        // rather than as raw bytes, keeping every bit of each component.
+        private static void WritePosition(Utf8JsonWriter writer, global::via.Position position)
+        {
+            writer.WriteStartObject();
+            writer.WriteNumber("X", position.x);
+            writer.WriteNumber("Y", position.y);
+            writer.WriteNumber("Z", position.z);
+            writer.WriteEndObject();
+        }
+
+        private static global::via.Position ReadPosition(JsonElement element)
+        {
+            return new global::via.Position
+            {
+                x = NumDouble(element, "X"),
+                y = NumDouble(element, "Y"),
+                z = NumDouble(element, "Z")
+            };
+        }
+
+        private static double NumDouble(JsonElement element, string name)
+        {
+            if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(name, out var v))
+                return 0;
+            return v.ValueKind == JsonValueKind.Number ? v.GetDouble() : 0;
         }
 
         private static readonly JsonSerializerOptions s_valueReadOptions = new()
